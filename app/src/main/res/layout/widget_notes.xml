@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="12dp">
+
+    <!-- Üst Başlık ve Butonlar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="8dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Notlarım"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="#1D1B20" />
+
+            <TextView
+                android:id="@+id/widget_subtitle_filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tüm Notlar"
+                android:textSize="11sp"
+                android:textColor="#6750A4" />
+        </LinearLayout>
+
+        <!-- Yenile Butonu -->
+        <ImageButton
+            android:id="@+id/widget_btn_refresh"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_widget_refresh"
+            android:contentDescription="Yenile"
+            android:scaleType="centerInside"
+            android:layout_marginEnd="6dp" />
+
+        <!-- Yeni Not Ekle Butonu -->
+        <ImageButton
+            android:id="@+id/widget_btn_add"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/widget_button_background"
+            android:src="@drawable/ic_widget_add"
+            android:contentDescription="Yeni Not"
+            android:scaleType="centerInside" />
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E0E3E7"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Notlar Listesi -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ListView
+            android:id="@+id/widget_notes_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="@null"
+            android:dividerHeight="8dp"
+            android:scrollbars="none" />
+
+        <!-- Boş Durum Görünümü -->
+        <TextView
+            android:id="@+id/widget_empty_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="Gösterilecek not bulunamadı.\n+ butonuna basarak yeni not ekleyin."
+            android:textColor="#79747E"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+</LinearLayout>

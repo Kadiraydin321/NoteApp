@@ -10,6 +10,12 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 0 ORDER BY isPinned DESC, timestamp DESC")
     fun getActiveNotes(): Flow<List<Note>>
 
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 0 ORDER BY isPinned DESC, timestamp DESC")
+    suspend fun getActiveNotesList(): List<Note>
+
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 0 AND isPinned = 1 ORDER BY timestamp DESC")
+    suspend fun getPinnedNotesList(): List<Note>
+
     @Query("SELECT * FROM notes WHERE isArchived = 1 AND isDeleted = 0 ORDER BY timestamp DESC")
     fun getArchivedNotes(): Flow<List<Note>>
 

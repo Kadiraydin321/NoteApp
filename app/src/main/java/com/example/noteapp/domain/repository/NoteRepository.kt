@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.Flow
 
 interface NoteRepository {
     fun getActiveNotes(): Flow<List<Note>>
+    suspend fun getActiveNotesList(): List<Note>
+    suspend fun getPinnedNotesList(): List<Note>
     fun getArchivedNotes(): Flow<List<Note>>
     fun getTrashNotes(): Flow<List<Note>>
     fun getNotesByCategory(categoryId: Long): Flow<List<Note>>

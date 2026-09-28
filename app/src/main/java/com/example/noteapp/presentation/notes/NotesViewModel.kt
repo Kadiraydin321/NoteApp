@@ -1,10 +1,12 @@
 package com.example.noteapp.presentation.notes
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.repository.NoteRepository
+import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,7 @@ data class NotesState(
 
 @HiltViewModel
 class NotesViewModel @Inject constructor(
+    private val app: Application,
     private val repository: NoteRepository
 ) : ViewModel() {
 
@@ -84,36 +87,42 @@ class NotesViewModel @Inject constructor(
     fun onPinNote(note: Note) {
         viewModelScope.launch {
             repository.updateNote(note.copy(isPinned = !note.isPinned))
+            NotesWidgetProvider.updateAllWidgets(app)
         }
     }
 
     fun onArchiveNote(note: Note) {
         viewModelScope.launch {
             repository.updateNote(note.copy(isArchived = !note.isArchived))
+            NotesWidgetProvider.updateAllWidgets(app)
         }
     }
 
     fun onMoveToTrash(note: Note) {
         viewModelScope.launch {
             repository.updateNote(note.copy(isDeleted = true))
+            NotesWidgetProvider.updateAllWidgets(app)
         }
     }
 
     fun onRestoreNote(note: Note) {
         viewModelScope.launch {
             repository.updateNote(note.copy(isDeleted = false))
+            NotesWidgetProvider.updateAllWidgets(app)
         }
     }
 
     fun onDeleteNotePermanently(note: Note) {
         viewModelScope.launch {
             repository.deleteNote(note)
+            NotesWidgetProvider.updateAllWidgets(app)
         }
     }
 
     fun onEmptyTrash() {
         viewModelScope.launch {
             repository.emptyTrash()
+            NotesWidgetProvider.updateAllWidgets(app)
         }
     }
 

@@ -42,7 +42,8 @@ fun NotesScreen(
     onEmptyTrash: () -> Unit,
     onCategorySelect: (Category?) -> Unit,
     onViewModeChange: (NotesViewMode) -> Unit,
-    onAddCategory: (String) -> Unit
+    onAddCategory: (String) -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -151,6 +152,19 @@ fun NotesScreen(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
                     )
                 }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    label = { Text("Ayarlar") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onSettingsClick()
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
             }
         }
     ) {
@@ -177,6 +191,9 @@ fun NotesScreen(
                             TextButton(onClick = onEmptyTrash) {
                                 Text("Çöpü Boşalt", color = MaterialTheme.colorScheme.error)
                             }
+                        }
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(Icons.Default.Settings, contentDescription = "Ayarlar")
                         }
                     }
                 )

@@ -1,12 +1,13 @@
 package com.example.noteapp
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
-import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -15,15 +16,30 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.noteapp.biometric.BiometricPromptManager
 import com.example.noteapp.biometric.BiometricResult
+import com.example.noteapp.data.settings.AppSettingsManager
+import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.presentation.detail.NoteDetailScreen
 import com.example.noteapp.presentation.detail.NoteDetailViewModel
 import com.example.noteapp.presentation.notes.NotesScreen
 import com.example.noteapp.presentation.notes.NotesViewModel
+import com.example.noteapp.presentation.settings.SettingsScreen
+import com.example.noteapp.presentation.settings.SettingsViewModel
 import com.example.noteapp.presentation.theme.NoteAppTheme
+import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
+
+    @Inject
+    lateinit var settingsManager: AppSettingsManager
+
+    @Inject
+    lateinit var repository: NoteRepository
 
     private val biometricPromptManager by lazy {
         BiometricPromptManager(this)
@@ -31,9 +47,19 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
-            NoteAppTheme {
+            val appSettings by settingsManager.settings.collectAsState()
+
+            NoteAppTheme(dynamicColor = appSettings.dynamicColor) {
                 val navController = rememberNavController()
+
+                // Widget'tan gelen intent'i kontrol et
+                LaunchedEffect(Unit) {
+                    handleWidgetIntent(intent) { route ->
+                        navController.navigate(route)
+                    }
+                }
 
                 NavHost(
                     navController = navController,
@@ -83,7 +109,10 @@ class MainActivity : FragmentActivity() {
                             onEmptyTrash = viewModel::onEmptyTrash,
                             onCategorySelect = viewModel::onCategorySelect,
                             onViewModeChange = viewModel::setViewMode,
-                            onAddCategory = viewModel::onAddCategory
+                            onAddCategory = viewModel::onAddCategory,
+                            onSettingsClick = {
+                                navController.navigate("settings_screen")
+                            }
                         )
                     }
 
@@ -119,6 +148,65 @@ class MainActivity : FragmentActivity() {
                                 navController.popBackStack()
                             }
                         )
+                    }
+
+                    composable("settings_screen") {
+                        val viewModel = hiltViewModel<SettingsViewModel>()
+                        val settingsState by viewModel.settings.collectAsState()
+
+                        SettingsScreen(
+                            settings = settingsState,
+                            onWidgetFilterChange = viewModel::setWidgetFilterMode,
+                            onWidgetShowLockedChange = viewModel::setWidgetShowLocked,
+                            onDefaultColorChange = viewModel::setDefaultNoteColor,
+                            onDynamicColorChange = viewModel::setDynamicColor,
+                            onRefreshWidget = viewModel::refreshWidget,
+                            onBackClick = {
+                                navController.popBackStack()
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
+    private fun handleWidgetIntent(intent: Intent?, onNavigate: (String) -> Unit) {
+        if (intent == null) return
+
+        // Widget + butonuna basıldıysa yeni not ekranı
+        if (intent.getBooleanExtra(NotesWidgetProvider.EXTRA_NEW_NOTE, false)) {
+            intent.removeExtra(NotesWidgetProvider.EXTRA_NEW_NOTE)
+            onNavigate("note_detail_screen")
+            return
+        }
+
+        // Widget'tan belirli bir nota tıklandıysa
+        val noteId = intent.getLongExtra("noteId", -1L)
+        if (noteId != -1L) {
+            intent.removeExtra("noteId")
+            CoroutineScope(Dispatchers.Main).launch {
+                val note = repository.getNoteById(noteId)
+                if (note != null) {
+                    if (note.isLocked) {
+                        biometricPromptManager.showBiometricPrompt(
+                            title = "Kilitli Not",
+                            description = "'${note.title}' notunu açmak için parmak izinizi veya PIN'inizi kullanın",
+                            onResult = { result ->
+                                if (result is BiometricResult.AuthenticationSuccess) {
+                                    onNavigate("note_detail_screen?noteId=$noteId")
+                                } else {
+                                    Toast.makeText(this@MainActivity, "Kimlik doğrulanmadı", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    } else {
+                        onNavigate("note_detail_screen?noteId=$noteId")
                     }
                 }
             }

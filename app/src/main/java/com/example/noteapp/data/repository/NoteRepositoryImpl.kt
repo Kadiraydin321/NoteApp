@@ -11,6 +11,8 @@ class NoteRepositoryImpl @Inject constructor(
     private val dao: NoteDao
 ) : NoteRepository {
     override fun getActiveNotes(): Flow<List<Note>> = dao.getActiveNotes()
+    override suspend fun getActiveNotesList(): List<Note> = dao.getActiveNotesList()
+    override suspend fun getPinnedNotesList(): List<Note> = dao.getPinnedNotesList()
     override fun getArchivedNotes(): Flow<List<Note>> = dao.getArchivedNotes()
     override fun getTrashNotes(): Flow<List<Note>> = dao.getTrashNotes()
     override fun getNotesByCategory(categoryId: Long): Flow<List<Note>> = dao.getNotesByCategory(categoryId)

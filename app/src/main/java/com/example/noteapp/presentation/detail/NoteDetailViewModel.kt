@@ -12,6 +12,8 @@ import com.example.noteapp.media.AudioPlayer
 import com.example.noteapp.media.AudioRecorder
 import com.example.noteapp.media.FileStorageHelper
 import com.example.noteapp.notification.AlarmScheduler
+import com.example.noteapp.data.settings.AppSettingsManager
+import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +45,7 @@ class NoteDetailViewModel @Inject constructor(
     private val alarmScheduler: AlarmScheduler,
     private val audioRecorder: AudioRecorder,
     private val audioPlayer: AudioPlayer,
+    private val settingsManager: AppSettingsManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -68,6 +71,12 @@ class NoteDetailViewModel @Inject constructor(
                         attachments = note.attachments
                     )
                 }
+            }
+        } else {
+            // Yeni not için ayarlardaki varsayılan rengi ata
+            val defaultColor = settingsManager.settings.value.defaultNoteColor
+            if (defaultColor != 0) {
+                _state.value = _state.value.copy(color = defaultColor)
             }
         }
     }
@@ -176,6 +185,9 @@ class NoteDetailViewModel @Inject constructor(
             } else if (currentState.reminderTime == null) {
                 alarmScheduler.cancel(finalId)
             }
+
+            // Ana ekran widget'ını otomatik güncelle
+            NotesWidgetProvider.updateAllWidgets(app)
 
             _state.value = _state.value.copy(isSaved = true)
         }
