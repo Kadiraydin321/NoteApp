@@ -22,7 +22,14 @@ class NoteRepositoryImpl @Inject constructor(
     override suspend fun deleteNote(note: Note) = dao.deleteNote(note)
     override suspend fun emptyTrash() = dao.emptyTrash()
 
+    override suspend fun getAllNotes(): List<Note> = dao.getAllNotes()
+    override suspend fun insertNotes(notes: List<Note>): List<Long> = dao.insertNotes(notes)
+    override suspend fun deleteAllNotes() = dao.deleteAllNotes()
+
     override fun getAllCategories(): Flow<List<Category>> = dao.getAllCategories()
+    override suspend fun getAllCategoriesList(): List<Category> = dao.getAllCategoriesList()
     override suspend fun insertCategory(category: Category): Long = dao.insertCategory(category)
+    override suspend fun insertCategories(categories: List<Category>) = dao.insertCategories(categories)
+    override suspend fun deleteAllCategories() = dao.deleteAllCategories()
     override suspend fun deleteCategory(category: Category) = dao.deleteCategory(category)
 }

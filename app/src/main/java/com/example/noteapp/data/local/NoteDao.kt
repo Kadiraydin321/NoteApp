@@ -40,12 +40,30 @@ interface NoteDao {
     @Query("DELETE FROM notes WHERE isDeleted = 1")
     suspend fun emptyTrash()
 
+    @Query("SELECT * FROM notes")
+    suspend fun getAllNotes(): List<Note>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNotes(notes: List<Note>): List<Long>
+
+    @Query("DELETE FROM notes")
+    suspend fun deleteAllNotes()
+
     // Categories
     @Query("SELECT * FROM categories ORDER BY name ASC")
     fun getAllCategories(): Flow<List<Category>>
 
+    @Query("SELECT * FROM categories")
+    suspend fun getAllCategoriesList(): List<Category>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCategory(category: Category): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCategories(categories: List<Category>)
+
+    @Query("DELETE FROM categories")
+    suspend fun deleteAllCategories()
 
     @Delete
     suspend fun deleteCategory(category: Category)

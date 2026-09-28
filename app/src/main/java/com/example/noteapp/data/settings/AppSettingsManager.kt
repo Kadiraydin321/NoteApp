@@ -18,7 +18,8 @@ data class AppSettings(
     val widgetFilterMode: WidgetFilterMode = WidgetFilterMode.ALL,
     val widgetShowLockedNotes: Boolean = false,
     val defaultNoteColor: Int = 0,
-    val dynamicColor: Boolean = true
+    val dynamicColor: Boolean = true,
+    val lastBackupTimestamp: Long? = null
 )
 
 @Singleton
@@ -41,13 +42,20 @@ class AppSettingsManager @Inject constructor(
         val showLocked = prefs.getBoolean(KEY_WIDGET_SHOW_LOCKED, false)
         val defaultColor = prefs.getInt(KEY_DEFAULT_COLOR, 0)
         val dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
+        val lastBackup = if (prefs.contains(KEY_LAST_BACKUP)) prefs.getLong(KEY_LAST_BACKUP, 0L) else null
 
         return AppSettings(
             widgetFilterMode = filterMode,
             widgetShowLockedNotes = showLocked,
             defaultNoteColor = defaultColor,
-            dynamicColor = dynamicColor
+            dynamicColor = dynamicColor,
+            lastBackupTimestamp = lastBackup
         )
+    }
+
+    fun setLastBackupTimestamp(timestamp: Long) {
+        prefs.edit().putLong(KEY_LAST_BACKUP, timestamp).apply()
+        _settings.value = _settings.value.copy(lastBackupTimestamp = timestamp)
     }
 
     fun setWidgetFilterMode(mode: WidgetFilterMode) {
@@ -75,6 +83,7 @@ class AppSettingsManager @Inject constructor(
         private const val KEY_WIDGET_SHOW_LOCKED = "widget_show_locked"
         private const val KEY_DEFAULT_COLOR = "default_note_color"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
+        private const val KEY_LAST_BACKUP = "last_backup_timestamp"
 
         // Helper for Widget Service to access synchronously without injection
         fun getWidgetFilterMode(context: Context): WidgetFilterMode {

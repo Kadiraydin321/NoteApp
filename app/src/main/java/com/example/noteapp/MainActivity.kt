@@ -189,14 +189,20 @@ class MainActivity : FragmentActivity() {
                     composable("settings_screen") {
                         val viewModel = hiltViewModel<SettingsViewModel>()
                         val settingsState by viewModel.settings.collectAsState()
+                        val backupUiState by viewModel.backupUiState.collectAsState()
 
                         SettingsScreen(
                             settings = settingsState,
+                            backupUiState = backupUiState,
                             onWidgetFilterChange = viewModel::setWidgetFilterMode,
                             onWidgetShowLockedChange = viewModel::setWidgetShowLocked,
                             onDefaultColorChange = viewModel::setDefaultNoteColor,
                             onDynamicColorChange = viewModel::setDynamicColor,
                             onRefreshWidget = viewModel::refreshWidget,
+                            onExportToUri = viewModel::exportBackupToUri,
+                            onExportAndShare = { viewModel.exportAndShare(it) },
+                            onImportFromUri = { uri, clear -> viewModel.importBackupFromUri(uri, clear) },
+                            onDismissBackupMessage = viewModel::dismissMessage,
                             onBackClick = {
                                 navController.popBackStack()
                             }

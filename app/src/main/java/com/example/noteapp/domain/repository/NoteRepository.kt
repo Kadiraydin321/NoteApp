@@ -17,7 +17,14 @@ interface NoteRepository {
     suspend fun deleteNote(note: Note)
     suspend fun emptyTrash()
 
+    suspend fun getAllNotes(): List<Note>
+    suspend fun insertNotes(notes: List<Note>): List<Long>
+    suspend fun deleteAllNotes()
+
     fun getAllCategories(): Flow<List<Category>>
+    suspend fun getAllCategoriesList(): List<Category>
     suspend fun insertCategory(category: Category): Long
+    suspend fun insertCategories(categories: List<Category>)
+    suspend fun deleteAllCategories()
     suspend fun deleteCategory(category: Category)
 }
