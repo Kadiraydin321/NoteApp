@@ -1,6 +1,6 @@
 package com.example.noteapp.biometric
 
-import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -15,7 +15,7 @@ sealed interface BiometricResult {
 }
 
 class BiometricPromptManager(
-    private val activity: AppCompatActivity
+    private val activity: FragmentActivity
 ) {
     fun showBiometricPrompt(
         title: String = "Kilitli Not",
