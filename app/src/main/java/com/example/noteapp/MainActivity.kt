@@ -20,6 +20,7 @@ import com.example.noteapp.data.settings.AppSettingsManager
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.presentation.detail.NoteDetailScreen
 import com.example.noteapp.presentation.detail.NoteDetailViewModel
+import com.example.noteapp.presentation.drawing.DrawingScreen
 import com.example.noteapp.presentation.notes.NotesScreen
 import com.example.noteapp.presentation.notes.NotesViewModel
 import com.example.noteapp.presentation.settings.SettingsScreen
@@ -117,16 +118,33 @@ class MainActivity : FragmentActivity() {
                     }
 
                     composable(
-                        route = "note_detail_screen?noteId={noteId}",
+                        route = "note_detail_screen?noteId={noteId}&autoAction={autoAction}",
                         arguments = listOf(
                             navArgument("noteId") {
                                 type = NavType.LongType
                                 defaultValue = -1L
+                            },
+                            navArgument("autoAction") {
+                                type = NavType.StringType
+                                defaultValue = ""
                             }
                         )
-                    ) {
+                    ) { backStackEntry ->
                         val viewModel = hiltViewModel<NoteDetailViewModel>()
                         val state by viewModel.state.collectAsState()
+                        val autoAction = backStackEntry.arguments?.getString("autoAction")
+
+                        // Çizim ekranından dönen çizim dosyasını yakala
+                        val savedDrawingPath by backStackEntry.savedStateHandle
+                            .getStateFlow<String?>("drawing_path", null)
+                            .collectAsState()
+
+                        LaunchedEffect(savedDrawingPath) {
+                            savedDrawingPath?.let { path ->
+                                viewModel.onAddAttachment(path)
+                                backStackEntry.savedStateHandle.remove<String>("drawing_path")
+                            }
+                        }
 
                         NoteDetailScreen(
                             state = state,
@@ -140,8 +158,26 @@ class MainActivity : FragmentActivity() {
                             onToggleAudioRecording = viewModel::toggleAudioRecording,
                             onToggleAudioPlayback = viewModel::toggleAudioPlayback,
                             onDeleteAttachment = viewModel::onDeleteAttachment,
+                            onAddDrawingClick = {
+                                navController.navigate("drawing_screen")
+                            },
                             onSaveClick = {
                                 viewModel.saveNote()
+                                navController.popBackStack()
+                            },
+                            onBackClick = {
+                                navController.popBackStack()
+                            },
+                            autoAction = autoAction?.ifBlank { null }
+                        )
+                    }
+
+                    composable("drawing_screen") {
+                        DrawingScreen(
+                            onDrawingSaved = { drawingPath ->
+                                navController.previousBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("drawing_path", drawingPath)
                                 navController.popBackStack()
                             },
                             onBackClick = {
@@ -179,7 +215,20 @@ class MainActivity : FragmentActivity() {
     private fun handleWidgetIntent(intent: Intent?, onNavigate: (String) -> Unit) {
         if (intent == null) return
 
-        // Widget + butonuna basıldıysa yeni not ekranı
+        // Widget hızlı aksiyon butonları (Metin, Görsel, Ses, Çizim)
+        val actionType = intent.getStringExtra(NotesWidgetProvider.EXTRA_ACTION_TYPE)
+        if (actionType != null) {
+            intent.removeExtra(NotesWidgetProvider.EXTRA_ACTION_TYPE)
+            when (actionType) {
+                NotesWidgetProvider.ACTION_TYPE_TEXT -> onNavigate("note_detail_screen")
+                NotesWidgetProvider.ACTION_TYPE_IMAGE -> onNavigate("note_detail_screen?autoAction=image")
+                NotesWidgetProvider.ACTION_TYPE_VOICE -> onNavigate("note_detail_screen?autoAction=voice")
+                NotesWidgetProvider.ACTION_TYPE_DRAW -> onNavigate("note_detail_screen?autoAction=draw")
+            }
+            return
+        }
+
+        // Widget eski + butonuna basıldıysa yeni not ekranı
         if (intent.getBooleanExtra(NotesWidgetProvider.EXTRA_NEW_NOTE, false)) {
             intent.removeExtra(NotesWidgetProvider.EXTRA_NEW_NOTE)
             onNavigate("note_detail_screen")

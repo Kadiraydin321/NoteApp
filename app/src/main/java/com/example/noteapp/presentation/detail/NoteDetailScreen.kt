@@ -59,8 +59,10 @@ fun NoteDetailScreen(
     onToggleAudioRecording: () -> Unit,
     onToggleAudioPlayback: (String) -> Unit,
     onDeleteAttachment: (String) -> Unit,
+    onAddDrawingClick: () -> Unit,
     onSaveClick: () -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    autoAction: String? = null
 ) {
     val context = LocalContext.current
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -76,6 +78,23 @@ fun NoteDetailScreen(
     ) { isGranted ->
         if (isGranted) {
             onToggleAudioRecording()
+        }
+    }
+
+    // Widget'tan belirli bir aksiyonla (görsel, ses, çizim) açıldıysa otomatik başlat
+    LaunchedEffect(autoAction) {
+        when (autoAction) {
+            "image" -> {
+                imagePickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            }
+            "voice" -> {
+                audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+            }
+            "draw" -> {
+                onAddDrawingClick()
+            }
         }
     }
 
@@ -163,6 +182,7 @@ fun NoteDetailScreen(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
                     },
+                    onAddDrawing = onAddDrawingClick,
                     onRecordAudio = {
                         audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
                     },

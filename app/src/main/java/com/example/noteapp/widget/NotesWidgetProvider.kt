@@ -36,6 +36,11 @@ class NotesWidgetProvider : AppWidgetProvider() {
     companion object {
         const val ACTION_REFRESH_WIDGET = "com.example.noteapp.ACTION_REFRESH_WIDGET"
         const val EXTRA_NEW_NOTE = "extra_new_note"
+        const val EXTRA_ACTION_TYPE = "extra_action_type"
+        const val ACTION_TYPE_TEXT = "ACTION_TEXT"
+        const val ACTION_TYPE_IMAGE = "ACTION_IMAGE"
+        const val ACTION_TYPE_VOICE = "ACTION_VOICE"
+        const val ACTION_TYPE_DRAW = "ACTION_DRAW"
 
         fun updateAppWidget(
             context: Context,
@@ -71,18 +76,45 @@ class NotesWidgetProvider : AppWidgetProvider() {
             )
             views.setPendingIntentTemplate(R.id.widget_notes_list, clickPendingIntent)
 
-            // Yeni Not Ekle (+) butonu
-            val addNoteIntent = Intent(context, MainActivity::class.java).apply {
-                putExtra(EXTRA_NEW_NOTE, true)
+            // 1. Metin Notu Ekle
+            val textIntent = Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_TEXT)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
-            val addPendingIntent = PendingIntent.getActivity(
-                context,
-                1,
-                addNoteIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            views.setOnClickPendingIntent(
+                R.id.widget_btn_add_text,
+                PendingIntent.getActivity(context, 10, textIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             )
-            views.setOnClickPendingIntent(R.id.widget_btn_add, addPendingIntent)
+
+            // 2. Görsel Notu Ekle
+            val imageIntent = Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_IMAGE)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            views.setOnClickPendingIntent(
+                R.id.widget_btn_add_image,
+                PendingIntent.getActivity(context, 11, imageIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            )
+
+            // 3. Ses Notu Ekle
+            val voiceIntent = Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_VOICE)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            views.setOnClickPendingIntent(
+                R.id.widget_btn_add_voice,
+                PendingIntent.getActivity(context, 12, voiceIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            )
+
+            // 4. Çizim Notu Ekle
+            val drawIntent = Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_DRAW)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            views.setOnClickPendingIntent(
+                R.id.widget_btn_add_draw,
+                PendingIntent.getActivity(context, 13, drawIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            )
 
             // Yenile butonu
             val refreshIntent = Intent(context, NotesWidgetProvider::class.java).apply {
@@ -90,7 +122,7 @@ class NotesWidgetProvider : AppWidgetProvider() {
             }
             val refreshPendingIntent = PendingIntent.getBroadcast(
                 context,
-                2,
+                20,
                 refreshIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )

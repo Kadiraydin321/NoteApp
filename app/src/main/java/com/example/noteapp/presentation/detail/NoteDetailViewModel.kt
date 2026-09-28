@@ -114,6 +114,12 @@ class NoteDetailViewModel @Inject constructor(
         }
     }
 
+    fun onAddAttachment(path: String) {
+        _state.value = _state.value.copy(
+            attachments = _state.value.attachments + path
+        )
+    }
+
     fun toggleAudioRecording() {
         if (_state.value.isRecordingAudio) {
             // Stop recording

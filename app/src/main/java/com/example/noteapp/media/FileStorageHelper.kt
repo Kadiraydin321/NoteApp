@@ -29,6 +29,20 @@ object FileStorageHelper {
         return File(context.filesDir, fileName)
     }
 
+    fun saveDrawingBitmap(context: Context, bitmap: android.graphics.Bitmap): String? {
+        return try {
+            val fileName = "DRAW_${UUID.randomUUID()}.png"
+            val file = File(context.filesDir, fileName)
+            FileOutputStream(file).use { out ->
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+            }
+            file.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     fun deleteFile(path: String): Boolean {
         return try {
             val file = File(path)

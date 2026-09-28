@@ -18,6 +18,7 @@ fun RichTextToolbar(
     textFieldValue: TextFieldValue,
     onValueChange: (TextFieldValue) -> Unit,
     onAddImage: () -> Unit,
+    onAddDrawing: () -> Unit,
     onRecordAudio: () -> Unit,
     isRecording: Boolean,
     modifier: Modifier = Modifier
@@ -80,6 +81,11 @@ fun RichTextToolbar(
             // Görsel Ekle
             IconButton(onClick = onAddImage) {
                 Icon(Icons.Default.Image, contentDescription = "Resim Ekle")
+            }
+
+            // Çizim Ekle
+            IconButton(onClick = onAddDrawing) {
+                Icon(Icons.Default.Brush, contentDescription = "Çizim Yap")
             }
 
             // Ses Kaydı
