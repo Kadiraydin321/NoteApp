@@ -18,10 +18,15 @@ import androidx.compose.ui.unit.sp
  * **kalın**, *italik*, ~~üstü çizili~~, ==vurgu== ve # Başlıkları
  * anında canlı olarak şekillendirip gösteren VisualTransformation.
  *
+ * [hideSyntaxTokens] true olduğunda, biçimlendirme işaretleri (*, **, ~~, ==)
+ * gizlenir; metin temiz ve stilize olarak görünür. Ancak tek başına yazılan
+ * veya madde imi olarak kullanılan yıldız işaretleri (* madde, 5 * 3) ASLA gizlenmez.
+ *
  * Orijinal metin uzunluğunu değiştirmediği için OffsetMapping.Identity
  * kullanılır; imleç ve seçim konumu asla kaymaz.
  */
 class MarkdownVisualTransformation(
+    val hideSyntaxTokens: Boolean = true,
     private val syntaxColor: Color = Color.Gray.copy(alpha = 0.55f),
     private val highlightColor: Color = Color(0xFFFFF59D),
     private val codeBgColor: Color = Color(0x1F000000)
@@ -32,6 +37,9 @@ class MarkdownVisualTransformation(
         if (raw.isEmpty()) {
             return TransformedText(text, OffsetMapping.Identity)
         }
+
+        val hiddenTokenStyle = SpanStyle(color = Color.Transparent, fontSize = 0.01.sp)
+        val visibleTokenStyle = SpanStyle(color = syntaxColor)
 
         val annotated = buildAnnotatedString {
             append(raw)
@@ -51,77 +59,87 @@ class MarkdownVisualTransformation(
                     range.first,
                     range.last + 1
                 )
-                // # işaretlerini hafif soluk göster
+                // # işaretlerini ayara göre gizle veya soluk göster
                 addStyle(
-                    SpanStyle(color = syntaxColor, fontWeight = FontWeight.Normal),
+                    if (hideSyntaxTokens) hiddenTokenStyle else visibleTokenStyle,
                     range.first,
                     range.first + level
                 )
             }
 
             // 2. Kalın (Bold): **metin**
-            val boldRegex = Regex("\\*\\*(.*?)\\*\\*")
+            // Sadece içinde en az bir karakter olan kapalı ** çiftini yakalar
+            val boldRegex = Regex("\\*\\*([^*\\n]+?)\\*\\*")
             for (match in boldRegex.findAll(raw)) {
                 val range = match.range
                 if (range.last >= range.first + 3) {
+                    // İçindeki metne BOLD uygula
                     addStyle(
                         SpanStyle(fontWeight = FontWeight.Bold),
-                        range.first,
-                        range.last + 1
+                        range.first + 2,
+                        range.last - 1
                     )
-                    // ** işaretlerini daha soluk yap
-                    addStyle(SpanStyle(color = syntaxColor), range.first, range.first + 2)
-                    addStyle(SpanStyle(color = syntaxColor), range.last - 1, range.last + 1)
+                    // Baştaki ve sondaki ** işaretlerini ayara göre gizle veya göster
+                    val tokenStyle = if (hideSyntaxTokens) hiddenTokenStyle else visibleTokenStyle
+                    addStyle(tokenStyle, range.first, range.first + 2)
+                    addStyle(tokenStyle, range.last - 1, range.last + 1)
                 }
             }
 
-            // 3. İtalik (Italic): *metin* (ancak ** olmayanlar)
-            val italicRegex = Regex("(?<!\\*)\\*(?!\\*)(.*?)(?<!\\*)\\*(?!\\*)")
+            // 3. İtalik (Italic): *metin*
+            // Başı ve sonu boşluk OLMAYAN, tek yıldızla sarılı ifadeleri yakalar.
+            // Bu sayede "* Madde" (liste) veya "5 * 3" (çarpma) gibi durumlardaki yıldızlar ASLA gizlenmez!
+            val italicRegex = Regex("(?<!\\*)\\*([^*\\s\\n](?:[^*\\n]*?[^*\\s\\n])?)\\*(?!\\*)")
             for (match in italicRegex.findAll(raw)) {
                 val range = match.range
                 if (range.last >= range.first + 2) {
+                    // İçindeki metne ITALIC uygula
                     addStyle(
                         SpanStyle(fontStyle = FontStyle.Italic),
-                        range.first,
-                        range.last + 1
+                        range.first + 1,
+                        range.last
                     )
-                    addStyle(SpanStyle(color = syntaxColor), range.first, range.first + 1)
-                    addStyle(SpanStyle(color = syntaxColor), range.last, range.last + 1)
+                    // Baştaki ve sondaki * işaretlerini ayara göre gizle veya göster
+                    val tokenStyle = if (hideSyntaxTokens) hiddenTokenStyle else visibleTokenStyle
+                    addStyle(tokenStyle, range.first, range.first + 1)
+                    addStyle(tokenStyle, range.last, range.last + 1)
                 }
             }
 
             // 4. Üstü Çizili (Strikethrough): ~~metin~~
-            val strikeRegex = Regex("~~(.*?)~~")
+            val strikeRegex = Regex("~~([^~\\n]+?)~~")
             for (match in strikeRegex.findAll(raw)) {
                 val range = match.range
                 if (range.last >= range.first + 3) {
                     addStyle(
                         SpanStyle(textDecoration = TextDecoration.LineThrough),
-                        range.first,
-                        range.last + 1
+                        range.first + 2,
+                        range.last - 1
                     )
-                    addStyle(SpanStyle(color = syntaxColor), range.first, range.first + 2)
-                    addStyle(SpanStyle(color = syntaxColor), range.last - 1, range.last + 1)
+                    val tokenStyle = if (hideSyntaxTokens) hiddenTokenStyle else visibleTokenStyle
+                    addStyle(tokenStyle, range.first, range.first + 2)
+                    addStyle(tokenStyle, range.last - 1, range.last + 1)
                 }
             }
 
             // 5. Fosforlu Vurgu (Highlight): ==metin==
-            val highlightRegex = Regex("==(.*?)==")
+            val highlightRegex = Regex("==([^=\\n]+?)==")
             for (match in highlightRegex.findAll(raw)) {
                 val range = match.range
                 if (range.last >= range.first + 3) {
                     addStyle(
                         SpanStyle(background = highlightColor, color = Color(0xFF1E1E1E)),
-                        range.first,
-                        range.last + 1
+                        range.first + 2,
+                        range.last - 1
                     )
-                    addStyle(SpanStyle(color = syntaxColor), range.first, range.first + 2)
-                    addStyle(SpanStyle(color = syntaxColor), range.last - 1, range.last + 1)
+                    val tokenStyle = if (hideSyntaxTokens) hiddenTokenStyle else visibleTokenStyle
+                    addStyle(tokenStyle, range.first, range.first + 2)
+                    addStyle(tokenStyle, range.last - 1, range.last + 1)
                 }
             }
 
             // 6. Kod Bloğu / Satır içi kod: `kod`
-            val codeRegex = Regex("`([^`]+)`")
+            val codeRegex = Regex("`([^`\\n]+?)`")
             for (match in codeRegex.findAll(raw)) {
                 val range = match.range
                 addStyle(

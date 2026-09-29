@@ -23,6 +23,8 @@ fun RichTextToolbar(
     textFieldValue: TextFieldValue,
     onValueChange: (TextFieldValue) -> Unit,
     onFocusRequest: () -> Unit = {},
+    hideMarkdownTokens: Boolean = true,
+    onToggleHideMarkdownTokens: () -> Unit = {},
     onAddImage: () -> Unit,
     onAddDrawing: () -> Unit,
     onRecordAudio: () -> Unit,
@@ -42,6 +44,22 @@ fun RichTextToolbar(
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 0. Hızlı İşaret Gizleme / Gösterme Anahtarı (Acil durum erişimi)
+            IconButton(
+                onClick = onToggleHideMarkdownTokens,
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = if (!hideMarkdownTokens) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent
+                )
+            ) {
+                Icon(
+                    imageVector = if (hideMarkdownTokens) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                    contentDescription = if (hideMarkdownTokens) "İşaretler Gizli (Temiz Görünüm)" else "İşaretler Görünür",
+                    tint = if (!hideMarkdownTokens) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            VerticalDivider(modifier = Modifier.height(24.dp).padding(horizontal = 2.dp))
+
             // 1. Kalın (Bold - **text**)
             IconButton(onClick = {
                 applyMarkdownWrap(textFieldValue, "**", "**", onValueChange, onFocusRequest)

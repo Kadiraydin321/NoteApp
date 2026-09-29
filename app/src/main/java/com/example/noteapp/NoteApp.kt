@@ -1,6 +1,7 @@
 package com.example.noteapp
 
 import android.app.Application
+import com.example.noteapp.data.sample.SampleDataLoader
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.HiltAndroidApp
@@ -10,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -18,11 +20,17 @@ class NoteApp : Application() {
     @Inject
     lateinit var repository: NoteRepository
 
+    @Inject
+    lateinit var sampleDataLoader: SampleDataLoader
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun onCreate() {
         super.onCreate()
         observeNotesForWidgetSync()
+        applicationScope.launch {
+            sampleDataLoader.populateIfEmpty(force = false)
+        }
     }
 
     /**

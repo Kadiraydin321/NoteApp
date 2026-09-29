@@ -47,6 +47,7 @@ fun SettingsScreen(
     onExportToUri: (Uri) -> Unit,
     onExportAndShare: (Context) -> Unit,
     onImportFromUri: (Uri, Boolean) -> Unit,
+    onLoadSampleNotes: () -> Unit = {},
     onDismissBackupMessage: () -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -176,6 +177,20 @@ fun SettingsScreen(
                         Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Yedekten Geri Yükle (İçe Aktar)")
+                    }
+
+                    // Buton 4: 25 Adet Zengin Örnek Not Yükle
+                    FilledTonalButton(
+                        onClick = onLoadSampleNotes,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("25 Adet Zengin Örnek Notu Yükle")
                     }
                 }
             }

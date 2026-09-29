@@ -12,7 +12,8 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingBottom="6dp">
+        android:paddingBottom="8dp"
+        android:paddingHorizontal="4dp">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -26,8 +27,8 @@
                 android:layout_height="wrap_content"
                 android:text="Notlarım"
                 android:textStyle="bold"
-                android:textSize="16sp"
-                android:textColor="#1D1B20" />
+                android:textSize="17sp"
+                android:textColor="#1C1B1F" />
 
             <TextView
                 android:id="@+id/widget_subtitle_filter"
@@ -35,14 +36,15 @@
                 android:layout_height="wrap_content"
                 android:text="Tüm Notlar"
                 android:textSize="11sp"
+                android:textStyle="bold"
                 android:textColor="#6750A4" />
         </LinearLayout>
 
         <!-- Yenile Butonu -->
         <ImageButton
             android:id="@+id/widget_btn_refresh"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_widget_refresh"
             android:contentDescription="Yenile"
@@ -50,120 +52,116 @@
 
     </LinearLayout>
 
-    <!-- Hızlı Not Ekleme Aksiyon Çubuğu (Metin, Görsel, Ses, Çizim) -->
+    <!-- Modern Hızlı Not Ekleme Butonları (Pill Action Buttons) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="@drawable/widget_item_background"
-        android:paddingVertical="4dp"
-        android:paddingHorizontal="6dp"
-        android:layout_marginBottom="8dp">
+        android:gravity="center"
+        android:layout_marginBottom="10dp">
 
-        <!-- 1. Metin Notu Ekle -->
+        <!-- 1. Metin Notu -->
         <LinearLayout
             android:id="@+id/widget_btn_add_text"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="46dp"
             android:layout_weight="1"
+            android:layout_marginEnd="4dp"
             android:orientation="horizontal"
             android:gravity="center"
-            android:padding="6dp"
-            android:background="?android:attr/selectableItemBackground">
+            android:background="@drawable/widget_btn_text_bg">
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
                 android:src="@drawable/ic_widget_text"
                 android:contentDescription="Metin Notu" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Not"
-                android:textSize="11sp"
-                android:textColor="#1D1B20"
+                android:textSize="12sp"
+                android:textColor="#4A148C"
                 android:textStyle="bold"
                 android:layout_marginStart="4dp" />
         </LinearLayout>
 
-        <!-- 2. Görsel Notu Ekle -->
+        <!-- 2. Görsel Notu -->
         <LinearLayout
             android:id="@+id/widget_btn_add_image"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="46dp"
             android:layout_weight="1"
+            android:layout_marginEnd="4dp"
             android:orientation="horizontal"
             android:gravity="center"
-            android:padding="6dp"
-            android:background="?android:attr/selectableItemBackground">
+            android:background="@drawable/widget_btn_image_bg">
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
                 android:src="@drawable/ic_widget_image"
                 android:contentDescription="Görsel Notu" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Görsel"
-                android:textSize="11sp"
-                android:textColor="#1D1B20"
+                android:textSize="12sp"
+                android:textColor="#0D47A1"
                 android:textStyle="bold"
                 android:layout_marginStart="4dp" />
         </LinearLayout>
 
-        <!-- 3. Ses Notu Ekle -->
+        <!-- 3. Ses Notu -->
         <LinearLayout
             android:id="@+id/widget_btn_add_voice"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="46dp"
             android:layout_weight="1"
+            android:layout_marginEnd="4dp"
             android:orientation="horizontal"
             android:gravity="center"
-            android:padding="6dp"
-            android:background="?android:attr/selectableItemBackground">
+            android:background="@drawable/widget_btn_voice_bg">
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
                 android:src="@drawable/ic_widget_mic"
                 android:contentDescription="Ses Notu" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Ses"
-                android:textSize="11sp"
-                android:textColor="#1D1B20"
+                android:textSize="12sp"
+                android:textColor="#B71C1C"
                 android:textStyle="bold"
                 android:layout_marginStart="4dp" />
         </LinearLayout>
 
-        <!-- 4. Çizim Notu Ekle -->
+        <!-- 4. Çizim Notu -->
         <LinearLayout
             android:id="@+id/widget_btn_add_draw"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="46dp"
             android:layout_weight="1"
             android:orientation="horizontal"
             android:gravity="center"
-            android:padding="6dp"
-            android:background="?android:attr/selectableItemBackground">
+            android:background="@drawable/widget_btn_draw_bg">
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
                 android:src="@drawable/ic_widget_draw"
                 android:contentDescription="Çizim Notu" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Çizim"
-                android:textSize="11sp"
-                android:textColor="#1D1B20"
+                android:textSize="12sp"
+                android:textColor="#1B5E20"
                 android:textStyle="bold"
                 android:layout_marginStart="4dp" />
         </LinearLayout>
 
     </LinearLayout>
 
-    <!-- Notlar Listesi -->
+    <!-- Notlar Listesi (ListView) -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -173,19 +171,19 @@
             android:id="@+id/widget_notes_list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:divider="@null"
-            android:dividerHeight="8dp"
+            android:divider="@android:color/transparent"
+            android:dividerHeight="6dp"
             android:scrollbars="none" />
 
-        <!-- Boş Durum Görünümü -->
+        <!-- Boş Liste Görünümü -->
         <TextView
             android:id="@+id/widget_empty_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center"
-            android:text="Gösterilecek not bulunamadı.\nYukarıdaki butonlardan yeni not ekleyebilirsiniz."
-            android:textColor="#79747E"
+            android:text="Henüz not bulunmuyor.\nYukarıdaki butonlardan hemen ekleyebilirsiniz."
             android:textSize="13sp"
+            android:textColor="#79747E"
             android:visibility="gone" />
 
     </FrameLayout>

@@ -202,6 +202,7 @@ class MainActivity : FragmentActivity() {
                             onExportToUri = viewModel::exportBackupToUri,
                             onExportAndShare = { viewModel.exportAndShare(it) },
                             onImportFromUri = { uri, clear -> viewModel.importBackupFromUri(uri, clear) },
+                            onLoadSampleNotes = viewModel::loadSampleNotes,
                             onDismissBackupMessage = viewModel::dismissMessage,
                             onBackClick = {
                                 navController.popBackStack()

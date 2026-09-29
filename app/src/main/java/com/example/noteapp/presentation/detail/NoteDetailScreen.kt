@@ -88,6 +88,7 @@ fun NoteDetailScreen(
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
     var isPreviewMode by remember { mutableStateOf(false) }
+    var hideMarkdownTokens by remember { mutableStateOf(true) }
 
     // Sayfa Arka Plan Rengi ve Kontrast Hesabı
     val baseNoteColor = if (state.color != 0 && state.color != Color.Transparent.toArgb()) {
@@ -228,6 +229,17 @@ fun NoteDetailScreen(
                     }
                 },
                 actions = {
+                    // Biçimlendirme İşaretlerini Gizle / Göster (Acil durum ve anlık kontrol)
+                    if (!isPreviewMode) {
+                        IconButton(onClick = { hideMarkdownTokens = !hideMarkdownTokens }) {
+                            Icon(
+                                imageVector = if (hideMarkdownTokens) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (hideMarkdownTokens) "İşaretler Gizli (Temiz Görünüm)" else "İşaretler Görünür",
+                                tint = if (!hideMarkdownTokens) MaterialTheme.colorScheme.tertiary else contentColor
+                            )
+                        }
+                    }
+
                     // Düzenle / Önizle Modu Değiştirici
                     IconButton(onClick = { isPreviewMode = !isPreviewMode }) {
                         Icon(
@@ -292,6 +304,8 @@ fun NoteDetailScreen(
                         textFieldValue = state.contentValue,
                         onValueChange = onContentValueChange,
                         onFocusRequest = { focusRequester.requestFocus() },
+                        hideMarkdownTokens = hideMarkdownTokens,
+                        onToggleHideMarkdownTokens = { hideMarkdownTokens = !hideMarkdownTokens },
                         onAddImage = {
                             imagePickerLauncher.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -491,7 +505,7 @@ fun NoteDetailScreen(
                                 color = hintColor
                             )
                         },
-                        visualTransformation = remember { MarkdownVisualTransformation() },
+                        visualTransformation = remember(hideMarkdownTokens) { MarkdownVisualTransformation(hideSyntaxTokens = hideMarkdownTokens) },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             color = contentColor,
                             lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.25f

@@ -31,7 +31,8 @@ data class BackupUiState(
 class SettingsViewModel @Inject constructor(
     private val app: Application,
     private val settingsManager: AppSettingsManager,
-    private val backupManager: BackupManager
+    private val backupManager: BackupManager,
+    private val sampleDataLoader: com.example.noteapp.data.sample.SampleDataLoader
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> = settingsManager.settings
@@ -174,6 +175,30 @@ class SettingsViewModel @Inject constructor(
                 _backupUiState.value = BackupUiState(
                     isOperating = false,
                     message = "İçe aktarma hatası: ${e.localizedMessage}",
+                    isSuccess = false
+                )
+            }
+        }
+    }
+
+    /**
+     * Kullanıcının isteği üzerine 25 adet zengin özellikli örnek notu yükler.
+     */
+    fun loadSampleNotes() {
+        viewModelScope.launch {
+            _backupUiState.value = BackupUiState(isOperating = true, operationTitle = "25 adet örnek not ve kategori yükleniyor...")
+            try {
+                sampleDataLoader.populateIfEmpty(force = true)
+                _backupUiState.value = BackupUiState(
+                    isOperating = false,
+                    message = "Harika! 25 adet zengin özellikli örnek not (çizimli, görselli, kilitli, renkli ve yapılacak listeleri) başarıyla yüklendi.",
+                    isSuccess = true
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _backupUiState.value = BackupUiState(
+                    isOperating = false,
+                    message = "Örnek notlar yüklenirken hata oluştu: ${e.localizedMessage}",
                     isSuccess = false
                 )
             }
