@@ -6,6 +6,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.media.AudioPlayer
@@ -16,8 +17,10 @@ import com.example.noteapp.data.settings.AppSettingsManager
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
@@ -103,6 +106,17 @@ class NoteDetailViewModel @Inject constructor(
 
     fun onSetReminder(timeInMillis: Long?) {
         _state.value = _state.value.copy(reminderTime = timeInMillis)
+    }
+
+    val categories: StateFlow<List<Category>> = repository.getAllCategories()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    fun onCategoryChange(categoryId: Long?) {
+        _state.value = _state.value.copy(categoryId = categoryId)
     }
 
     fun onAddImage(uri: Uri) {

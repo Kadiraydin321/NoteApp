@@ -164,7 +164,7 @@ fun RichTextToolbar(
 /**
  * Seçili metnin başına ve sonuna markdown formatı uygular, imleç ve seçimi korur.
  */
-private fun applyMarkdownWrap(
+internal fun applyMarkdownWrap(
     value: TextFieldValue,
     prefix: String,
     suffix: String,
@@ -203,7 +203,7 @@ private fun applyMarkdownWrap(
 /**
  * İmlecin bulunduğu satırın başına prefix ekler veya varsa kaldırır.
  */
-private fun applyPrefixToLine(
+internal fun applyPrefixToLine(
     value: TextFieldValue,
     prefix: String,
     onValueChange: (TextFieldValue) -> Unit,
@@ -235,7 +235,7 @@ private fun applyPrefixToLine(
 /**
  * İmlecin bulunduğu konuma metin ekler.
  */
-private fun insertTextAtCursor(
+internal fun insertTextAtCursor(
     value: TextFieldValue,
     inserted: String,
     onValueChange: (TextFieldValue) -> Unit,

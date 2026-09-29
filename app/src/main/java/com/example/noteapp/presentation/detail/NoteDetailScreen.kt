@@ -10,11 +10,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -25,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -42,10 +44,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.example.noteapp.domain.model.Category
 import com.example.noteapp.presentation.components.AttachmentList
 import com.example.noteapp.presentation.components.MarkdownPreview
 import com.example.noteapp.presentation.components.MarkdownVisualTransformation
-import com.example.noteapp.presentation.components.RichTextToolbar
+import com.example.noteapp.presentation.components.applyMarkdownWrap
+import com.example.noteapp.presentation.components.applyPrefixToLine
+import com.example.noteapp.presentation.components.insertTextAtCursor
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.max
@@ -68,10 +73,20 @@ val NoteColors = listOf(
     Color(0xFF1E1E1E)  // Gece Siyahı
 )
 
+enum class NoteToolCategory {
+    NONE,
+    MEDIA,
+    FORMAT,
+    COLOR,
+    CATEGORY
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteDetailScreen(
     state: NoteDetailState,
+    categories: List<Category> = emptyList(),
+    onCategoryChange: (Long?) -> Unit = {},
     onTitleChange: (String) -> Unit,
     onContentValueChange: (TextFieldValue) -> Unit,
     onColorChange: (Int) -> Unit,
@@ -101,6 +116,8 @@ fun NoteDetailScreen(
     var hideMarkdownTokens by remember { mutableStateOf(true) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var revertConfirmPath by remember { mutableStateOf<String?>(null) }
+    var showMoreMenu by remember { mutableStateOf(false) }
+    var activeToolCategory by remember { mutableStateOf(NoteToolCategory.NONE) }
 
     // Görsel düzenlemeden yeni dönüldüyse geri alma için anında snackbar göster
     LaunchedEffect(justEditedImagePath) {
@@ -310,45 +327,7 @@ fun NoteDetailScreen(
                     }
                 },
                 actions = {
-                    // Biçimlendirme İşaretlerini Gizle / Göster (Acil durum ve anlık kontrol)
-                    if (!isPreviewMode) {
-                        IconButton(onClick = { hideMarkdownTokens = !hideMarkdownTokens }) {
-                            Icon(
-                                imageVector = if (hideMarkdownTokens) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (hideMarkdownTokens) "İşaretler Gizli (Temiz Görünüm)" else "İşaretler Görünür",
-                                tint = if (!hideMarkdownTokens) MaterialTheme.colorScheme.tertiary else contentColor
-                            )
-                        }
-                    }
-
-                    // Düzenle / Önizle Modu Değiştirici
-                    IconButton(onClick = { isPreviewMode = !isPreviewMode }) {
-                        Icon(
-                            imageVector = if (isPreviewMode) Icons.Default.Edit else Icons.Default.RemoveRedEye,
-                            contentDescription = if (isPreviewMode) "Düzenle" else "Önizle"
-                        )
-                    }
-
-                    // Kopyala
-                    IconButton(onClick = { copyNoteToClipboard() }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Kopyala")
-                    }
-
-                    // Paylaş
-                    IconButton(onClick = { shareNote() }) {
-                        Icon(Icons.Default.Share, contentDescription = "Paylaş")
-                    }
-
-                    // Hatırlatıcı Butonu
-                    IconButton(onClick = { showDateTimePicker() }) {
-                        Icon(
-                            imageVector = if (state.reminderTime != null) Icons.Default.AlarmOn else Icons.Default.AddAlert,
-                            contentDescription = "Hatırlatıcı",
-                            tint = if (state.reminderTime != null) MaterialTheme.colorScheme.primary else contentColor
-                        )
-                    }
-
-                    // Sabitle Butonu
+                    // 1. Sabitleme (Pin) Butonu - Ana Aksiyon
                     IconButton(onClick = onTogglePin) {
                         Icon(
                             imageVector = if (state.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
@@ -357,16 +336,7 @@ fun NoteDetailScreen(
                         )
                     }
 
-                    // Kilit Butonu
-                    IconButton(onClick = onToggleLock) {
-                        Icon(
-                            imageVector = if (state.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                            contentDescription = "Kilit",
-                            tint = if (state.isLocked) MaterialTheme.colorScheme.primary else contentColor
-                        )
-                    }
-
-                    // Notu Sil Butonu
+                    // 2. Notu Sil Butonu - Ana Aksiyon
                     IconButton(onClick = { showDeleteConfirmDialog = true }) {
                         Icon(
                             Icons.Default.Delete,
@@ -375,108 +345,473 @@ fun NoteDetailScreen(
                         )
                     }
 
-                    // Kaydet
+                    // 3. Kaydet Butonu - Ana Aksiyon
                     IconButton(onClick = onSaveClick) {
-                        Icon(Icons.Default.Done, contentDescription = "Kaydet")
+                        Icon(Icons.Default.Done, contentDescription = "Kaydet", tint = contentColor)
+                    }
+
+                    // 4. Üç Nokta Menüsü - Harici Tüm Özellikler
+                    Box {
+                        IconButton(onClick = { showMoreMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Daha Fazla Seçenek", tint = contentColor)
+                        }
+
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false }
+                        ) {
+                            // Önizleme / Düzenleme Modu
+                            DropdownMenuItem(
+                                text = { Text(if (isPreviewMode) "Düzenleme Moduna Geç" else "Önizleme Moduna Geç") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (isPreviewMode) Icons.Default.Edit else Icons.Default.RemoveRedEye,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    isPreviewMode = !isPreviewMode
+                                    showMoreMenu = false
+                                }
+                            )
+
+                            // Kilit Butonu
+                            DropdownMenuItem(
+                                text = { Text(if (state.isLocked) "Kilidi Kaldır" else "Notu Kilitle") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (state.isLocked) Icons.Default.LockOpen else Icons.Default.Lock,
+                                        contentDescription = null,
+                                        tint = if (state.isLocked) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                    )
+                                },
+                                onClick = {
+                                    onToggleLock()
+                                    showMoreMenu = false
+                                }
+                            )
+
+                            // Hatırlatıcı
+                            DropdownMenuItem(
+                                text = { Text(if (state.reminderTime != null) "Hatırlatıcıyı Düzenle" else "Hatırlatıcı Ekle") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (state.reminderTime != null) Icons.Default.AlarmOn else Icons.Default.AddAlert,
+                                        contentDescription = null,
+                                        tint = if (state.reminderTime != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                    )
+                                },
+                                onClick = {
+                                    showDateTimePicker()
+                                    showMoreMenu = false
+                                }
+                            )
+
+                            HorizontalDivider()
+
+                            // Notu Paylaş
+                            DropdownMenuItem(
+                                text = { Text("Notu Paylaş") },
+                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                onClick = {
+                                    shareNote()
+                                    showMoreMenu = false
+                                }
+                            )
+
+                            // Kopyala
+                            DropdownMenuItem(
+                                text = { Text("Panoya Kopyala") },
+                                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                                onClick = {
+                                    copyNoteToClipboard()
+                                    showMoreMenu = false
+                                }
+                            )
+
+                            HorizontalDivider()
+
+                            // Markdown İşaretleri Gizleme / Gösterme
+                            DropdownMenuItem(
+                                text = { Text(if (hideMarkdownTokens) "Biçim İşaretlerini Göster (*, #)" else "Biçim İşaretlerini Gizle (Temiz)") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (hideMarkdownTokens) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    hideMarkdownTokens = !hideMarkdownTokens
+                                    showMoreMenu = false
+                                }
+                            )
+                        }
                     }
                 }
             )
         },
         bottomBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .imePadding()
-            ) {
-                // Zengin Metin Araç Çubuğu (Sadece Düzenleme Modunda)
-                if (!isPreviewMode) {
-                    RichTextToolbar(
-                        textFieldValue = state.contentValue,
-                        onValueChange = onContentValueChange,
-                        onFocusRequest = { focusRequester.requestFocus() },
-                        hideMarkdownTokens = hideMarkdownTokens,
-                        onToggleHideMarkdownTokens = { hideMarkdownTokens = !hideMarkdownTokens },
-                        onAddImage = {
-                            imagePickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        },
-                        onAddDrawing = onAddDrawingClick,
-                        onRecordAudio = {
-                            audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
-                        },
-                        isRecording = state.isRecordingAudio
-                    )
-                }
-
-                // Sayfa Rengi Seçim Paleti ve İstatistik Çubuğu
-                Surface(
-                    tonalElevation = 4.dp,
-                    shadowElevation = 6.dp,
-                    color = if (isDarkBackground) Color(0xFF242424) else MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.fillMaxWidth()
+            if (!isPreviewMode) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .imePadding()
                 ) {
-                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                        // Not İstatistikleri (Kelime, Karakter, Okuma Süresi)
+                    // Kategoriye Göre Genişleyen Araç Kutusu (Drawer / Expansion Panel)
+                    AnimatedVisibility(
+                        visible = activeToolCategory != NoteToolCategory.NONE,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Surface(
+                            tonalElevation = 6.dp,
+                            shadowElevation = 8.dp,
+                            color = if (isDarkBackground) Color(0xFF232323) else MaterialTheme.colorScheme.surfaceContainerHighest,
+                            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                // Panel Başlığı ve Kapatma Butonu
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = when (activeToolCategory) {
+                                            NoteToolCategory.MEDIA -> "Medya ve Eklentiler"
+                                            NoteToolCategory.FORMAT -> "Metin Biçimlendirme"
+                                            NoteToolCategory.COLOR -> "Sayfa Arka Plan Rengi"
+                                            NoteToolCategory.CATEGORY -> "Not Kategorisi"
+                                            else -> ""
+                                        },
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+
+                                    IconButton(
+                                        onClick = { activeToolCategory = NoteToolCategory.NONE },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Kapat", modifier = Modifier.size(18.dp))
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                when (activeToolCategory) {
+                                    NoteToolCategory.MEDIA -> {
+                                        // Medya Butonları
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.SpaceAround,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // 1. Görsel Ekle
+                                            OutlinedButton(
+                                                onClick = {
+                                                    imagePickerLauncher.launch(
+                                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                    )
+                                                }
+                                            ) {
+                                                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Resim", style = MaterialTheme.typography.labelMedium)
+                                            }
+
+                                            // 2. Çizim Yap
+                                            OutlinedButton(onClick = onAddDrawingClick) {
+                                                Icon(Icons.Default.Brush, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Çizim", style = MaterialTheme.typography.labelMedium)
+                                            }
+
+                                            // 3. Ses Kaydet
+                                            Button(
+                                                onClick = {
+                                                    audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                                },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (state.isRecordingAudio) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                                )
+                                            ) {
+                                                Icon(
+                                                    if (state.isRecordingAudio) Icons.Default.Stop else Icons.Default.Mic,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(if (state.isRecordingAudio) "Durdur" else "Ses", style = MaterialTheme.typography.labelMedium)
+                                            }
+
+                                            // 4. Zaman Damgası
+                                            IconButton(
+                                                onClick = {
+                                                    val now = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date())
+                                                    insertTextAtCursor(state.contentValue, "[$now] ", onContentValueChange) { focusRequester.requestFocus() }
+                                                }
+                                            ) {
+                                                Icon(Icons.Default.AccessTime, contentDescription = "Zaman Damgası")
+                                            }
+                                        }
+                                    }
+
+                                    NoteToolCategory.FORMAT -> {
+                                        // Metin Biçimlendirme Araçları
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState())
+                                                .padding(vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // Kalın
+                                            IconButton(onClick = {
+                                                applyMarkdownWrap(state.contentValue, "**", "**", onContentValueChange) { focusRequester.requestFocus() }
+                                            }) {
+                                                Icon(Icons.Default.FormatBold, contentDescription = "Kalın")
+                                            }
+                                            // İtalik
+                                            IconButton(onClick = {
+                                                applyMarkdownWrap(state.contentValue, "*", "*", onContentValueChange) { focusRequester.requestFocus() }
+                                            }) {
+                                                Icon(Icons.Default.FormatItalic, contentDescription = "İtalik")
+                                            }
+                                            // Üstü Çizili
+                                            IconButton(onClick = {
+                                                applyMarkdownWrap(state.contentValue, "~~", "~~", onContentValueChange) { focusRequester.requestFocus() }
+                                            }) {
+                                                Icon(Icons.Default.FormatStrikethrough, contentDescription = "Üstü Çizili")
+                                            }
+                                            // Fosforlu Vurgu
+                                            IconButton(onClick = {
+                                                applyMarkdownWrap(state.contentValue, "==", "==", onContentValueChange) { focusRequester.requestFocus() }
+                                            }) {
+                                                Icon(Icons.Default.BorderColor, contentDescription = "Vurgu", tint = Color(0xFFFBC02D))
+                                            }
+                                            VerticalDivider(modifier = Modifier.height(24.dp).padding(horizontal = 4.dp))
+                                            // Başlık (H3)
+                                            IconButton(onClick = {
+                                                applyPrefixToLine(state.contentValue, "### ", onContentValueChange) { focusRequester.requestFocus() }
+                                            }) {
+                                                Icon(Icons.Default.Title, contentDescription = "Başlık")
+                                            }
+                                            // Kontrol Kutusu
+                                            IconButton(onClick = {
+                                                applyPrefixToLine(state.contentValue, "- [ ] ", onContentValueChange) { focusRequester.requestFocus() }
+                                            }) {
+                                                Icon(Icons.Default.Checklist, contentDescription = "Yapılacak")
+                                            }
+                                            // Madde İşareti
+                                            IconButton(onClick = {
+                                                applyPrefixToLine(state.contentValue, "• ", onContentValueChange) { focusRequester.requestFocus() }
+                                            }) {
+                                                Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "Madde")
+                                            }
+                                            // Numaralı Liste
+                                            IconButton(onClick = {
+                                                applyPrefixToLine(state.contentValue, "1. ", onContentValueChange) { focusRequester.requestFocus() }
+                                            }) {
+                                                Icon(Icons.Default.FormatListNumbered, contentDescription = "Numaralı")
+                                            }
+                                            // Alıntı
+                                            IconButton(onClick = {
+                                                applyPrefixToLine(state.contentValue, "> ", onContentValueChange) { focusRequester.requestFocus() }
+                                            }) {
+                                                Icon(Icons.Default.FormatQuote, contentDescription = "Alıntı")
+                                            }
+                                        }
+                                    }
+
+                                    NoteToolCategory.COLOR -> {
+                                        // Renk Paleti Listesi
+                                        LazyRow(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            items(NoteColors) { color ->
+                                                val argb = color.toArgb()
+                                                val isSelected = (state.color == argb) || (state.color == 0 && color == Color.Transparent)
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(34.dp)
+                                                        .clip(CircleShape)
+                                                        .background(if (color == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant else color)
+                                                        .border(
+                                                            width = if (isSelected) 3.dp else 1.dp,
+                                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.5f),
+                                                            shape = CircleShape
+                                                        )
+                                                        .clickable { onColorChange(argb) },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    if (color == Color.Transparent) {
+                                                        Icon(
+                                                            Icons.Default.FormatColorReset,
+                                                            contentDescription = "Varsayılan",
+                                                            modifier = Modifier.size(16.dp),
+                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    } else if (isSelected) {
+                                                        Icon(
+                                                            Icons.Default.Check,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(16.dp),
+                                                            tint = if (color.luminance() < 0.5f) Color.White else Color.Black
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    NoteToolCategory.CATEGORY -> {
+                                        // Kategori Seçim Listesi
+                                        LazyRow(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            item {
+                                                FilterChip(
+                                                    selected = state.categoryId == null,
+                                                    onClick = { onCategoryChange(null) },
+                                                    label = { Text("Kategorisiz") },
+                                                    leadingIcon = if (state.categoryId == null) {
+                                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                                    } else null
+                                                )
+                                            }
+
+                                            items(categories) { category ->
+                                                val isSelected = state.categoryId == category.id
+                                                FilterChip(
+                                                    selected = isSelected,
+                                                    onClick = { onCategoryChange(if (isSelected) null else category.id) },
+                                                    label = { Text(category.name) },
+                                                    leadingIcon = if (isSelected) {
+                                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                                    } else null
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    NoteToolCategory.NONE -> {}
+                                }
+                            }
+                        }
+                    }
+
+                    // Alt Sabit Kategori Dok Barı (Minimalist ve Şık)
+                    Surface(
+                        tonalElevation = 3.dp,
+                        shadowElevation = 6.dp,
+                        color = if (isDarkBackground) Color(0xFF1E1E1E) else MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 2.dp),
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "$wordCount kelime  •  $charCount karakter",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "~$readingTime dk okuma",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        // Renk Paleti Listesi
-                        LazyRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            items(NoteColors) { color ->
-                                val argb = color.toArgb()
-                                val isSelected = (state.color == argb) || (state.color == 0 && color == Color.Transparent)
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(if (color == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant else color)
-                                        .border(
-                                            width = if (isSelected) 3.dp else 1.dp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.5f),
-                                            shape = CircleShape
-                                        )
-                                        .clickable { onColorChange(argb) },
-                                    contentAlignment = Alignment.Center
+                            // 4 Kategori Düğmesi
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                // 1. Ekle / Medya
+                                IconButton(
+                                    onClick = {
+                                        activeToolCategory = if (activeToolCategory == NoteToolCategory.MEDIA) NoteToolCategory.NONE else NoteToolCategory.MEDIA
+                                    },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        containerColor = if (activeToolCategory == NoteToolCategory.MEDIA) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                                    )
                                 ) {
-                                    if (color == Color.Transparent) {
-                                        Icon(
-                                            Icons.Default.FormatColorReset,
-                                            contentDescription = "Varsayılan",
-                                            modifier = Modifier.size(16.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    } else if (isSelected) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = if (color.luminance() < 0.5f) Color.White else Color.Black
-                                        )
-                                    }
+                                    Icon(
+                                        Icons.Default.AddCircleOutline,
+                                        contentDescription = "Ekle",
+                                        tint = if (activeToolCategory == NoteToolCategory.MEDIA) MaterialTheme.colorScheme.primary else contentColor
+                                    )
+                                }
+
+                                // 2. Metin Biçimlendirme
+                                IconButton(
+                                    onClick = {
+                                        activeToolCategory = if (activeToolCategory == NoteToolCategory.FORMAT) NoteToolCategory.NONE else NoteToolCategory.FORMAT
+                                    },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        containerColor = if (activeToolCategory == NoteToolCategory.FORMAT) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Default.FormatSize,
+                                        contentDescription = "Biçimlendir",
+                                        tint = if (activeToolCategory == NoteToolCategory.FORMAT) MaterialTheme.colorScheme.primary else contentColor
+                                    )
+                                }
+
+                                // 3. Renk & Tema
+                                IconButton(
+                                    onClick = {
+                                        activeToolCategory = if (activeToolCategory == NoteToolCategory.COLOR) NoteToolCategory.NONE else NoteToolCategory.COLOR
+                                    },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        containerColor = if (activeToolCategory == NoteToolCategory.COLOR) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Default.Palette,
+                                        contentDescription = "Renk",
+                                        tint = if (activeToolCategory == NoteToolCategory.COLOR) MaterialTheme.colorScheme.primary else contentColor
+                                    )
+                                }
+
+                                // 4. Kategori / Klasör
+                                IconButton(
+                                    onClick = {
+                                        activeToolCategory = if (activeToolCategory == NoteToolCategory.CATEGORY) NoteToolCategory.NONE else NoteToolCategory.CATEGORY
+                                    },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        containerColor = if (activeToolCategory == NoteToolCategory.CATEGORY) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Default.FolderOpen,
+                                        contentDescription = "Kategori",
+                                        tint = if (activeToolCategory == NoteToolCategory.CATEGORY) MaterialTheme.colorScheme.primary else contentColor
+                                    )
+                                }
+                            }
+
+                            // Sağ Bölüm: Aktif ses kaydı bildirimi veya Kelime sayısı
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (state.isRecordingAudio) {
+                                    AssistChip(
+                                        onClick = onToggleAudioRecording,
+                                        label = { Text("Kayıt Durdur", color = MaterialTheme.colorScheme.error) },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Stop, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                        },
+                                        colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
+                                    )
+                                } else {
+                                    Text(
+                                        text = "$wordCount kelime",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = contentColor.copy(alpha = 0.65f),
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    )
                                 }
                             }
                         }
@@ -507,6 +842,19 @@ fun NoteDetailScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
+                // Notun Atandığı Kategori Etiketi (Varsa)
+                val currentCategory = categories.firstOrNull { it.id == state.categoryId }
+                if (currentCategory != null) {
+                    SuggestionChip(
+                        onClick = {
+                            activeToolCategory = if (activeToolCategory == NoteToolCategory.CATEGORY) NoteToolCategory.NONE else NoteToolCategory.CATEGORY
+                        },
+                        label = { Text(currentCategory.name, style = MaterialTheme.typography.labelSmall) },
+                        icon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                }
+
                 // Hatırlatıcı Bilgisi Varsa Göster
                 state.reminderTime?.let { reminderTime ->
                     val formatter = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())

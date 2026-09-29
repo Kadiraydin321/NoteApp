@@ -168,8 +168,12 @@ class MainActivity : FragmentActivity() {
                             }
                         }
 
+                        val categories by viewModel.categories.collectAsState()
+
                         NoteDetailScreen(
                             state = state,
+                            categories = categories,
+                            onCategoryChange = viewModel::onCategoryChange,
                             onTitleChange = viewModel::onTitleChange,
                             onContentValueChange = viewModel::onContentValueChange,
                             onColorChange = viewModel::onColorChange,
