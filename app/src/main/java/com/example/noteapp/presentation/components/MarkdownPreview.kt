@@ -157,39 +157,176 @@ fun MarkdownPreview(
 }
 
 /**
- * Satır içi Markdown formatlarını (**kalın**, *italik*, ~~üstü çizili~~, ==vurgu==, `kod`) AnnotatedString'e dönüştürür.
+ * Satır içi Markdown formatlarını (**kalın**, *italik*, ~~üstü çizili~~, ==vurgu==, `kod`)
+ * temiz bir şekilde işler; biçimlendirme işaretlerini kaldırarak sadece stilize edilmiş metni döndürür.
  */
 fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString {
+    if (text.isEmpty()) return buildAnnotatedString { }
+
+    data class Span(val start: Int, val end: Int, val style: SpanStyle)
+    val tokenIndices = mutableSetOf<Int>()
+    val spans = mutableListOf<Span>()
+    val boldTokenRanges = mutableListOf<IntRange>()
+
+    // 1. Çift Yıldız Kalın: **metin**
+    val boldAsteriskRegex = Regex("(?<!\\\\)\\*\\*(?!\\s)([^\n]+?)(?<!\\s)\\*\\*")
+    for (match in boldAsteriskRegex.findAll(text)) {
+        val range = match.range
+        if (range.last >= range.first + 3) {
+            val openToken = range.first until (range.first + 2)
+            val closeToken = (range.last - 1)..range.last
+            boldTokenRanges.add(openToken)
+            boldTokenRanges.add(closeToken)
+            openToken.forEach { tokenIndices.add(it) }
+            closeToken.forEach { tokenIndices.add(it) }
+            spans.add(Span(range.first + 2, range.last - 1, SpanStyle(fontWeight = FontWeight.Bold)))
+        }
+    }
+
+    // 2. Çift Alt Çizgi Kalın: __metin__
+    val boldUnderscoreRegex = Regex("(?<!\\\\)__(?!\\s)([^\n]+?)(?<!\\s)__")
+    for (match in boldUnderscoreRegex.findAll(text)) {
+        val range = match.range
+        if (range.last >= range.first + 3) {
+            val openToken = range.first until (range.first + 2)
+            val closeToken = (range.last - 1)..range.last
+            boldTokenRanges.add(openToken)
+            boldTokenRanges.add(closeToken)
+            openToken.forEach { tokenIndices.add(it) }
+            closeToken.forEach { tokenIndices.add(it) }
+            spans.add(Span(range.first + 2, range.last - 1, SpanStyle(fontWeight = FontWeight.Bold)))
+        }
+    }
+
+    // 3. Tek Yıldız İtalik: *metin* (Kalın işaretlerine dahil olmayanlar)
+    fun isIndexInBoldToken(index: Int): Boolean = boldTokenRanges.any { index in it }
+
+    var i = 0
+    while (i < text.length) {
+        if (text[i] == '*' && !isIndexInBoldToken(i)) {
+            if (i + 1 < text.length && text[i + 1] != ' ' && text[i + 1] != '\t' && text[i + 1] != '\n' && text[i + 1] != '*') {
+                var closeIdx = -1
+                var j = i + 1
+                while (j < text.length && text[j] != '\n') {
+                    if (text[j] == '*' && !isIndexInBoldToken(j)) {
+                        if (text[j - 1] != ' ' && text[j - 1] != '\t' && text[j - 1] != '*') {
+                            closeIdx = j
+                            break
+                        }
+                    }
+                    j++
+                }
+
+                if (closeIdx != -1 && closeIdx > i + 1) {
+                    tokenIndices.add(i)
+                    tokenIndices.add(closeIdx)
+                    spans.add(Span(i + 1, closeIdx, SpanStyle(fontStyle = FontStyle.Italic)))
+                    i = closeIdx + 1
+                    continue
+                }
+            }
+        }
+        i++
+    }
+
+    // 4. Tek Alt Çizgi İtalik: _metin_
+    var u = 0
+    while (u < text.length) {
+        if (text[u] == '_' && !isIndexInBoldToken(u)) {
+            if (u + 1 < text.length && text[u + 1] != ' ' && text[u + 1] != '\t' && text[u + 1] != '\n' && text[u + 1] != '_') {
+                var closeIdx = -1
+                var j = u + 1
+                while (j < text.length && text[j] != '\n') {
+                    if (text[j] == '_' && !isIndexInBoldToken(j)) {
+                        if (text[j - 1] != ' ' && text[j - 1] != '\t' && text[j - 1] != '_') {
+                            closeIdx = j
+                            break
+                        }
+                    }
+                    j++
+                }
+
+                if (closeIdx != -1 && closeIdx > u + 1) {
+                    tokenIndices.add(u)
+                    tokenIndices.add(closeIdx)
+                    spans.add(Span(u + 1, closeIdx, SpanStyle(fontStyle = FontStyle.Italic)))
+                    u = closeIdx + 1
+                    continue
+                }
+            }
+        }
+        u++
+    }
+
+    // 5. Üstü Çizili: ~~metin~~
+    val strikeRegex = Regex("~~([^~\\n]+?)~~")
+    for (match in strikeRegex.findAll(text)) {
+        val range = match.range
+        if (range.last >= range.first + 3) {
+            tokenIndices.add(range.first)
+            tokenIndices.add(range.first + 1)
+            tokenIndices.add(range.last - 1)
+            tokenIndices.add(range.last)
+            spans.add(Span(range.first + 2, range.last - 1, SpanStyle(textDecoration = TextDecoration.LineThrough)))
+        }
+    }
+
+    // 6. Fosforlu Vurgu: ==metin==
+    val highlightRegex = Regex("==([^=\\n]+?)==")
+    for (match in highlightRegex.findAll(text)) {
+        val range = match.range
+        if (range.last >= range.first + 3) {
+            tokenIndices.add(range.first)
+            tokenIndices.add(range.first + 1)
+            tokenIndices.add(range.last - 1)
+            tokenIndices.add(range.last)
+            spans.add(Span(range.first + 2, range.last - 1, SpanStyle(background = Color(0xFFFFF59D), color = Color(0xFF212121))))
+        }
+    }
+
+    // 7. Kod: `metin`
+    val codeRegex = Regex("`([^`\\n]+?)`")
+    for (match in codeRegex.findAll(text)) {
+        val range = match.range
+        tokenIndices.add(range.first)
+        tokenIndices.add(range.last)
+        spans.add(Span(range.first + 1, range.last, SpanStyle(fontFamily = FontFamily.Monospace, background = Color(0x1F000000))))
+    }
+
+    // Metni oluştururken işaretleri atla ve yeni indeksleri haritalandır
+    val oldToNew = IntArray(text.length) { -1 }
+    val cleanBuilder = StringBuilder()
+
+    for (k in text.indices) {
+        if (k !in tokenIndices) {
+            oldToNew[k] = cleanBuilder.length
+            cleanBuilder.append(text[k])
+        }
+    }
+
     return buildAnnotatedString {
-        append(text)
+        append(cleanBuilder.toString())
 
-        // **Kalın**
-        Regex("\\*\\*(.*?)\\*\\*").findAll(text).forEach { match ->
-            val inner = match.groupValues[1]
-            val start = match.range.first
-            val end = match.range.last + 1
-            // Sadece iç metni göster veya stil uygula
-            addStyle(SpanStyle(fontWeight = FontWeight.Bold), start, end)
-        }
+        for (span in spans) {
+            var newStart = -1
+            for (pos in span.start until span.end) {
+                if (oldToNew[pos] != -1) {
+                    newStart = oldToNew[pos]
+                    break
+                }
+            }
 
-        // *İtalik*
-        Regex("(?<!\\*)\\*(?!\\*)(.*?)(?<!\\*)\\*(?!\\*)").findAll(text).forEach { match ->
-            addStyle(SpanStyle(fontStyle = FontStyle.Italic), match.range.first, match.range.last + 1)
-        }
+            var newEnd = -1
+            for (pos in (span.end - 1) downTo span.start) {
+                if (oldToNew[pos] != -1) {
+                    newEnd = oldToNew[pos] + 1
+                    break
+                }
+            }
 
-        // ~~Üstü Çizili~~
-        Regex("~~(.*?)~~").findAll(text).forEach { match ->
-            addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough), match.range.first, match.range.last + 1)
-        }
-
-        // ==Vurgu==
-        Regex("==(.*?)==").findAll(text).forEach { match ->
-            addStyle(SpanStyle(background = Color(0xFFFFF59D), color = Color(0xFF212121)), match.range.first, match.range.last + 1)
-        }
-
-        // `Kod`
-        Regex("`([^`]+)`").findAll(text).forEach { match ->
-            addStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color(0x1F000000)), match.range.first, match.range.last + 1)
+            if (newStart != -1 && newEnd != -1 && newEnd > newStart) {
+                addStyle(span.style, newStart, newEnd)
+            }
         }
     }
 }
