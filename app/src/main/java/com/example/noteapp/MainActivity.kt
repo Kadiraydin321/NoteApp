@@ -10,19 +10,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -60,11 +68,21 @@ class MainActivity : FragmentActivity() {
         BiometricPromptManager(this)
     }
 
+    private val isPrivacyShieldActive = mutableStateOf(false)
+    private var navControllerRef: NavController? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Window seviyesinde ekran görüntüsü ve önizleme koruması
+        window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE
+        )
+
         setContent {
             val appSettings by settingsManager.settings.collectAsState()
+            val isShieldActive by remember { isPrivacyShieldActive }
 
             // Güvenlik: autoLockOnExit aktif ise veya güvenli modda ekran görüntüsü ve uygulama önizlemelerini engelle
             LaunchedEffect(appSettings.autoLockOnExit) {
@@ -83,18 +101,22 @@ class MainActivity : FragmentActivity() {
                 dynamicColor = appSettings.dynamicColor
             ) {
                 val navController = rememberNavController()
-
-                // Widget'tan gelen intent'i kontrol et
-                LaunchedEffect(Unit) {
-                    handleWidgetIntent(intent) { route ->
-                        navController.navigate(route)
-                    }
+                LaunchedEffect(navController) {
+                    navControllerRef = navController
                 }
 
-                NavHost(
-                    navController = navController,
-                    startDestination = "notes_screen"
-                ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // Widget'tan gelen intent'i kontrol et
+                    LaunchedEffect(Unit) {
+                        handleWidgetIntent(intent) { route ->
+                            navController.navigate(route)
+                        }
+                    }
+
+                    NavHost(
+                        navController = navController,
+                        startDestination = "notes_screen"
+                    ) {
                     composable("notes_screen") {
                         val viewModel = hiltViewModel<NotesViewModel>()
                         val state by viewModel.state.collectAsState()
@@ -320,10 +342,16 @@ class MainActivity : FragmentActivity() {
                         }
 
                         val categories by viewModel.categories.collectAsState()
+                        val canUndo by viewModel.canUndo.collectAsState()
+                        val canRedo by viewModel.canRedo.collectAsState()
 
                         NoteDetailScreen(
                             state = state,
                             categories = categories,
+                            canUndo = canUndo,
+                            canRedo = canRedo,
+                            onUndo = viewModel::undo,
+                            onRedo = viewModel::redo,
                             onCategoryChange = viewModel::onCategoryChange,
                             onAddCategory = viewModel::onAddCategory,
                             onTitleChange = viewModel::onTitleChange,
@@ -359,6 +387,7 @@ class MainActivity : FragmentActivity() {
                                 navController.popBackStack()
                             },
                             onBackClick = {
+                                viewModel.saveNote()
                                 navController.popBackStack()
                             },
                             autoAction = autoAction?.ifBlank { null },
@@ -438,6 +467,84 @@ class MainActivity : FragmentActivity() {
                                 navController.popBackStack()
                             }
                         )
+                    }
+                }
+
+                // Kapkara Gizlilik Kalkanı (Task Switcher ve Arka Plan Önizlemesini Tamamen Karartma)
+                if (isShieldActive && appSettings.autoLockOnExit) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(56.dp)
+                            )
+                            Text(
+                                text = "Gizlilik Koruması",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "İçerik güvenliğiniz için gizlendi",
+                                color = Color.White.copy(alpha = 0.6f),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Task Switcher (Son Uygulamalar) önizlemesini anında kapkara yapmak için
+        if (settingsManager.settings.value.autoLockOnExit) {
+            isPrivacyShieldActive.value = !hasFocus
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (settingsManager.settings.value.autoLockOnExit) {
+            isPrivacyShieldActive.value = true
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (settingsManager.settings.value.autoLockOnExit) {
+            isPrivacyShieldActive.value = true
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isPrivacyShieldActive.value = false
+        // Eğer kullanıcı kilitli bir notun içindeyken uygulamadan çıktıysa, geri döndüğünde ana ekrana döner
+        if (settingsManager.settings.value.autoLockOnExit) {
+            navControllerRef?.let { nav ->
+                val currentRoute = nav.currentBackStackEntry?.destination?.route
+                if (currentRoute?.startsWith("note_detail_screen") == true) {
+                    val noteId = nav.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
+                    if (noteId != -1L) {
+                        CoroutineScope(Dispatchers.Main).launch {
+                            val note = repository.getNoteById(noteId)
+                            if (note != null && note.isLocked) {
+                                nav.popBackStack("notes_screen", inclusive = false)
+                            }
+                        }
                     }
                 }
             }

@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
+import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -86,6 +88,10 @@ enum class NoteToolCategory {
 fun NoteDetailScreen(
     state: NoteDetailState,
     categories: List<Category> = emptyList(),
+    canUndo: Boolean = false,
+    canRedo: Boolean = false,
+    onUndo: () -> Unit = {},
+    onRedo: () -> Unit = {},
     onCategoryChange: (Long?) -> Unit = {},
     onAddCategory: (String) -> Unit = {},
     onTitleChange: (String) -> Unit,
@@ -122,6 +128,19 @@ fun NoteDetailScreen(
     var revertConfirmPath by remember { mutableStateOf<String?>(null) }
     var showMoreMenu by remember { mutableStateOf(false) }
     var activeToolCategory by remember { mutableStateOf(NoteToolCategory.NONE) }
+
+    // Donanımsal veya jest ile geri tuşuna basıldığında otomatik kaydet
+    BackHandler {
+        onSaveClick()
+        onBackClick()
+    }
+
+    // Not detay ekranından herhangi bir şekilde ayrılındığında otomatik kaydet
+    DisposableEffect(Unit) {
+        onDispose {
+            onSaveClick()
+        }
+    }
 
     // Görsel düzenlemeden yeni dönüldüyse geri alma için anında snackbar göster
     LaunchedEffect(justEditedImagePath) {
@@ -331,6 +350,30 @@ fun NoteDetailScreen(
                     }
                 },
                 actions = {
+                    // Geri Al (Undo)
+                    IconButton(
+                        onClick = onUndo,
+                        enabled = canUndo
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Undo,
+                            contentDescription = "Geri Al",
+                            tint = if (canUndo) contentColor else contentColor.copy(alpha = 0.35f)
+                        )
+                    }
+
+                    // İleri Al (Redo)
+                    IconButton(
+                        onClick = onRedo,
+                        enabled = canRedo
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Redo,
+                            contentDescription = "İleri Al",
+                            tint = if (canRedo) contentColor else contentColor.copy(alpha = 0.35f)
+                        )
+                    }
+
                     // 1. Sabitleme (Pin) Butonu - Ana Aksiyon
                     IconButton(onClick = onTogglePin) {
                         Icon(
@@ -585,6 +628,24 @@ fun NoteDetailScreen(
                                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
+                                            // Geri Al (Undo)
+                                            IconButton(onClick = onUndo, enabled = canUndo) {
+                                                Icon(
+                                                    Icons.AutoMirrored.Filled.Undo,
+                                                    contentDescription = "Geri Al",
+                                                    tint = if (canUndo) contentColor else contentColor.copy(alpha = 0.35f)
+                                                )
+                                            }
+                                            // İleri Al (Redo)
+                                            IconButton(onClick = onRedo, enabled = canRedo) {
+                                                Icon(
+                                                    Icons.AutoMirrored.Filled.Redo,
+                                                    contentDescription = "İleri Al",
+                                                    tint = if (canRedo) contentColor else contentColor.copy(alpha = 0.35f)
+                                                )
+                                            }
+                                            VerticalDivider(modifier = Modifier.height(24.dp).padding(horizontal = 4.dp))
+
                                             // Kalın
                                             IconButton(onClick = {
                                                 applyMarkdownWrap(state.contentValue, "**", "**", onContentValueChange) { focusRequester.requestFocus() }
