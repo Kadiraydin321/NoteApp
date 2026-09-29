@@ -65,6 +65,18 @@ interface NoteDao {
     @Query("DELETE FROM categories")
     suspend fun deleteAllCategories()
 
+    @Query("UPDATE notes SET isDeleted = 1 WHERE id IN (:noteIds)")
+    suspend fun moveNotesToTrash(noteIds: List<Long>)
+
+    @Query("UPDATE notes SET categoryId = :categoryId WHERE id IN (:noteIds)")
+    suspend fun updateNotesCategory(noteIds: List<Long>, categoryId: Long?)
+
+    @Query("DELETE FROM notes WHERE id IN (:noteIds)")
+    suspend fun deleteNotesPermanently(noteIds: List<Long>)
+
+    @Query("UPDATE notes SET categoryId = NULL WHERE categoryId = :categoryId")
+    suspend fun clearCategoryFromNotes(categoryId: Long)
+
     @Delete
     suspend fun deleteCategory(category: Category)
 }

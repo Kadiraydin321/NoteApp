@@ -87,6 +87,7 @@ fun NoteDetailScreen(
     state: NoteDetailState,
     categories: List<Category> = emptyList(),
     onCategoryChange: (Long?) -> Unit = {},
+    onAddCategory: (String) -> Unit = {},
     onTitleChange: (String) -> Unit,
     onContentValueChange: (TextFieldValue) -> Unit,
     onColorChange: (Int) -> Unit,
@@ -115,6 +116,9 @@ fun NoteDetailScreen(
     var isPreviewMode by remember { mutableStateOf(false) }
     var hideMarkdownTokens by remember { mutableStateOf(true) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showAddCategoryDialog by remember { mutableStateOf(false) }
+    var newCategoryName by remember { mutableStateOf("") }
+    var showStatsDialog by remember { mutableStateOf(false) }
     var revertConfirmPath by remember { mutableStateOf<String?>(null) }
     var showMoreMenu by remember { mutableStateOf(false) }
     var activeToolCategory by remember { mutableStateOf(NoteToolCategory.NONE) }
@@ -445,6 +449,18 @@ fun NoteDetailScreen(
                                     showMoreMenu = false
                                 }
                             )
+
+                            HorizontalDivider()
+
+                            // Not İstatistikleri
+                            DropdownMenuItem(
+                                text = { Text("Not İstatistikleri") },
+                                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
+                                onClick = {
+                                    showStatsDialog = true
+                                    showMoreMenu = false
+                                }
+                            )
                         }
                     }
                 }
@@ -682,6 +698,16 @@ fun NoteDetailScreen(
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
+                                            item {
+                                                ElevatedAssistChip(
+                                                    onClick = { showAddCategoryDialog = true },
+                                                    label = { Text("Yeni") },
+                                                    leadingIcon = {
+                                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                    }
+                                                )
+                                            }
+
                                             item {
                                                 FilterChip(
                                                     selected = state.categoryId == null,
@@ -969,5 +995,96 @@ fun NoteDetailScreen(
                 Spacer(modifier = Modifier.height(100.dp))
             }
         }
+    }
+
+    // Yeni Kategori Ekleme Dialogu
+    if (showAddCategoryDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showAddCategoryDialog = false
+                newCategoryName = ""
+            },
+            title = { Text("Yeni Kategori Oluştur") },
+            text = {
+                OutlinedTextField(
+                    value = newCategoryName,
+                    onValueChange = { newCategoryName = it },
+                    placeholder = { Text("Kategori adı (örn: Projeler)") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newCategoryName.isNotBlank()) {
+                        onAddCategory(newCategoryName)
+                        newCategoryName = ""
+                        showAddCategoryDialog = false
+                    }
+                }) {
+                    Text("Ekle")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showAddCategoryDialog = false
+                    newCategoryName = ""
+                }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    // Not İstatistikleri Dialogu
+    if (showStatsDialog) {
+        val text = state.contentValue.text
+        val wordCount = if (text.isBlank()) 0 else text.trim().split("\\s+".toRegex()).count { it.isNotBlank() }
+        val charCount = text.length
+        val readingTimeMin = kotlin.math.max(1, (wordCount / 200.0).roundToInt())
+
+        AlertDialog(
+            onDismissRequest = { showStatsDialog = false },
+            icon = { Icon(Icons.Default.Analytics, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Not İstatistikleri") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Kelime Sayısı:", fontWeight = FontWeight.Medium)
+                        Text("$wordCount kelime", fontWeight = FontWeight.Bold)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Karakter Sayısı:", fontWeight = FontWeight.Medium)
+                        Text("$charCount karakter", fontWeight = FontWeight.Bold)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Tahmini Okuma Süresi:", fontWeight = FontWeight.Medium)
+                        Text("~$readingTimeMin dakika", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                    if (state.attachments.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Medya & Ekler:", fontWeight = FontWeight.Medium)
+                            Text("${state.attachments.size} adet", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showStatsDialog = false }) {
+                    Text("Kapat")
+                }
+            }
+        )
     }
 }

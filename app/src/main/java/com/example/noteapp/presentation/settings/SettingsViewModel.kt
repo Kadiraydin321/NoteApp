@@ -58,6 +58,26 @@ class SettingsViewModel @Inject constructor(
         settingsManager.setDynamicColor(enabled)
     }
 
+    fun setThemeMode(mode: com.example.noteapp.data.settings.ThemeMode) {
+        settingsManager.setThemeMode(mode)
+    }
+
+    fun setLayoutMode(mode: com.example.noteapp.data.settings.NotesLayoutMode) {
+        settingsManager.setLayoutMode(mode)
+    }
+
+    fun setMasterPin(pin: String?) {
+        settingsManager.setMasterPin(pin)
+    }
+
+    fun setAutoLockOnExit(enabled: Boolean) {
+        settingsManager.setAutoLockOnExit(enabled)
+    }
+
+    fun setHighContrastNegative(enabled: Boolean) {
+        settingsManager.setHighContrastNegative(enabled)
+    }
+
     fun refreshWidget() {
         NotesWidgetProvider.updateAllWidgets(app)
     }

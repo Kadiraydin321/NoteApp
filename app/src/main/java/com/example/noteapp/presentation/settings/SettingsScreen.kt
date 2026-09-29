@@ -29,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.noteapp.data.settings.AppSettings
+import com.example.noteapp.data.settings.NotesLayoutMode
+import com.example.noteapp.data.settings.ThemeMode
 import com.example.noteapp.data.settings.WidgetFilterMode
 import com.example.noteapp.presentation.detail.NoteColors
 import java.text.SimpleDateFormat
@@ -43,6 +45,11 @@ fun SettingsScreen(
     onWidgetShowLockedChange: (Boolean) -> Unit,
     onDefaultColorChange: (Int) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
+    onThemeModeChange: (ThemeMode) -> Unit = {},
+    onLayoutModeChange: (NotesLayoutMode) -> Unit = {},
+    onMasterPinChange: (String?) -> Unit = {},
+    onAutoLockChange: (Boolean) -> Unit = {},
+    onHighContrastChange: (Boolean) -> Unit = {},
     onRefreshWidget: () -> Unit,
     onExportToUri: (Uri) -> Unit,
     onExportAndShare: (Context) -> Unit,
@@ -54,6 +61,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
+    var showSetPinDialog by remember { mutableStateOf(false) }
+    var pinInput by remember { mutableStateOf("") }
 
     // Yeni dosya oluşturarak dışa aktarma (SAF CreateDocument)
     val createDocumentLauncher = rememberLauncherForActivityResult(
@@ -340,6 +349,96 @@ fun SettingsScreen(
 
                     HorizontalDivider()
 
+                    // Tema Seçimi: Sistem, Açık, Koyu
+                    Text("Uygulama Teması:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = settings.themeMode == ThemeMode.SYSTEM,
+                            onClick = { onThemeModeChange(ThemeMode.SYSTEM) },
+                            label = { Text("Sistem") },
+                            leadingIcon = if (settings.themeMode == ThemeMode.SYSTEM) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = settings.themeMode == ThemeMode.LIGHT,
+                            onClick = { onThemeModeChange(ThemeMode.LIGHT) },
+                            label = { Text("Açık") },
+                            leadingIcon = if (settings.themeMode == ThemeMode.LIGHT) {
+                                { Icon(Icons.Default.LightMode, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = settings.themeMode == ThemeMode.DARK,
+                            onClick = { onThemeModeChange(ThemeMode.DARK) },
+                            label = { Text("Koyu") },
+                            leadingIcon = if (settings.themeMode == ThemeMode.DARK) {
+                                { Icon(Icons.Default.DarkMode, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    // Varsayılan Not Listeleme Düzeni
+                    Text("Ana Sayfa Not Düzeni:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = settings.layoutMode == NotesLayoutMode.STAGGERED_GRID,
+                            onClick = { onLayoutModeChange(NotesLayoutMode.STAGGERED_GRID) },
+                            label = { Text("Izgara") },
+                            leadingIcon = if (settings.layoutMode == NotesLayoutMode.STAGGERED_GRID) {
+                                { Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = settings.layoutMode == NotesLayoutMode.LIST,
+                            onClick = { onLayoutModeChange(NotesLayoutMode.LIST) },
+                            label = { Text("Geniş Liste") },
+                            leadingIcon = if (settings.layoutMode == NotesLayoutMode.LIST) {
+                                { Icon(Icons.Default.ViewAgenda, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = settings.layoutMode == NotesLayoutMode.COMPACT_LIST,
+                            onClick = { onLayoutModeChange(NotesLayoutMode.COMPACT_LIST) },
+                            label = { Text("Kompakt") },
+                            leadingIcon = if (settings.layoutMode == NotesLayoutMode.COMPACT_LIST) {
+                                { Icon(Icons.Default.ViewHeadline, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    // Negatif / Yüksek Kontrastlı Metinler
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Negatif & Yüksek Kontrast Metin", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text(
+                                "Koyu temada ve renkli notlarda yazı rengini otomatik olarak tersine çevirerek her zaman net okunabilir kılar",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = settings.highContrastNegative,
+                            onCheckedChange = onHighContrastChange
+                        )
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -386,7 +485,7 @@ fun SettingsScreen(
             }
 
             // ==========================================
-            // BÖLÜM 4: GÜVENLİK BİLGİSİ
+            // BÖLÜM 4: GÜVENLİK & BİYOMETRİK KORUMA
             // ==========================================
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -407,7 +506,7 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            "Güvenlik & Gizlilik",
+                            "Güvenlik & Biyometrik Koruma",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -415,11 +514,81 @@ fun SettingsScreen(
 
                     HorizontalDivider()
 
-                    Text(
-                        "Notlarınızı biyometrik olarak (parmak izi / cihaz PIN'i) kilitlemek için, herhangi bir notun düzenleme ekranında üst kısımdaki 'Kilit' simgesine dokunmanız yeterlidir. Kilitli notlar kimlik doğrulanmadan açılamaz.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    // Master PIN Ayarı
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Yedek Güvenlik PIN'i",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                if (settings.masterPin != null) "PIN belirlendi (Parmak izi çalışmadığında kullanılır)"
+                                else "Biyometrik donanım olmayan cihazlar veya yedek kilit için PIN belirleyin",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        FilledTonalButton(onClick = { showSetPinDialog = true }) {
+                            Text(if (settings.masterPin != null) "Değiştir" else "Ayarla")
+                        }
+                    }
+
+                    if (settings.masterPin != null) {
+                        TextButton(
+                            onClick = { onMasterPinChange(null) },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Text("PIN'i Kaldır")
+                        }
+                    }
+
+                    HorizontalDivider()
+
+                    // Arka Plana Geçince Kilitle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Uygulama Ayrılınca Otomatik Kilitle", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text(
+                                "Uygulama arka plana geçtiğinde kilitli notların oturumunu anında sonlandırır",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = settings.autoLockOnExit,
+                            onCheckedChange = onAutoLockChange
+                        )
+                    }
+
+                    HorizontalDivider()
+
+                    // FLAG_SECURE ve Donanım Koruması Bilgisi
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                            Text(
+                                "Güçlendirilmiş Güvenlik: Kilitli notlar açıkken ekran görüntüsü alınması ve son uygulamalar (Recents) ekranında içeriklerin sızması Android işletim sistemi düzeyinde engellenir.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
                 }
             }
 
@@ -541,6 +710,56 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = onDismissBackupMessage) {
                     Text("Tamam")
+                }
+            }
+        )
+    }
+
+    // 4. PIN Belirleme / Değiştirme Penceresi
+    if (showSetPinDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showSetPinDialog = false
+                pinInput = ""
+            },
+            title = { Text("Güvenlik PIN'i Belirle") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Kilitli notlara erişim için 4-6 haneli bir PIN kodu girin:",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = pinInput,
+                        onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) pinInput = it },
+                        placeholder = { Text("Örn: 1234") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (pinInput.length >= 4) {
+                            onMasterPinChange(pinInput)
+                            showSetPinDialog = false
+                            pinInput = ""
+                        }
+                    },
+                    enabled = pinInput.length >= 4
+                ) {
+                    Text("Kaydet")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showSetPinDialog = false
+                    pinInput = ""
+                }) {
+                    Text("İptal")
                 }
             }
         )

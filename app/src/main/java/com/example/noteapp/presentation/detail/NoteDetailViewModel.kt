@@ -119,6 +119,14 @@ class NoteDetailViewModel @Inject constructor(
         _state.value = _state.value.copy(categoryId = categoryId)
     }
 
+    fun onAddCategory(name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            val newId = repository.insertCategory(Category(name = name.trim()))
+            _state.value = _state.value.copy(categoryId = newId)
+        }
+    }
+
     fun onAddImage(uri: Uri) {
         val savedPath = FileStorageHelper.saveImageFromUri(app, uri)
         if (savedPath != null) {

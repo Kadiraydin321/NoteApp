@@ -27,4 +27,8 @@ interface NoteRepository {
     suspend fun insertCategories(categories: List<Category>)
     suspend fun deleteAllCategories()
     suspend fun deleteCategory(category: Category)
+
+    suspend fun moveNotesToTrash(noteIds: List<Long>)
+    suspend fun updateNotesCategory(noteIds: List<Long>, categoryId: Long?)
+    suspend fun deleteNotesPermanently(noteIds: List<Long>)
 }

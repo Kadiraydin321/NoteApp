@@ -60,6 +60,28 @@ class NoteRepositoryImpl @Inject constructor(
     override suspend fun getAllCategoriesList(): List<Category> = dao.getAllCategoriesList()
     override suspend fun insertCategory(category: Category): Long = dao.insertCategory(category)
     override suspend fun insertCategories(categories: List<Category>) = dao.insertCategories(categories)
-    override suspend fun deleteAllCategories() = dao.deleteAllCategories()
-    override suspend fun deleteCategory(category: Category) = dao.deleteCategory(category)
+    override suspend fun deleteAllCategories() {
+        dao.deleteAllCategories()
+        NotesWidgetProvider.updateAllWidgets(context)
+    }
+    override suspend fun deleteCategory(category: Category) {
+        dao.clearCategoryFromNotes(category.id)
+        dao.deleteCategory(category)
+        NotesWidgetProvider.updateAllWidgets(context)
+    }
+
+    override suspend fun moveNotesToTrash(noteIds: List<Long>) {
+        dao.moveNotesToTrash(noteIds)
+        NotesWidgetProvider.updateAllWidgets(context)
+    }
+
+    override suspend fun updateNotesCategory(noteIds: List<Long>, categoryId: Long?) {
+        dao.updateNotesCategory(noteIds, categoryId)
+        NotesWidgetProvider.updateAllWidgets(context)
+    }
+
+    override suspend fun deleteNotesPermanently(noteIds: List<Long>) {
+        dao.deleteNotesPermanently(noteIds)
+        NotesWidgetProvider.updateAllWidgets(context)
+    }
 }
