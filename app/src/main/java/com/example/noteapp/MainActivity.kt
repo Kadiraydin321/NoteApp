@@ -39,6 +39,7 @@ import androidx.navigation.navArgument
 import com.example.noteapp.biometric.BiometricPromptManager
 import com.example.noteapp.biometric.BiometricResult
 import com.example.noteapp.data.settings.AppSettingsManager
+import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.presentation.detail.NoteDetailScreen
 import com.example.noteapp.presentation.detail.NoteDetailViewModel
@@ -70,6 +71,8 @@ class MainActivity : FragmentActivity() {
 
     private val isPrivacyShieldActive = mutableStateOf(false)
     private var navControllerRef: NavController? = null
+    private var pendingWidgetIntent by mutableStateOf<Intent?>(null)
+    private var wasAppInBackground = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,9 +83,16 @@ class MainActivity : FragmentActivity() {
             android.view.WindowManager.LayoutParams.FLAG_SECURE
         )
 
+        pendingWidgetIntent = intent
+
         setContent {
             val appSettings by settingsManager.settings.collectAsState()
             val isShieldActive by remember { isPrivacyShieldActive }
+
+            // Biyometrik yerine Master PIN doğrulama / belirleme diyaloğu
+            var noteToUnlockWithPin by remember { mutableStateOf<Note?>(null) }
+            var pinInput by remember { mutableStateOf("") }
+            var pinErrorText by remember { mutableStateOf<String?>(null) }
 
             // Güvenlik: autoLockOnExit aktif ise veya güvenli modda ekran görüntüsü ve uygulama önizlemelerini engelle
             LaunchedEffect(appSettings.autoLockOnExit) {
@@ -107,10 +117,136 @@ class MainActivity : FragmentActivity() {
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     // Widget'tan gelen intent'i kontrol et
-                    LaunchedEffect(Unit) {
-                        handleWidgetIntent(intent) { route ->
-                            navController.navigate(route)
+                    LaunchedEffect(pendingWidgetIntent) {
+                        val incoming = pendingWidgetIntent
+                        if (incoming != null) {
+                            handleWidgetIntent(
+                                intent = incoming,
+                                onUnlockWithPinRequired = { note ->
+                                    noteToUnlockWithPin = note
+                                },
+                                onNavigate = { route ->
+                                    navController.navigate(route) {
+                                        popUpTo("notes_screen") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
+                            pendingWidgetIntent = null
                         }
+                    }
+
+                    // Master PIN Diyaloğu
+                    if (noteToUnlockWithPin != null) {
+                        val targetNote = noteToUnlockWithPin!!
+                        val hasMasterPin = !appSettings.masterPin.isNullOrBlank()
+
+                        AlertDialog(
+                            onDismissRequest = {
+                                noteToUnlockWithPin = null
+                                pinInput = ""
+                                pinErrorText = null
+                            },
+                            icon = {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            title = {
+                                Text(
+                                    if (hasMasterPin) "Master PIN Girin" else "Kilitli Not - PIN Belirleyin"
+                                )
+                            },
+                            text = {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        if (hasMasterPin)
+                                            "'${targetNote.title.ifBlank { "Not" }}' kilitli. Açmak için Master PIN kodunuzu girin:"
+                                        else
+                                            "Cihazınızda biyometrik kilit bulunamadı. Bu notu açmak ve güvenliğinizi korumak için lütfen en az 4 haneli bir Master PIN belirleyin:"
+                                    )
+                                    OutlinedTextField(
+                                        value = pinInput,
+                                        onValueChange = {
+                                            if (it.length <= 8 && it.all { c -> c.isDigit() }) {
+                                                pinInput = it
+                                                pinErrorText = null
+                                            }
+                                        },
+                                        label = { Text("PIN Kodu") },
+                                        singleLine = true,
+                                        visualTransformation = PasswordVisualTransformation(),
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.NumberPassword
+                                        ),
+                                        isError = pinErrorText != null,
+                                        supportingText = {
+                                            if (pinErrorText != null) {
+                                                Text(
+                                                    pinErrorText!!,
+                                                    color = MaterialTheme.colorScheme.error
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        if (hasMasterPin) {
+                                            if (pinInput == appSettings.masterPin) {
+                                                val id = targetNote.id
+                                                noteToUnlockWithPin = null
+                                                pinInput = ""
+                                                pinErrorText = null
+                                                navController.navigate("note_detail_screen?noteId=$id") {
+                                                    popUpTo("notes_screen") { inclusive = false }
+                                                    launchSingleTop = true
+                                                }
+                                            } else {
+                                                pinErrorText = "Hatalı PIN! Lütfen tekrar deneyin."
+                                            }
+                                        } else {
+                                            if (pinInput.length >= 4) {
+                                                CoroutineScope(Dispatchers.Main).launch {
+                                                    settingsManager.setMasterPin(pinInput)
+                                                    Toast.makeText(this@MainActivity, "Master PIN kaydedildi", Toast.LENGTH_SHORT).show()
+                                                    val id = targetNote.id
+                                                    noteToUnlockWithPin = null
+                                                    pinInput = ""
+                                                    pinErrorText = null
+                                                    navController.navigate("note_detail_screen?noteId=$id") {
+                                                        popUpTo("notes_screen") { inclusive = false }
+                                                        launchSingleTop = true
+                                                    }
+                                                }
+                                            } else {
+                                                pinErrorText = "PIN en az 4 haneli olmalıdır"
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Text(if (hasMasterPin) "Aç" else "Kaydet ve Aç")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    onClick = {
+                                        noteToUnlockWithPin = null
+                                        pinInput = ""
+                                        pinErrorText = null
+                                    }
+                                ) {
+                                    Text("İptal")
+                                }
+                            }
+                        )
                     }
 
                     NavHost(
@@ -120,117 +256,6 @@ class MainActivity : FragmentActivity() {
                     composable("notes_screen") {
                         val viewModel = hiltViewModel<NotesViewModel>()
                         val state by viewModel.state.collectAsState()
-
-                        // Biyometrik yerine Master PIN doğrulama / belirleme diyaloğu
-                        var noteToUnlockWithPin by remember { mutableStateOf<com.example.noteapp.domain.model.Note?>(null) }
-                        var pinInput by remember { mutableStateOf("") }
-                        var pinErrorText by remember { mutableStateOf<String?>(null) }
-
-                        if (noteToUnlockWithPin != null) {
-                            val targetNote = noteToUnlockWithPin!!
-                            val hasMasterPin = !appSettings.masterPin.isNullOrBlank()
-
-                            androidx.compose.material3.AlertDialog(
-                                onDismissRequest = {
-                                    noteToUnlockWithPin = null
-                                    pinInput = ""
-                                    pinErrorText = null
-                                },
-                                icon = {
-                                    androidx.compose.material3.Icon(
-                                        androidx.compose.material.icons.Icons.Default.Lock,
-                                        contentDescription = null,
-                                        tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                                    )
-                                },
-                                title = {
-                                    androidx.compose.material3.Text(
-                                        if (hasMasterPin) "Master PIN Girin" else "Kilitli Not - PIN Belirleyin"
-                                    )
-                                },
-                                text = {
-                                    androidx.compose.foundation.layout.Column(
-                                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        androidx.compose.material3.Text(
-                                            if (hasMasterPin)
-                                                "'${targetNote.title.ifBlank { "Not" }}' kilitli. Açmak için Master PIN kodunuzu girin:"
-                                            else
-                                                "Cihazınızda biyometrik kilit bulunamadı. Bu notu açmak ve güvenliğinizi korumak için lütfen en az 4 haneli bir Master PIN belirleyin:"
-                                        )
-                                        androidx.compose.material3.OutlinedTextField(
-                                            value = pinInput,
-                                            onValueChange = {
-                                                if (it.length <= 8 && it.all { c -> c.isDigit() }) {
-                                                    pinInput = it
-                                                    pinErrorText = null
-                                                }
-                                            },
-                                            label = { androidx.compose.material3.Text("PIN Kodu") },
-                                            singleLine = true,
-                                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                                keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
-                                            ),
-                                            isError = pinErrorText != null,
-                                            supportingText = {
-                                                if (pinErrorText != null) {
-                                                    androidx.compose.material3.Text(
-                                                        pinErrorText!!,
-                                                        color = androidx.compose.material3.MaterialTheme.colorScheme.error
-                                                    )
-                                                }
-                                            },
-                                            modifier = androidx.compose.ui.Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                },
-                                confirmButton = {
-                                    androidx.compose.material3.TextButton(
-                                        onClick = {
-                                            if (hasMasterPin) {
-                                                if (pinInput == appSettings.masterPin) {
-                                                    val id = targetNote.id
-                                                    noteToUnlockWithPin = null
-                                                    pinInput = ""
-                                                    pinErrorText = null
-                                                    navController.navigate("note_detail_screen?noteId=$id")
-                                                } else {
-                                                    pinErrorText = "Hatalı PIN! Lütfen tekrar deneyin."
-                                                }
-                                            } else {
-                                                if (pinInput.length >= 4) {
-                                                    CoroutineScope(Dispatchers.Main).launch {
-                                                        settingsManager.setMasterPin(pinInput)
-                                                        Toast.makeText(this@MainActivity, "Master PIN kaydedildi", Toast.LENGTH_SHORT).show()
-                                                        val id = targetNote.id
-                                                        noteToUnlockWithPin = null
-                                                        pinInput = ""
-                                                        pinErrorText = null
-                                                        navController.navigate("note_detail_screen?noteId=$id")
-                                                    }
-                                                } else {
-                                                    pinErrorText = "PIN en az 4 haneli olmalıdır"
-                                                }
-                                            }
-                                        }
-                                    ) {
-                                        androidx.compose.material3.Text(if (hasMasterPin) "Aç" else "Kaydet ve Aç")
-                                    }
-                                },
-                                dismissButton = {
-                                    androidx.compose.material3.TextButton(
-                                        onClick = {
-                                            noteToUnlockWithPin = null
-                                            pinInput = ""
-                                            pinErrorText = null
-                                        }
-                                    ) {
-                                        androidx.compose.material3.Text("İptal")
-                                    }
-                                }
-                            )
-                        }
 
                         NotesScreen(
                             state = state,
@@ -291,6 +316,7 @@ class MainActivity : FragmentActivity() {
                             onTogglePinForSelected = viewModel::togglePinForSelected,
                             onDuplicateNote = viewModel::onDuplicateNote,
                             onFilterTypeChange = viewModel::setFilterType,
+                            onSortOrderChange = viewModel::setSortOrder,
                             onSettingsClick = {
                                 navController.navigate("settings_screen")
                             }
@@ -357,6 +383,7 @@ class MainActivity : FragmentActivity() {
                             onTitleChange = viewModel::onTitleChange,
                             onContentValueChange = viewModel::onContentValueChange,
                             onColorChange = viewModel::onColorChange,
+                            onBackgroundImageChange = viewModel::onBackgroundImageChange,
                             onTogglePin = viewModel::onTogglePin,
                             onToggleLock = viewModel::onToggleLock,
                             onSetReminder = viewModel::onSetReminder,
@@ -384,11 +411,19 @@ class MainActivity : FragmentActivity() {
                             },
                             onSaveClick = {
                                 viewModel.saveNote()
-                                navController.popBackStack()
+                                if (!navController.popBackStack()) {
+                                    navController.navigate("notes_screen") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
                             },
                             onBackClick = {
                                 viewModel.saveNote()
-                                navController.popBackStack()
+                                if (!navController.popBackStack()) {
+                                    navController.navigate("notes_screen") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
                             },
                             autoAction = autoAction?.ifBlank { null },
                             justEditedImagePath = justEditedImagePath,
@@ -418,10 +453,18 @@ class MainActivity : FragmentActivity() {
                                 navController.previousBackStackEntry
                                     ?.savedStateHandle
                                     ?.set("edited_image_pair", Pair(originalPath, newPath))
-                                navController.popBackStack()
+                                if (!navController.popBackStack()) {
+                                    navController.navigate("notes_screen") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
                             },
                             onBackClick = {
-                                navController.popBackStack()
+                                if (!navController.popBackStack()) {
+                                    navController.navigate("notes_screen") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
                             }
                         )
                     }
@@ -432,10 +475,18 @@ class MainActivity : FragmentActivity() {
                                 navController.previousBackStackEntry
                                     ?.savedStateHandle
                                     ?.set("drawing_path", drawingPath)
-                                navController.popBackStack()
+                                if (!navController.popBackStack()) {
+                                    navController.navigate("notes_screen") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
                             },
                             onBackClick = {
-                                navController.popBackStack()
+                                if (!navController.popBackStack()) {
+                                    navController.navigate("notes_screen") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
                             }
                         )
                     }
@@ -458,9 +509,9 @@ class MainActivity : FragmentActivity() {
                             onAutoLockChange = viewModel::setAutoLockOnExit,
                             onHighContrastChange = viewModel::setHighContrastNegative,
                             onRefreshWidget = viewModel::refreshWidget,
-                            onExportToUri = viewModel::exportBackupToUri,
-                            onExportAndShare = { viewModel.exportAndShare(it) },
-                            onImportFromUri = { uri, clear -> viewModel.importBackupFromUri(uri, clear) },
+                            onExportToUri = { uri, pass -> viewModel.exportBackupToUri(uri, pass) },
+                            onExportAndShare = { ctx, pass -> viewModel.exportAndShare(ctx, pass) },
+                            onImportFromUri = { uri, clear, pass -> viewModel.importBackupFromUri(uri, clear, pass) },
                             onLoadSampleNotes = viewModel::loadSampleNotes,
                             onDismissBackupMessage = viewModel::dismissMessage,
                             onBackClick = {
@@ -507,42 +558,38 @@ class MainActivity : FragmentActivity() {
     }
 }
 
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        // Task Switcher (Son Uygulamalar) önizlemesini anında kapkara yapmak için
-        if (settingsManager.settings.value.autoLockOnExit) {
-            isPrivacyShieldActive.value = !hasFocus
-        }
-    }
-
     override fun onPause() {
         super.onPause()
-        if (settingsManager.settings.value.autoLockOnExit) {
-            isPrivacyShieldActive.value = true
-        }
+        // Sistem diyalogları (izinler, biyometrik vb.) geçici olarak pause yapabileceği için
+        // kalkanı burada değil, yalnızca uygulama tamamen arka plana geçtiğinde (onStop) aktifleştiriyoruz.
     }
 
     override fun onStop() {
         super.onStop()
         if (settingsManager.settings.value.autoLockOnExit) {
             isPrivacyShieldActive.value = true
+            wasAppInBackground = true
         }
     }
 
     override fun onResume() {
         super.onResume()
         isPrivacyShieldActive.value = false
-        // Eğer kullanıcı kilitli bir notun içindeyken uygulamadan çıktıysa, geri döndüğünde ana ekrana döner
-        if (settingsManager.settings.value.autoLockOnExit) {
-            navControllerRef?.let { nav ->
-                val currentRoute = nav.currentBackStackEntry?.destination?.route
-                if (currentRoute?.startsWith("note_detail_screen") == true) {
-                    val noteId = nav.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
-                    if (noteId != -1L) {
-                        CoroutineScope(Dispatchers.Main).launch {
-                            val note = repository.getNoteById(noteId)
-                            if (note != null && note.isLocked) {
-                                nav.popBackStack("notes_screen", inclusive = false)
+
+        if (wasAppInBackground && settingsManager.settings.value.autoLockOnExit) {
+            wasAppInBackground = false
+            // Eğer widget'tan yeni bir yönlendirme gelmiyorsa ve kilitli bir nottaysak ana ekrana dön
+            if (pendingWidgetIntent == null) {
+                navControllerRef?.let { nav ->
+                    val currentRoute = nav.currentBackStackEntry?.destination?.route
+                    if (currentRoute?.startsWith("note_detail_screen") == true) {
+                        val noteId = nav.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
+                        if (noteId != -1L) {
+                            CoroutineScope(Dispatchers.Main).launch {
+                                val note = repository.getNoteById(noteId)
+                                if (note != null && note.isLocked) {
+                                    nav.popBackStack("notes_screen", inclusive = false)
+                                }
                             }
                         }
                     }
@@ -554,9 +601,14 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        pendingWidgetIntent = intent
     }
 
-    private fun handleWidgetIntent(intent: Intent?, onNavigate: (String) -> Unit) {
+    private fun handleWidgetIntent(
+        intent: Intent?,
+        onUnlockWithPinRequired: (Note) -> Unit,
+        onNavigate: (String) -> Unit
+    ) {
         if (intent == null) return
 
         // Widget hızlı aksiyon butonları (Metin, Görsel, Ses, Çizim)
@@ -565,6 +617,7 @@ class MainActivity : FragmentActivity() {
             intent.removeExtra(NotesWidgetProvider.EXTRA_ACTION_TYPE)
             when (actionType) {
                 NotesWidgetProvider.ACTION_TYPE_TEXT -> onNavigate("note_detail_screen")
+                NotesWidgetProvider.ACTION_TYPE_CHECKLIST -> onNavigate("note_detail_screen?autoAction=checklist")
                 NotesWidgetProvider.ACTION_TYPE_IMAGE -> onNavigate("note_detail_screen?autoAction=image")
                 NotesWidgetProvider.ACTION_TYPE_VOICE -> onNavigate("note_detail_screen?autoAction=voice")
                 NotesWidgetProvider.ACTION_TYPE_DRAW -> onNavigate("note_detail_screen?autoAction=draw")
@@ -591,10 +644,26 @@ class MainActivity : FragmentActivity() {
                             title = "Kilitli Not",
                             description = "'${note.title}' notunu açmak için parmak izinizi veya PIN'inizi kullanın",
                             onResult = { result ->
-                                if (result is BiometricResult.AuthenticationSuccess) {
-                                    onNavigate("note_detail_screen?noteId=$noteId")
-                                } else {
-                                    Toast.makeText(this@MainActivity, "Kimlik doğrulanmadı", Toast.LENGTH_SHORT).show()
+                                when (result) {
+                                    is BiometricResult.AuthenticationSuccess -> {
+                                        onNavigate("note_detail_screen?noteId=$noteId")
+                                    }
+                                    is BiometricResult.AuthenticationError -> {
+                                        if (!settingsManager.settings.value.masterPin.isNullOrBlank()) {
+                                            onUnlockWithPinRequired(note)
+                                        } else {
+                                            Toast.makeText(this@MainActivity, result.error, Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    is BiometricResult.AuthenticationFailed -> {
+                                        Toast.makeText(this@MainActivity, "Kimlik doğrulama başarısız", Toast.LENGTH_SHORT).show()
+                                    }
+                                    is BiometricResult.FeatureUnavailable,
+                                    is BiometricResult.HardwareUnavailable,
+                                    is BiometricResult.NoneEnrolled -> {
+                                        // Biyometrik yoksa veya tanımlı değilse Master PIN sor
+                                        onUnlockWithPinRequired(note)
+                                    }
                                 }
                             }
                         )

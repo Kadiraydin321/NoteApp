@@ -18,11 +18,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -67,6 +69,7 @@ fun NotesScreen(
     onTogglePinForSelected: () -> Unit = {},
     onDuplicateNote: (Note) -> Unit = {},
     onFilterTypeChange: (NoteTypeFilter) -> Unit = {},
+    onSortOrderChange: (NoteSortOrder) -> Unit = {},
     onSettingsClick: () -> Unit
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -79,12 +82,13 @@ fun NotesScreen(
     var categoryToDelete by remember { mutableStateOf<Category?>(null) }
     var showBatchCategoryDialog by remember { mutableStateOf(false) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+    var showSortMenu by remember { mutableStateOf(false) }
 
     val isSelectionMode = state.selectedNoteIds.isNotEmpty()
 
-    // Filtrelenmiş Notlar Listesi
-    val filteredNotes = remember(state.notes, state.searchQuery, state.filterType, state.selectedCategory) {
-        state.notes.filter { note ->
+    // Filtrelenmiş ve Sıralanmış Notlar Listesi
+    val filteredNotes = remember(state.notes, state.searchQuery, state.filterType, state.selectedCategory, state.sortOrder) {
+        val baseFiltered = state.notes.filter { note ->
             val matchesSearch = state.searchQuery.isBlank() ||
                     note.title.contains(state.searchQuery, ignoreCase = true) ||
                     note.content.contains(state.searchQuery, ignoreCase = true)
@@ -97,6 +101,18 @@ fun NotesScreen(
             }
             matchesSearch && matchesType
         }
+
+        val comparator = when (state.sortOrder) {
+            NoteSortOrder.MODIFIED_DESC -> compareByDescending<Note> { it.updatedAt }
+            NoteSortOrder.MODIFIED_ASC -> compareBy<Note> { it.updatedAt }
+            NoteSortOrder.CREATED_DESC -> compareByDescending<Note> { it.createdAt }
+            NoteSortOrder.CREATED_ASC -> compareBy<Note> { it.createdAt }
+            NoteSortOrder.TITLE_AZ -> compareBy<Note> { it.title.lowercase() }
+            NoteSortOrder.TITLE_ZA -> compareByDescending<Note> { it.title.lowercase() }
+        }
+
+        val (pinned, unpinned) = baseFiltered.partition { it.isPinned }
+        pinned.sortedWith(comparator) + unpinned.sortedWith(comparator)
     }
 
     ModalNavigationDrawer(
@@ -118,6 +134,17 @@ fun NotesScreen(
                     selected = state.viewMode == NotesViewMode.ALL && state.selectedCategory == null,
                     onClick = {
                         onViewModeChange(NotesViewMode.ALL)
+                        scope.launch { drawerState.close() }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                    label = { Text("Hatırlatıcılar") },
+                    selected = state.viewMode == NotesViewMode.REMINDERS,
+                    onClick = {
+                        onViewModeChange(NotesViewMode.REMINDERS)
                         scope.launch { drawerState.close() }
                     },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
@@ -254,6 +281,7 @@ fun NotesScreen(
                             Text(
                                 text = when (state.viewMode) {
                                     NotesViewMode.ALL -> state.selectedCategory?.let { "#${it.name}" } ?: "Notlarım"
+                                    NotesViewMode.REMINDERS -> "Hatırlatıcılar"
                                     NotesViewMode.ARCHIVE -> "Arşiv"
                                     NotesViewMode.TRASH -> "Çöp Kutusu"
                                 },
@@ -271,6 +299,33 @@ fun NotesScreen(
                                     Text("Çöpü Boşalt", color = MaterialTheme.colorScheme.error)
                                 }
                             } else {
+                                // Sıralama Butonu
+                                Box {
+                                    IconButton(onClick = { showSortMenu = true }) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Sort,
+                                            contentDescription = "Sırala"
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = showSortMenu,
+                                        onDismissRequest = { showSortMenu = false }
+                                    ) {
+                                        NoteSortOrder.values().forEach { order ->
+                                            DropdownMenuItem(
+                                                text = { Text(order.title) },
+                                                onClick = {
+                                                    onSortOrderChange(order)
+                                                    showSortMenu = false
+                                                },
+                                                trailingIcon = if (state.sortOrder == order) {
+                                                    { Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                                                } else null
+                                            )
+                                        }
+                                    }
+                                }
+
                                 // Not Listeleme Düzen Değiştirici Butonu
                                 IconButton(onClick = {
                                     val nextMode = when (state.layoutMode) {
@@ -414,7 +469,7 @@ fun NotesScreen(
                             LazyVerticalStaggeredGrid(
                                 columns = StaggeredGridCells.Fixed(2),
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(16.dp),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 100.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalItemSpacing = 12.dp
                             ) {
@@ -456,7 +511,7 @@ fun NotesScreen(
                         NotesLayoutMode.LIST -> {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(16.dp),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 100.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 items(filteredNotes, key = { it.id }) { note ->
@@ -497,7 +552,7 @@ fun NotesScreen(
                         NotesLayoutMode.COMPACT_LIST -> {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 items(filteredNotes, key = { it.id }) { note ->
@@ -779,11 +834,11 @@ fun NoteCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .border(
                 width = if (isSelected) 3.dp else 0.dp,
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(20.dp)
             )
             .combinedClickable(
                 onClick = onClick,
@@ -793,9 +848,20 @@ fun NoteCard(
             containerColor = colorSpec.backgroundColor
         )
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            if (!note.backgroundImage.isNullOrEmpty()) {
+                AsyncImage(
+                    model = File(note.backgroundImage),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .alpha(0.35f)
+                )
+            }
+            Column(
+                modifier = Modifier.padding(14.dp)
+            ) {
             // Seçim Modu Checkbox'ı veya Görsel Eki
             val firstImage = note.attachments.firstOrNull { !it.endsWith(".mp4") && !it.endsWith(".m4a") }
             firstImage?.let { imgPath ->
@@ -834,7 +900,7 @@ fun NoteCard(
                         onCheckedChange = { onClick() },
                         modifier = Modifier.size(24.dp)
                     )
-                } else if (viewMode == NotesViewMode.ALL) {
+                } else if (viewMode == NotesViewMode.ALL || viewMode == NotesViewMode.REMINDERS) {
                     IconButton(
                         onClick = onPinClick,
                         modifier = Modifier.size(24.dp)
@@ -869,8 +935,18 @@ fun NoteCard(
                 }
             } else if (note.content.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
+                val displayContent = remember(note.content) {
+                    note.content.lines().joinToString("\n") { line ->
+                        val trimmed = line.trimStart()
+                        when {
+                            trimmed.startsWith("- [x] ") -> "☑ " + trimmed.removePrefix("- [x] ")
+                            trimmed.startsWith("- [ ] ") -> "☐ " + trimmed.removePrefix("- [ ] ")
+                            else -> line
+                        }
+                    }
+                }
                 Text(
-                    text = note.content,
+                    text = displayContent,
                     style = MaterialTheme.typography.bodyMedium,
                     color = colorSpec.contentColor,
                     maxLines = 6,
@@ -907,7 +983,7 @@ fun NoteCard(
 
                 Row {
                     when (viewMode) {
-                        NotesViewMode.ALL -> {
+                        NotesViewMode.ALL, NotesViewMode.REMINDERS -> {
                             IconButton(onClick = onDuplicateClick, modifier = Modifier.size(28.dp)) {
                                 Icon(Icons.Default.ContentCopy, contentDescription = "Çoğalt", modifier = Modifier.size(17.dp), tint = colorSpec.iconTint)
                             }
@@ -938,6 +1014,7 @@ fun NoteCard(
                 }
             }
         }
+        }
     }
 }
 
@@ -963,14 +1040,14 @@ fun CompactNoteCard(
     val dateStr = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(note.timestamp))
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         color = colorSpec.backgroundColor,
         modifier = modifier
             .fillMaxWidth()
             .border(
                 width = if (isSelected) 2.dp else 0.dp,
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(16.dp)
             )
             .combinedClickable(
                 onClick = onClick,
@@ -1051,7 +1128,7 @@ fun CompactNoteCard(
                     color = colorSpec.secondaryColor
                 )
 
-                if (viewMode == NotesViewMode.ALL && !isSelectionMode) {
+                if ((viewMode == NotesViewMode.ALL || viewMode == NotesViewMode.REMINDERS) && !isSelectionMode) {
                     IconButton(
                         onClick = onPinClick,
                         modifier = Modifier.size(28.dp)

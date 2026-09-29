@@ -21,6 +21,7 @@ import javax.inject.Inject
 
 enum class NotesViewMode {
     ALL,
+    REMINDERS,
     ARCHIVE,
     TRASH
 }
@@ -33,10 +34,13 @@ enum class NoteTypeFilter {
     AUDIO
 }
 
-enum class NoteSortOrder {
-    DATE_DESC,
-    DATE_ASC,
-    TITLE_AZ
+enum class NoteSortOrder(val title: String) {
+    MODIFIED_DESC("Değiştirilme (En Yeni)"),
+    MODIFIED_ASC("Değiştirilme (En Eski)"),
+    CREATED_DESC("Oluşturulma (En Yeni)"),
+    CREATED_ASC("Oluşturulma (En Eski)"),
+    TITLE_AZ("Başlık (A - Z)"),
+    TITLE_ZA("Başlık (Z - A)")
 }
 
 data class NotesState(
@@ -48,7 +52,7 @@ data class NotesState(
     val layoutMode: NotesLayoutMode = NotesLayoutMode.STAGGERED_GRID,
     val selectedNoteIds: Set<Long> = emptySet(),
     val filterType: NoteTypeFilter = NoteTypeFilter.ALL,
-    val sortOrder: NoteSortOrder = NoteSortOrder.DATE_DESC
+    val sortOrder: NoteSortOrder = NoteSortOrder.MODIFIED_DESC
 )
 
 @HiltViewModel
@@ -104,12 +108,18 @@ class NotesViewModel @Inject constructor(
                 if (cat != null) repository.getNotesByCategory(cat.id)
                 else repository.getActiveNotes()
             }
+            NotesViewMode.REMINDERS -> repository.getActiveNotes()
             NotesViewMode.ARCHIVE -> repository.getArchivedNotes()
             NotesViewMode.TRASH -> repository.getTrashNotes()
         }
 
         notesJob = flow.onEach { notes ->
-            _state.value = _state.value.copy(notes = notes)
+            val finalNotes = if (_state.value.viewMode == NotesViewMode.REMINDERS) {
+                notes.filter { it.reminderTime != null && it.reminderTime > 0 }
+            } else {
+                notes
+            }
+            _state.value = _state.value.copy(notes = finalNotes)
         }.launchIn(viewModelScope)
     }
 

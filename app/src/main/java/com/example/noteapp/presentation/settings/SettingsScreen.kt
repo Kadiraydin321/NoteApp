@@ -51,9 +51,9 @@ fun SettingsScreen(
     onAutoLockChange: (Boolean) -> Unit = {},
     onHighContrastChange: (Boolean) -> Unit = {},
     onRefreshWidget: () -> Unit,
-    onExportToUri: (Uri) -> Unit,
-    onExportAndShare: (Context) -> Unit,
-    onImportFromUri: (Uri, Boolean) -> Unit,
+    onExportToUri: (Uri, String?) -> Unit,
+    onExportAndShare: (Context, String?) -> Unit,
+    onImportFromUri: (Uri, Boolean, String?) -> Unit,
     onLoadSampleNotes: () -> Unit = {},
     onDismissBackupMessage: () -> Unit,
     onBackClick: () -> Unit
@@ -61,15 +61,19 @@ fun SettingsScreen(
     val context = LocalContext.current
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
+    var showExportPasswordDialog by remember { mutableStateOf(false) }
+    var isSharePending by remember { mutableStateOf(false) }
+    var vaultPasswordForExport by remember { mutableStateOf("") }
+    var importPasswordInput by remember { mutableStateOf("") }
     var showSetPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
 
     // Yeni dosya oluşturarak dışa aktarma (SAF CreateDocument)
     val createDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip")
+        contract = ActivityResultContracts.CreateDocument("*/*")
     ) { uri ->
         if (uri != null) {
-            onExportToUri(uri)
+            onExportToUri(uri, vaultPasswordForExport.ifBlank { null })
         }
     }
 
@@ -79,6 +83,7 @@ fun SettingsScreen(
     ) { uri ->
         if (uri != null) {
             pendingImportUri = uri
+            importPasswordInput = settings.masterPin ?: ""
             showImportConfirmDialog = true
         }
     }
@@ -156,24 +161,29 @@ fun SettingsScreen(
                     // Buton 1: Cihaza / Dosyalara Kaydet
                     Button(
                         onClick = {
-                            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                            createDocumentLauncher.launch("NoteApp_Yedek_$dateStr.zip")
+                            isSharePending = false
+                            vaultPasswordForExport = settings.masterPin ?: ""
+                            showExportPasswordDialog = true
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Yedek Paketi Olarak Kaydet (.zip)")
+                        Text("Kasa Kilidi ile Yedekle (.notevault / .zip)")
                     }
 
                     // Buton 2: Paylaş Menüsü ile Dışa Aktar (WhatsApp, Drive, vb.)
                     OutlinedButton(
-                        onClick = { onExportAndShare(context) },
+                        onClick = {
+                            isSharePending = true
+                            vaultPasswordForExport = settings.masterPin ?: ""
+                            showExportPasswordDialog = true
+                        },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Yedeği Paylaş / Gönder (Drive, Mail, vb.)")
+                        Text("Kasa Kilidi ile Yedeği Paylaş / Gönder")
                     }
 
                     // Buton 3: Yedeği İçe Aktar (Geri Yükle)
@@ -619,24 +629,95 @@ fun SettingsScreen(
     // İLETİŞİM KUTULARI VE BİLDİRİMLER
     // ==========================================
 
-    // 1. İçe Aktarma Onay Penceresi (Birleştir veya Sıfırla)
+    // 0. Kasa Kilidi ile Dışa Aktarma Penceresi
+    if (showExportPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportPasswordDialog = false },
+            icon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Kasa Kilidi ile Şifreleme") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Yedek dosyanızı AES-256-GCM ve PBKDF2 hash koruması ile şifrelemek için bir Kasa Kilidi (şifre/PIN) girin:",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = vaultPasswordForExport,
+                        onValueChange = { vaultPasswordForExport = it },
+                        placeholder = { Text("Kasa Şifresi / PIN") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        "Not: Bu şifre yedeği başka cihaza taşırken veya geri yüklerken istenecektir.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExportPasswordDialog = false
+                        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                        if (isSharePending) {
+                            onExportAndShare(context, vaultPasswordForExport.ifBlank { null })
+                        } else {
+                            val ext = if (vaultPasswordForExport.isNotBlank()) "notevault" else "zip"
+                            createDocumentLauncher.launch("NoteApp_Yedek_$dateStr.$ext")
+                        }
+                    }
+                ) {
+                    Text(if (vaultPasswordForExport.isNotBlank()) "Şifreli Yedekle" else "Şifresiz Yedekle")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportPasswordDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    // 1. İçe Aktarma Onay Penceresi (Birleştir veya Sıfırla & Kasa Kilidi)
     if (showImportConfirmDialog && pendingImportUri != null) {
         val uri = pendingImportUri!!
         AlertDialog(
             onDismissRequest = {
                 showImportConfirmDialog = false
                 pendingImportUri = null
+                importPasswordInput = ""
             },
+            icon = { Icon(Icons.Default.Restore, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
             title = { Text("Yedekten Geri Yükle") },
             text = {
-                Text("Seçtiğiniz yedek dosyasındaki notlar ve medya dosyaları geri yüklenecektir. Nasıl yüklemek istersiniz?")
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Seçtiğiniz yedek dosyasındaki notlar ve medya dosyaları geri yüklenecektir.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "Yedek dosyası Kasa Kilidi ile şifrelenmiş ise lütfen şifrenizi girin:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = importPasswordInput,
+                        onValueChange = { importPasswordInput = it },
+                        placeholder = { Text("Kasa Kilidi Şifresi (Varsa)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showImportConfirmDialog = false
+                        val pass = importPasswordInput.ifBlank { null }
                         pendingImportUri = null
-                        onImportFromUri(uri, false)
+                        importPasswordInput = ""
+                        onImportFromUri(uri, false, pass)
                     }
                 ) {
                     Text("Mevcut Notları Koru & Ekle")
@@ -647,8 +728,10 @@ fun SettingsScreen(
                     TextButton(
                         onClick = {
                             showImportConfirmDialog = false
+                            val pass = importPasswordInput.ifBlank { null }
                             pendingImportUri = null
-                            onImportFromUri(uri, true)
+                            importPasswordInput = ""
+                            onImportFromUri(uri, true, pass)
                         },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) {
@@ -658,6 +741,7 @@ fun SettingsScreen(
                         onClick = {
                             showImportConfirmDialog = false
                             pendingImportUri = null
+                            importPasswordInput = ""
                         }
                     ) {
                         Text("İptal")

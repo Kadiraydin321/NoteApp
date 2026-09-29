@@ -33,19 +33,25 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
+import coil.compose.AsyncImage
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.presentation.components.AttachmentList
 import com.example.noteapp.presentation.components.MarkdownPreview
@@ -53,6 +59,7 @@ import com.example.noteapp.presentation.components.MarkdownVisualTransformation
 import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
 import com.example.noteapp.presentation.components.insertTextAtCursor
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.max
@@ -97,6 +104,7 @@ fun NoteDetailScreen(
     onTitleChange: (String) -> Unit,
     onContentValueChange: (TextFieldValue) -> Unit,
     onColorChange: (Int) -> Unit,
+    onBackgroundImageChange: (String?) -> Unit = {},
     onTogglePin: () -> Unit,
     onToggleLock: () -> Unit,
     onSetReminder: (Long?) -> Unit,
@@ -129,17 +137,9 @@ fun NoteDetailScreen(
     var showMoreMenu by remember { mutableStateOf(false) }
     var activeToolCategory by remember { mutableStateOf(NoteToolCategory.NONE) }
 
-    // Donanımsal veya jest ile geri tuşuna basıldığında otomatik kaydet
+    // Donanımsal veya jest ile geri tuşuna basıldığında
     BackHandler {
-        onSaveClick()
         onBackClick()
-    }
-
-    // Not detay ekranından herhangi bir şekilde ayrılındığında otomatik kaydet
-    DisposableEffect(Unit) {
-        onDispose {
-            onSaveClick()
-        }
     }
 
     // Görsel düzenlemeden yeni dönüldüyse geri alma için anında snackbar göster
@@ -176,11 +176,78 @@ fun NoteDetailScreen(
     val hintColor = contentColor.copy(alpha = 0.55f)
 
     // Medya ve Ses Seçicileri
+    var showImageSourceDialog by remember { mutableStateOf(false) }
+    var tempCameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempCameraUri != null) {
+            onAddImageUri(tempCameraUri!!)
+        }
+    }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
             onAddImageUri(uri)
+        }
+    }
+
+    val backgroundImagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            val savedPath = com.example.noteapp.media.FileStorageHelper.saveImageFromUri(context, uri)
+            if (savedPath != null) {
+                onBackgroundImageChange(savedPath)
+            }
+        }
+    }
+
+    fun launchCamera() {
+        try {
+            val photoFile = File(context.cacheDir, "camera_capture_${System.currentTimeMillis()}.jpg")
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                photoFile
+            )
+            tempCameraUri = uri
+            takePictureLauncher.launch(uri)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Kamera başlatılamadı: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Not İçi Arama Durumu
+    var isSearchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var currentMatchIndex by remember { mutableIntStateOf(0) }
+
+    val searchMatches = remember(state.contentValue.text, searchQuery) {
+        if (searchQuery.length < 2) emptyList<Int>()
+        else {
+            val list = mutableListOf<Int>()
+            var idx = state.contentValue.text.indexOf(searchQuery, 0, ignoreCase = true)
+            while (idx >= 0) {
+                list.add(idx)
+                idx = state.contentValue.text.indexOf(searchQuery, idx + 1, ignoreCase = true)
+            }
+            list
+        }
+    }
+
+    LaunchedEffect(currentMatchIndex, searchMatches) {
+        if (searchMatches.isNotEmpty() && currentMatchIndex in searchMatches.indices) {
+            val start = searchMatches[currentMatchIndex]
+            val end = start + searchQuery.length
+            onContentValueChange(
+                state.contentValue.copy(
+                    selection = TextRange(start, end)
+                )
+            )
         }
     }
 
@@ -192,19 +259,29 @@ fun NoteDetailScreen(
         }
     }
 
-    // Widget'tan otomatik aksiyonla açıldıysa
+    // Widget'tan otomatik aksiyonla açıldıysa (tek seferlik çalışması için rememberSaveable ile korunur)
+    var autoActionExecuted by rememberSaveable(autoAction) { mutableStateOf(false) }
+
     LaunchedEffect(autoAction) {
-        when (autoAction) {
-            "image" -> {
-                imagePickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                )
-            }
-            "voice" -> {
-                audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
-            }
-            "draw" -> {
-                onAddDrawingClick()
+        if (!autoActionExecuted && !autoAction.isNullOrBlank()) {
+            autoActionExecuted = true
+            when (autoAction) {
+                "image" -> {
+                    showImageSourceDialog = true
+                }
+                "voice" -> {
+                    audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                }
+                "draw" -> {
+                    onAddDrawingClick()
+                }
+                "checklist" -> {
+                    if (state.contentValue.text.isBlank()) {
+                        onContentValueChange(TextFieldValue("- [ ] ", selection = TextRange(6)))
+                    } else {
+                        insertTextAtCursor(state.contentValue, "\n- [ ] ", onContentValueChange) { focusRequester.requestFocus() }
+                    }
+                }
             }
         }
     }
@@ -331,77 +408,209 @@ fun NoteDetailScreen(
         )
     }
 
+    if (showImageSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            icon = { Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Görsel Ekle") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showImageSourceDialog = false
+                                launchCamera()
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Fotoğraf Çek (Kamera)", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showImageSourceDialog = false
+                                imagePickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(Icons.Default.Image, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Galeriden Seç", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showImageSourceDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = animatedBgColor,
         contentColor = contentColor,
         topBar = {
-            TopAppBar(
-                title = { },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = animatedBgColor,
-                    titleContentColor = contentColor,
-                    actionIconContentColor = contentColor,
-                    navigationIconContentColor = contentColor
-                ),
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
-                    }
-                },
-                actions = {
-                    // Geri Al (Undo)
-                    IconButton(
-                        onClick = onUndo,
-                        enabled = canUndo
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Undo,
-                            contentDescription = "Geri Al",
-                            tint = if (canUndo) contentColor else contentColor.copy(alpha = 0.35f)
+            if (isSearchActive) {
+                TopAppBar(
+                    title = {
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = {
+                                searchQuery = it
+                                currentMatchIndex = 0
+                            },
+                            placeholder = { Text("Notta ara...", color = hintColor) },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = if (isDarkBackground) Color.White else MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.fillMaxWidth()
                         )
-                    }
-
-                    // İleri Al (Redo)
-                    IconButton(
-                        onClick = onRedo,
-                        enabled = canRedo
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Redo,
-                            contentDescription = "İleri Al",
-                            tint = if (canRedo) contentColor else contentColor.copy(alpha = 0.35f)
-                        )
-                    }
-
-                    // 1. Sabitleme (Pin) Butonu - Ana Aksiyon
-                    IconButton(onClick = onTogglePin) {
-                        Icon(
-                            imageVector = if (state.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
-                            contentDescription = "Sabitle",
-                            tint = if (state.isPinned) MaterialTheme.colorScheme.primary else contentColor
-                        )
-                    }
-
-                    // 2. Notu Sil Butonu - Ana Aksiyon
-                    IconButton(onClick = { showDeleteConfirmDialog = true }) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Notu Sil",
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
-                        )
-                    }
-
-                    // 3. Kaydet Butonu - Ana Aksiyon
-                    IconButton(onClick = onSaveClick) {
-                        Icon(Icons.Default.Done, contentDescription = "Kaydet", tint = contentColor)
-                    }
-
-                    // 4. Üç Nokta Menüsü - Harici Tüm Özellikler
-                    Box {
-                        IconButton(onClick = { showMoreMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Daha Fazla Seçenek", tint = contentColor)
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = animatedBgColor,
+                        titleContentColor = contentColor,
+                        actionIconContentColor = contentColor,
+                        navigationIconContentColor = contentColor
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            isSearchActive = false
+                            searchQuery = ""
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Aramayı Kapat")
                         }
+                    },
+                    actions = {
+                        if (searchMatches.isNotEmpty()) {
+                            Text(
+                                "${currentMatchIndex + 1}/${searchMatches.size}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = contentColor,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                            IconButton(onClick = {
+                                if (searchMatches.isNotEmpty()) {
+                                    currentMatchIndex = if (currentMatchIndex > 0) currentMatchIndex - 1 else searchMatches.size - 1
+                                }
+                            }) {
+                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Önceki Eşleşme")
+                            }
+                            IconButton(onClick = {
+                                if (searchMatches.isNotEmpty()) {
+                                    currentMatchIndex = if (currentMatchIndex < searchMatches.size - 1) currentMatchIndex + 1 else 0
+                                }
+                            }) {
+                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Sonraki Eşleşme")
+                            }
+                        } else if (searchQuery.isNotBlank()) {
+                            Text(
+                                "0/0",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = contentColor.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                    }
+                )
+            } else {
+                TopAppBar(
+                    title = { },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = animatedBgColor,
+                        titleContentColor = contentColor,
+                        actionIconContentColor = contentColor,
+                        navigationIconContentColor = contentColor
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                        }
+                    },
+                    actions = {
+                        // Geri Al (Undo)
+                        IconButton(
+                            onClick = onUndo,
+                            enabled = canUndo
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Undo,
+                                contentDescription = "Geri Al",
+                                tint = if (canUndo) contentColor else contentColor.copy(alpha = 0.35f)
+                            )
+                        }
+
+                        // İleri Al (Redo)
+                        IconButton(
+                            onClick = onRedo,
+                            enabled = canRedo
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Redo,
+                                contentDescription = "İleri Al",
+                                tint = if (canRedo) contentColor else contentColor.copy(alpha = 0.35f)
+                            )
+                        }
+
+                        // 1. Sabitleme (Pin) Butonu - Ana Aksiyon
+                        IconButton(onClick = onTogglePin) {
+                            Icon(
+                                imageVector = if (state.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
+                                contentDescription = "Sabitle",
+                                tint = if (state.isPinned) MaterialTheme.colorScheme.primary else contentColor
+                            )
+                        }
+
+                        // 2. Notu Sil Butonu - Ana Aksiyon
+                        IconButton(onClick = { showDeleteConfirmDialog = true }) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Notu Sil",
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
+                            )
+                        }
+
+                        // 3. Kaydet Butonu - Ana Aksiyon
+                        IconButton(onClick = onSaveClick) {
+                            Icon(Icons.Default.Done, contentDescription = "Kaydet", tint = contentColor)
+                        }
+
+                        // 4. Not İçi Arama Butonu
+                        IconButton(onClick = { isSearchActive = true }) {
+                            Icon(Icons.Default.Search, contentDescription = "Notta Ara", tint = contentColor)
+                        }
+
+                        // 5. Üç Nokta Menüsü - Harici Tüm Özellikler
+                        Box {
+                            IconButton(onClick = { showMoreMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "Daha Fazla Seçenek", tint = contentColor)
+                            }
 
                         DropdownMenu(
                             expanded = showMoreMenu,
@@ -508,7 +717,8 @@ fun NoteDetailScreen(
                     }
                 }
             )
-        },
+        }
+    },
         bottomBar = {
             if (!isPreviewMode) {
                 Column(
@@ -570,11 +780,7 @@ fun NoteDetailScreen(
                                         ) {
                                             // 1. Görsel Ekle
                                             OutlinedButton(
-                                                onClick = {
-                                                    imagePickerLauncher.launch(
-                                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                                    )
-                                                }
+                                                onClick = { showImageSourceDialog = true }
                                             ) {
                                                 Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                                                 Spacer(modifier = Modifier.width(6.dp))
@@ -705,45 +911,96 @@ fun NoteDetailScreen(
                                     }
 
                                     NoteToolCategory.COLOR -> {
-                                        // Renk Paleti Listesi
-                                        LazyRow(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            items(NoteColors) { color ->
-                                                val argb = color.toArgb()
-                                                val isSelected = (state.color == argb) || (state.color == 0 && color == Color.Transparent)
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            // Renk Paleti Listesi
+                                            LazyRow(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                items(NoteColors) { color ->
+                                                    val argb = color.toArgb()
+                                                    val isSelected = (state.color == argb) || (state.color == 0 && color == Color.Transparent)
 
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(34.dp)
-                                                        .clip(CircleShape)
-                                                        .background(if (color == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant else color)
-                                                        .border(
-                                                            width = if (isSelected) 3.dp else 1.dp,
-                                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.5f),
-                                                            shape = CircleShape
-                                                        )
-                                                        .clickable { onColorChange(argb) },
-                                                    contentAlignment = Alignment.Center
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(34.dp)
+                                                            .clip(CircleShape)
+                                                            .background(if (color == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant else color)
+                                                            .border(
+                                                                width = if (isSelected) 3.dp else 1.dp,
+                                                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.5f),
+                                                                shape = CircleShape
+                                                            )
+                                                            .clickable { onColorChange(argb) },
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        if (color == Color.Transparent) {
+                                                            Icon(
+                                                                Icons.Default.FormatColorReset,
+                                                                contentDescription = "Varsayılan",
+                                                                modifier = Modifier.size(16.dp),
+                                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        } else if (isSelected) {
+                                                            Icon(
+                                                                Icons.Default.Check,
+                                                                contentDescription = null,
+                                                                modifier = Modifier.size(16.dp),
+                                                                tint = if (color.luminance() < 0.5f) Color.White else Color.Black
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Arka Plan Görseli Seçimi ve Kaldırma
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
-                                                    if (color == Color.Transparent) {
-                                                        Icon(
-                                                            Icons.Default.FormatColorReset,
-                                                            contentDescription = "Varsayılan",
-                                                            modifier = Modifier.size(16.dp),
-                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    OutlinedButton(
+                                                        onClick = {
+                                                            backgroundImagePickerLauncher.launch(
+                                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                            )
+                                                        }
+                                                    ) {
+                                                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(if (state.backgroundImage != null) "Arka Planı Değiştir" else "Arka Plan Resmi Seç", style = MaterialTheme.typography.labelMedium)
+                                                    }
+
+                                                    if (!state.backgroundImage.isNullOrEmpty()) {
+                                                        AsyncImage(
+                                                            model = File(state.backgroundImage),
+                                                            contentDescription = "Arka Plan Önizleme",
+                                                            contentScale = ContentScale.Crop,
+                                                            modifier = Modifier
+                                                                .size(36.dp)
+                                                                .clip(RoundedCornerShape(8.dp))
+                                                                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
                                                         )
-                                                    } else if (isSelected) {
-                                                        Icon(
-                                                            Icons.Default.Check,
-                                                            contentDescription = null,
-                                                            modifier = Modifier.size(16.dp),
-                                                            tint = if (color.luminance() < 0.5f) Color.White else Color.Black
-                                                        )
+                                                    }
+                                                }
+
+                                                if (!state.backgroundImage.isNullOrEmpty()) {
+                                                    TextButton(
+                                                        onClick = { onBackgroundImageChange(null) },
+                                                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                                    ) {
+                                                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("Resmi Kaldır", style = MaterialTheme.typography.labelSmall)
                                                     }
                                                 }
                                             }
@@ -814,8 +1071,21 @@ fun NoteDetailScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 4 Kategori Düğmesi
+                            // Düğmeler
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                // 0. Onay Kutusu (Checklist)
+                                IconButton(
+                                    onClick = {
+                                        applyPrefixToLine(state.contentValue, "- [ ] ", onContentValueChange) { focusRequester.requestFocus() }
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.CheckBox,
+                                        contentDescription = "Onay Kutusu Ekle",
+                                        tint = contentColor
+                                    )
+                                }
+
                                 // 1. Ekle / Medya
                                 IconButton(
                                     onClick = {
@@ -923,6 +1193,16 @@ fun NoteDetailScreen(
                     }
                 }
         ) {
+            if (!state.backgroundImage.isNullOrEmpty()) {
+                AsyncImage(
+                    model = File(state.backgroundImage),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha(0.25f)
+                )
+            }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1129,6 +1409,21 @@ fun NoteDetailScreen(
                     ) {
                         Text("Tahmini Okuma Süresi:", fontWeight = FontWeight.Medium)
                         Text("~$readingTimeMin dakika", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                    val dateFormat = remember { SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("tr")) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Oluşturulma:", fontWeight = FontWeight.Medium)
+                        Text(dateFormat.format(Date(state.createdAt)), fontWeight = FontWeight.SemiBold)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Son Düzenleme:", fontWeight = FontWeight.Medium)
+                        Text(dateFormat.format(Date(state.updatedAt)), fontWeight = FontWeight.SemiBold)
                     }
                     if (state.attachments.isNotEmpty()) {
                         Row(

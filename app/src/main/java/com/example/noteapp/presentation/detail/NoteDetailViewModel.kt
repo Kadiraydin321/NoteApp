@@ -46,7 +46,10 @@ data class NoteDetailState(
     val isRecordingAudio: Boolean = false,
     val isPlayingAudio: Boolean = false,
     val currentPlayingPath: String? = null,
-    val isSaved: Boolean = false
+    val isSaved: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val backgroundImage: String? = null
 )
 
 @HiltViewModel
@@ -95,7 +98,10 @@ class NoteDetailViewModel @Inject constructor(
                         isLocked = note.isLocked,
                         categoryId = note.categoryId,
                         reminderTime = note.reminderTime,
-                        attachments = note.attachments
+                        attachments = note.attachments,
+                        createdAt = if (note.createdAt != 0L) note.createdAt else note.timestamp,
+                        updatedAt = if (note.updatedAt != 0L) note.updatedAt else note.timestamp,
+                        backgroundImage = note.backgroundImage
                     )
                     lastCommittedSnapshot = NoteHistorySnapshot(note.title, initialContent)
                     undoStack.clear()
@@ -362,14 +368,20 @@ class NoteDetailViewModel @Inject constructor(
         }
     }
 
+    fun onBackgroundImageChange(imagePath: String?) {
+        _state.value = _state.value.copy(backgroundImage = imagePath)
+        saveNoteQuietly()
+    }
+
     fun saveNoteQuietly() {
         val currentState = _state.value
         val noteId = currentState.currentNoteId ?: 0L
-        if (noteId == 0L && currentState.title.isBlank() && currentState.contentValue.text.isBlank() && currentState.attachments.isEmpty()) {
+        if (noteId == 0L && currentState.title.isBlank() && currentState.contentValue.text.isBlank() && currentState.attachments.isEmpty() && currentState.backgroundImage == null) {
             return
         }
 
         viewModelScope.launch {
+            val now = System.currentTimeMillis()
             val note = Note(
                 id = noteId,
                 title = currentState.title,
@@ -380,7 +392,10 @@ class NoteDetailViewModel @Inject constructor(
                 categoryId = currentState.categoryId,
                 reminderTime = currentState.reminderTime,
                 attachments = currentState.attachments,
-                timestamp = System.currentTimeMillis()
+                timestamp = now,
+                createdAt = currentState.createdAt,
+                updatedAt = now,
+                backgroundImage = currentState.backgroundImage
             )
             val savedId = repository.insertNote(note)
             if (_state.value.currentNoteId == null || _state.value.currentNoteId == 0L) {
@@ -403,7 +418,7 @@ class NoteDetailViewModel @Inject constructor(
             // Ana ekran widget'ını otomatik güncelle
             NotesWidgetProvider.updateAllWidgets(app)
 
-            _state.value = _state.value.copy(isSaved = true)
+            _state.value = _state.value.copy(isSaved = true, updatedAt = now)
         }
     }
 

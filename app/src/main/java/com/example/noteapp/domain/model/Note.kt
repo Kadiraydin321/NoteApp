@@ -17,7 +17,10 @@ data class Note(
     val isDeleted: Boolean = false, // Çöp kutusu
     val isLocked: Boolean = false,  // Biyometrik / Şifre kilidi
     val reminderTime: Long? = null, // Hatırlatıcı tarihi
-    val attachments: List<String> = emptyList() // Görsel / Dosya yolları
+    val attachments: List<String> = emptyList(), // Görsel / Dosya yolları
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val backgroundImage: String? = null // Arka plan görseli
 )
 
 @Entity(tableName = "categories")

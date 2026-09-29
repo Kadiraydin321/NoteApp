@@ -85,12 +85,12 @@ class SettingsViewModel @Inject constructor(
     /**
      * Seçilen URI hedefine ZIP yedeği oluşturup yazar.
      */
-    fun exportBackupToUri(uri: Uri) {
+    fun exportBackupToUri(uri: Uri, vaultPassword: String? = null) {
         viewModelScope.launch {
             _backupUiState.value = BackupUiState(isOperating = true, operationTitle = "Yedek paketi hazırlanıyor...")
             try {
                 app.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    val result = backupManager.createBackup(outputStream)
+                    val result = backupManager.createBackup(outputStream, vaultPassword)
                     when (result) {
                         is BackupResult.Success -> {
                             val now = System.currentTimeMillis()
@@ -130,10 +130,10 @@ class SettingsViewModel @Inject constructor(
     /**
      * Yedek oluşturup Android Paylaş menüsü ile doğrudan uygulamalara gönderir.
      */
-    fun exportAndShare(context: Context) {
+    fun exportAndShare(context: Context, vaultPassword: String? = null) {
         viewModelScope.launch {
             _backupUiState.value = BackupUiState(isOperating = true, operationTitle = "Yedek dosyası hazırlanıyor...")
-            val result = backupManager.createShareableBackupFile()
+            val result = backupManager.createShareableBackupFile(vaultPassword)
             when (result) {
                 is BackupResult.Success -> {
                     val now = System.currentTimeMillis()
@@ -161,18 +161,25 @@ class SettingsViewModel @Inject constructor(
     /**
      * Seçilen ZIP yedek dosyasından notları ve medyaları içe aktarır.
      */
-    fun importBackupFromUri(uri: Uri, clearExisting: Boolean) {
+    fun importBackupFromUri(uri: Uri, clearExisting: Boolean, vaultPassword: String? = null) {
         viewModelScope.launch {
             _backupUiState.value = BackupUiState(isOperating = true, operationTitle = "Yedek verileri geri yükleniyor...")
             try {
                 app.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val result = backupManager.restoreBackup(inputStream, clearExisting)
+                    val result = backupManager.restoreBackup(inputStream, clearExisting, vaultPassword)
                     when (result) {
                         is RestoreResult.Success -> {
                             _backupUiState.value = BackupUiState(
                                 isOperating = false,
-                                message = "Geri yükleme tamamlandı! ${result.notesCount} not ve ${result.attachmentsCount} medya dosyası içeri aktarıldı.",
+                                message = "Geri yükleme tamamlandı! ${result.notesCount} not ve ${result.attachmentsCount} medya dosyası başarıyla içeri aktarıldı.",
                                 isSuccess = true
+                            )
+                        }
+                        is RestoreResult.NeedsPassword -> {
+                            _backupUiState.value = BackupUiState(
+                                isOperating = false,
+                                message = "Bu yedek dosyası Kasa Kilidi ile şifrelenmiştir. Lütfen kasa kilidini giriniz.",
+                                isSuccess = false
                             )
                         }
                         is RestoreResult.Error -> {

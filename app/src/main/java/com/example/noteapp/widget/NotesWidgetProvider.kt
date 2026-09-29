@@ -38,6 +38,7 @@ class NotesWidgetProvider : AppWidgetProvider() {
         const val EXTRA_NEW_NOTE = "extra_new_note"
         const val EXTRA_ACTION_TYPE = "extra_action_type"
         const val ACTION_TYPE_TEXT = "ACTION_TEXT"
+        const val ACTION_TYPE_CHECKLIST = "ACTION_CHECKLIST"
         const val ACTION_TYPE_IMAGE = "ACTION_IMAGE"
         const val ACTION_TYPE_VOICE = "ACTION_VOICE"
         const val ACTION_TYPE_DRAW = "ACTION_DRAW"
@@ -48,6 +49,24 @@ class NotesWidgetProvider : AppWidgetProvider() {
             appWidgetId: Int
         ) {
             val views = RemoteViews(context.packageName, R.layout.widget_notes)
+
+            // Uygulama ve Sistem Tema Uyumu (Karanlık / Aydınlık)
+            val isDark = AppSettingsManager.isWidgetDarkTheme(context)
+            if (isDark) {
+                views.setInt(R.id.widget_root, "setBackgroundResource", R.drawable.widget_background_dark)
+                views.setTextColor(R.id.widget_title, 0xFFFFFFFF.toInt())
+                views.setTextColor(R.id.widget_subtitle_filter, 0xFFD0BCFF.toInt())
+                views.setTextColor(R.id.widget_empty_view, 0xFFCAC4D0.toInt())
+                views.setInt(R.id.widget_floating_bar, "setBackgroundResource", R.drawable.widget_floating_bar_bg_dark)
+                views.setInt(R.id.widget_btn_add_text, "setBackgroundResource", R.drawable.widget_fab_bg_dark)
+            } else {
+                views.setInt(R.id.widget_root, "setBackgroundResource", R.drawable.widget_background)
+                views.setTextColor(R.id.widget_title, 0xFF1C1B1F.toInt())
+                views.setTextColor(R.id.widget_subtitle_filter, 0xFF6750A4.toInt())
+                views.setTextColor(R.id.widget_empty_view, 0xFF79747E.toInt())
+                views.setInt(R.id.widget_floating_bar, "setBackgroundResource", R.drawable.widget_floating_bar_bg)
+                views.setInt(R.id.widget_btn_add_text, "setBackgroundResource", R.drawable.widget_fab_bg)
+            }
 
             // Filtre durumunu göster (Tüm Notlar vs Favoriler)
             val filterMode = AppSettingsManager.getWidgetFilterMode(context)
@@ -66,8 +85,19 @@ class NotesWidgetProvider : AppWidgetProvider() {
             views.setRemoteAdapter(R.id.widget_notes_list, serviceIntent)
             views.setEmptyView(R.id.widget_notes_list, R.id.widget_empty_view)
 
+            // Başlığa tıklandığında uygulamayı ana sayfada aç
+            val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            views.setOnClickPendingIntent(
+                R.id.widget_title,
+                PendingIntent.getActivity(context, 1, openAppIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            )
+
             // Not öğesine tıklanıldığında açılacak Activity şablonu
-            val clickIntent = Intent(context, MainActivity::class.java)
+            val clickIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
             val clickPendingIntent = PendingIntent.getActivity(
                 context,
                 0,
@@ -76,40 +106,50 @@ class NotesWidgetProvider : AppWidgetProvider() {
             )
             views.setPendingIntentTemplate(R.id.widget_notes_list, clickPendingIntent)
 
-            // 1. Metin Notu Ekle
+            // 1. Yeni Metin Notu Ekle (+) Floating FAB
             val textIntent = Intent(context, MainActivity::class.java).apply {
                 putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_TEXT)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             views.setOnClickPendingIntent(
                 R.id.widget_btn_add_text,
                 PendingIntent.getActivity(context, 10, textIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             )
 
-            // 2. Görsel Notu Ekle
+            // 2. Yapılacaklar Listesi / Onay Kutusu Ekle
+            val todoIntent = Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_CHECKLIST)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            views.setOnClickPendingIntent(
+                R.id.widget_btn_add_todo,
+                PendingIntent.getActivity(context, 14, todoIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            )
+
+            // 3. Görsel Notu Ekle
             val imageIntent = Intent(context, MainActivity::class.java).apply {
                 putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_IMAGE)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             views.setOnClickPendingIntent(
                 R.id.widget_btn_add_image,
                 PendingIntent.getActivity(context, 11, imageIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             )
 
-            // 3. Ses Notu Ekle
+            // 4. Ses Notu Ekle
             val voiceIntent = Intent(context, MainActivity::class.java).apply {
                 putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_VOICE)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             views.setOnClickPendingIntent(
                 R.id.widget_btn_add_voice,
                 PendingIntent.getActivity(context, 12, voiceIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             )
 
-            // 4. Çizim Notu Ekle
+            // 5. Çizim Notu Ekle
             val drawIntent = Intent(context, MainActivity::class.java).apply {
                 putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_DRAW)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             views.setOnClickPendingIntent(
                 R.id.widget_btn_add_draw,

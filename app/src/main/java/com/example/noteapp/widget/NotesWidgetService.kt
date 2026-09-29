@@ -67,17 +67,24 @@ class NotesRemoteViewsFactory(
 
         val views = RemoteViews(context.packageName, R.layout.widget_note_item)
 
+        val isDark = AppSettingsManager.isWidgetDarkTheme(context)
+
         // Başlık
         val titleText = if (note.title.isNotBlank()) note.title else "Başlıksız Not"
         views.setTextViewText(R.id.widget_item_title, titleText)
 
-        // İçerik özeti
+        // İçerik özeti (Onay kutusu işaretlerini güzelleştir: [x] -> ☑, [ ] -> ☐)
         if (note.isLocked) {
             views.setTextViewText(R.id.widget_item_content, "🔒 Bu not kilitli (Görüntülemek için dokunun)")
             views.setViewVisibility(R.id.widget_item_lock, View.VISIBLE)
         } else {
-            val contentText = if (note.content.isNotBlank()) {
-                note.content.replace("\n", " ").take(100)
+            val formattedContent = note.content
+                .replace("- [x] ", "☑ ")
+                .replace("- [ ] ", "☐ ")
+                .replace("- [X] ", "☑ ")
+
+            val contentText = if (formattedContent.isNotBlank()) {
+                formattedContent.replace("\n", "  •  ").take(120)
             } else {
                 "İçerik yok"
             }
@@ -91,12 +98,22 @@ class NotesRemoteViewsFactory(
             if (note.isPinned) View.VISIBLE else View.GONE
         )
 
-        // Arka plan rengi (renk ayarlanmışsa hafif tonla renklendir)
-        if (note.color != 0) {
-            views.setInt(R.id.widget_item_container, "setBackgroundColor", note.color)
-        } else {
-            views.setInt(R.id.widget_item_container, "setBackgroundResource", R.drawable.widget_item_background)
-        }
+        // Yuvarlak Köşeli Arka Plan Renklendirmesi (Radius 20dp asla bozulmaz)
+        val defaultCardColor = if (isDark) 0xFF2B2930.toInt() else 0xFFFFFFFF.toInt()
+        val cardColor = if (note.color != 0) note.color else defaultCardColor
+        views.setInt(R.id.widget_item_bg_image, "setColorFilter", cardColor)
+
+        // Metin rengini arka plan parlaklığına (luminance) göre zıt yap
+        val r = android.graphics.Color.red(cardColor) / 255.0
+        val g = android.graphics.Color.green(cardColor) / 255.0
+        val b = android.graphics.Color.blue(cardColor) / 255.0
+        val luminance = 0.299 * r + 0.587 * g + 0.114 * b
+
+        val titleColor = if (luminance < 0.45) 0xFFF8F9FA.toInt() else 0xFF1D1B20.toInt()
+        val contentColor = if (luminance < 0.45) 0xFFD0D4D9.toInt() else 0xFF49454F.toInt()
+
+        views.setTextColor(R.id.widget_item_title, titleColor)
+        views.setTextColor(R.id.widget_item_content, contentColor)
 
         // Tıklama intent'i (fill-in intent)
         val fillInIntent = Intent().apply {

@@ -170,5 +170,21 @@ class AppSettingsManager @Inject constructor(
             val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
             return prefs.getBoolean(KEY_WIDGET_SHOW_LOCKED, false)
         }
+
+        fun getThemeMode(context: Context): ThemeMode {
+            val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+            val str = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
+            return try { ThemeMode.valueOf(str) } catch (_: Exception) { ThemeMode.SYSTEM }
+        }
+
+        fun isWidgetDarkTheme(context: Context): Boolean {
+            val mode = getThemeMode(context)
+            val isNight = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            return when (mode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> isNight
+            }
+        }
     }
 }
