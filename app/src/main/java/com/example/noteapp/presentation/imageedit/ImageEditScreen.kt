@@ -510,6 +510,44 @@ fun ImageEditScreen(
         )
     }
 
+    val hasPreEditBackup = remember { com.example.noteapp.media.ImageBackupManager.hasPreviousVersion(context, imagePath) }
+    var showRevertBackupConfirm by remember { mutableStateOf(false) }
+
+    if (showRevertBackupConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRevertBackupConfirm = false },
+            icon = { Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Orijinal Görsele Dön") },
+            text = { Text("Bu görselin önceki tüm düzenlemelerini geri alıp en baştaki orijinal haline dönmek istiyor musunuz?") },
+            confirmButton = {
+                Button(onClick = {
+                    showRevertBackupConfirm = false
+                    val originalBackupPath = com.example.noteapp.media.ImageBackupManager.getPreviousVersionPath(context, imagePath)
+                    if (originalBackupPath != null) {
+                        loadScaledBitmap(originalBackupPath, 2560, 2560)?.let { originalBmp ->
+                            recordSnapshot()
+                            currentBitmap = originalBmp
+                            drawingStrokes.clear()
+                            textOverlays.clear()
+                            brightness = 0f
+                            contrast = 1f
+                            saturation = 1f
+                            selectedFilter = FilterPreset.NONE
+                            cropRectFraction = Rect(0.02f, 0.02f, 0.98f, 0.98f)
+                        }
+                    }
+                }) {
+                    Text("Orijinale Dön")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRevertBackupConfirm = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -526,6 +564,17 @@ fun ImageEditScreen(
                     }
                 },
                 actions = {
+                    // Orijinal Görsele Geri Dön (Eğer önceden düzenlendiyse)
+                    if (hasPreEditBackup) {
+                        IconButton(onClick = { showRevertBackupConfirm = true }) {
+                            Icon(
+                                Icons.Default.History,
+                                contentDescription = "Önceki Orijinale Dön",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
                     // Geri Al (Undo)
                     IconButton(
                         onClick = { handleUndo() },

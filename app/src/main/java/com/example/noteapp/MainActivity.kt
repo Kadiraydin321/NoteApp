@@ -7,6 +7,9 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
@@ -155,9 +158,12 @@ class MainActivity : FragmentActivity() {
                             .getStateFlow<Pair<String, String>?>("edited_image_pair", null)
                             .collectAsState()
 
+                        var justEditedImagePath by remember { mutableStateOf<String?>(null) }
+
                         LaunchedEffect(editedImagePair) {
                             editedImagePair?.let { (oldPath, newPath) ->
                                 viewModel.onUpdateAttachment(oldPath, newPath)
+                                justEditedImagePath = newPath
                                 backStackEntry.savedStateHandle.remove<Pair<String, String>>("edited_image_pair")
                             }
                         }
@@ -178,6 +184,12 @@ class MainActivity : FragmentActivity() {
                                 val encodedPath = java.net.URLEncoder.encode(imagePath, java.nio.charset.StandardCharsets.UTF_8.toString())
                                 navController.navigate("image_edit_screen?imagePath=$encodedPath")
                             },
+                            onRevertImageEdit = { path ->
+                                viewModel.revertImageEdit(path)
+                            },
+                            canRevertImage = { path ->
+                                viewModel.canRevertImage(path)
+                            },
                             onDeleteNoteClick = {
                                 viewModel.deleteNote {
                                     navController.popBackStack()
@@ -193,7 +205,9 @@ class MainActivity : FragmentActivity() {
                             onBackClick = {
                                 navController.popBackStack()
                             },
-                            autoAction = autoAction?.ifBlank { null }
+                            autoAction = autoAction?.ifBlank { null },
+                            justEditedImagePath = justEditedImagePath,
+                            onClearJustEditedImage = { justEditedImagePath = null }
                         )
                     }
 

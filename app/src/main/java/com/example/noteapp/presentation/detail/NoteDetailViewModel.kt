@@ -160,9 +160,26 @@ class NoteDetailViewModel @Inject constructor(
     }
 
     fun onUpdateAttachment(oldPath: String, newPath: String) {
+        com.example.noteapp.media.ImageBackupManager.recordEditBackup(app, oldPath, newPath)
         val updated = _state.value.attachments.map { if (it == oldPath) newPath else it }
         _state.value = _state.value.copy(attachments = updated)
         saveNote()
+    }
+
+    fun revertImageEdit(currentEditedPath: String, onReverted: (oldPath: String) -> Unit = {}): Boolean {
+        val previousPath = com.example.noteapp.media.ImageBackupManager.revertToPreviousVersion(app, currentEditedPath)
+        if (previousPath != null) {
+            val updated = _state.value.attachments.map { if (it == currentEditedPath) previousPath else it }
+            _state.value = _state.value.copy(attachments = updated)
+            saveNote()
+            onReverted(previousPath)
+            return true
+        }
+        return false
+    }
+
+    fun canRevertImage(path: String): Boolean {
+        return com.example.noteapp.media.ImageBackupManager.hasPreviousVersion(app, path)
     }
 
     fun deleteNote(onDeleted: () -> Unit) {

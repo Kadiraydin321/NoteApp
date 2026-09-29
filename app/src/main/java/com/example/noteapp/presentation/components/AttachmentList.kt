@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
@@ -26,6 +28,8 @@ fun AttachmentList(
     isPlayingAudio: Boolean,
     currentPlayingPath: String?,
     onImageClick: (String) -> Unit = {},
+    onRevertImage: ((String) -> Unit)? = null,
+    canRevertImage: ((String) -> Boolean)? = null,
     modifier: Modifier = Modifier
 ) {
     if (attachments.isEmpty()) return
@@ -97,6 +101,7 @@ fun AttachmentList(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
+                            val isEdited = canRevertImage?.invoke(path) == true
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = null,
@@ -105,24 +110,54 @@ fun AttachmentList(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Düzenlemek için dokun",
+                                text = if (isEdited) "Düzenlendi (Geri alınabilir)" else "Düzenlemek için dokun",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
 
-                    // Sil Butonu
-                    IconButton(
-                        onClick = { onDeleteAttachment(path) },
+                    // Üst Butonlar (Sil ve Geri Al)
+                    Row(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(8.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
-                        )
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Görseli Sil")
+                        if (canRevertImage?.invoke(path) == true && onRevertImage != null) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                shape = CircleShape,
+                                shadowElevation = 2.dp,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { onRevertImage(path) },
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Undo,
+                                        contentDescription = "Düzenlemeyi Geri Al (Eski haline dön)",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            shape = CircleShape,
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            IconButton(
+                                onClick = { onDeleteAttachment(path) },
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Görseli Sil", modifier = Modifier.size(18.dp))
+                            }
+                        }
                     }
                 }
             }

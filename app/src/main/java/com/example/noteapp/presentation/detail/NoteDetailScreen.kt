@@ -25,9 +25,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,17 +83,39 @@ fun NoteDetailScreen(
     onToggleAudioPlayback: (String) -> Unit,
     onDeleteAttachment: (String) -> Unit,
     onImageClick: (String) -> Unit,
+    onRevertImageEdit: (String) -> Unit,
+    canRevertImage: (String) -> Boolean,
     onDeleteNoteClick: () -> Unit,
     onAddDrawingClick: () -> Unit,
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
-    autoAction: String? = null
+    autoAction: String? = null,
+    justEditedImagePath: String? = null,
+    onClearJustEditedImage: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     var isPreviewMode by remember { mutableStateOf(false) }
     var hideMarkdownTokens by remember { mutableStateOf(true) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var revertConfirmPath by remember { mutableStateOf<String?>(null) }
+
+    // Görsel düzenlemeden yeni dönüldüyse geri alma için anında snackbar göster
+    LaunchedEffect(justEditedImagePath) {
+        justEditedImagePath?.let { editedPath ->
+            val result = snackbarHostState.showSnackbar(
+                message = "Görsel düzenlendi. İsterseniz önceki haline dönebilirsiniz.",
+                actionLabel = "Geri Al",
+                duration = SnackbarDuration.Long
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                onRevertImageEdit(editedPath)
+            }
+            onClearJustEditedImage()
+        }
+    }
 
     // Sayfa Arka Plan Rengi ve Kontrast Hesabı
     val baseNoteColor = if (state.color != 0 && state.color != Color.Transparent.toArgb()) {
@@ -239,7 +263,36 @@ fun NoteDetailScreen(
         )
     }
 
+    if (revertConfirmPath != null) {
+        AlertDialog(
+            onDismissRequest = { revertConfirmPath = null },
+            icon = { Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Görsel Düzenlemesini Geri Al") },
+            text = { Text("Bu görseli son yapılan düzenlemelerden önceki orijinal haline geri döndürmek istiyor musunuz?") },
+            confirmButton = {
+                Button(onClick = {
+                    val target = revertConfirmPath
+                    revertConfirmPath = null
+                    if (target != null) {
+                        onRevertImageEdit(target)
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Görsel önceki haline geri döndürüldü.")
+                        }
+                    }
+                }) {
+                    Text("Eski Haline Dön")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { revertConfirmPath = null }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = animatedBgColor,
         contentColor = contentColor,
         topBar = {
@@ -475,6 +528,8 @@ fun NoteDetailScreen(
                         isPlayingAudio = state.isPlayingAudio,
                         currentPlayingPath = state.currentPlayingPath,
                         onImageClick = onImageClick,
+                        onRevertImage = { revertConfirmPath = it },
+                        canRevertImage = canRevertImage,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }
