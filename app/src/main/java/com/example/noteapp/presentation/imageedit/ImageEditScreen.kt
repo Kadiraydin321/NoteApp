@@ -818,104 +818,116 @@ fun ImageEditScreen(
                 val dstLeft = (canvasW - dstW) / 2f
                 val dstTop = (canvasH - dstH) / 2f
 
+                val currentCropRect by rememberUpdatedState(cropRectFraction)
+                val currentAspectRatio by rememberUpdatedState(selectedAspectRatio.ratio)
+                val currentDrawingMode by rememberUpdatedState(drawingMode)
+                val currentBrushColor by rememberUpdatedState(brushColor)
+                val currentBrushSizeDp by rememberUpdatedState(brushSizeDp)
+                val imgRatio = if (bmp.height > 0) bmp.width.toFloat() / bmp.height.toFloat() else 1f
+                val currentImgRatio by rememberUpdatedState(imgRatio)
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        // ÇİZİM VE SİLGİ DOKUNMATİK ALGILAYICISI
-                        .pointerInput(activeTab, drawingMode, brushColor, brushSizeDp, dstLeft, dstTop, dstW, dstH) {
-                            if (activeTab == ImageEditorTab.DRAW && dstW > 0 && dstH > 0) {
-                                detectDragGestures(
-                                    onDragStart = { offset ->
-                                        if (drawingMode == DrawingMode.ERASER) {
-                                            eraserPositionScreen = offset
-                                            val norm = Offset((offset.x - dstLeft) / dstW, (offset.y - dstTop) / dstH)
-                                            val eraseRadiusNorm = (brushSizeDp * 2.5f * density) / dstW
-                                            val removed = eraseStrokesAt(drawingStrokes, norm, eraseRadiusNorm)
-                                            if (removed) {
-                                                recordSnapshot()
-                                            }
-                                        } else {
-                                            val norm = Offset(
-                                                ((offset.x - dstLeft) / dstW).coerceIn(0f, 1f),
-                                                ((offset.y - dstTop) / dstH).coerceIn(0f, 1f)
-                                            )
-                                            activePointsFraction = listOf(norm)
-                                        }
-                                    },
-                                    onDrag = { change, _ ->
-                                        change.consume()
-                                        if (drawingMode == DrawingMode.ERASER) {
-                                            eraserPositionScreen = change.position
-                                            val norm = Offset((change.position.x - dstLeft) / dstW, (change.position.y - dstTop) / dstH)
-                                            val eraseRadiusNorm = (brushSizeDp * 2.5f * density) / dstW
-                                            eraseStrokesAt(drawingStrokes, norm, eraseRadiusNorm)
-                                        } else {
-                                            val norm = Offset(
-                                                ((change.position.x - dstLeft) / dstW).coerceIn(0f, 1f),
-                                                ((change.position.y - dstTop) / dstH).coerceIn(0f, 1f)
-                                            )
-                                            activePointsFraction = activePointsFraction + norm
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        if (drawingMode == DrawingMode.ERASER) {
-                                            eraserPositionScreen = null
-                                        } else if (activePointsFraction.isNotEmpty()) {
-                                            recordSnapshot()
-                                            drawingStrokes.add(
-                                                DrawingStroke(
-                                                    pointsFraction = activePointsFraction,
-                                                    color = brushColor,
-                                                    strokeWidthDp = brushSizeDp,
-                                                    isHighlighter = drawingMode == DrawingMode.HIGHLIGHTER
+                        .pointerInput(activeTab, dstLeft, dstTop, dstW, dstH) {
+                            if (dstW <= 0 || dstH <= 0) return@pointerInput
+                            when (activeTab) {
+                                ImageEditorTab.DRAW -> {
+                                    detectDragGestures(
+                                        onDragStart = { offset ->
+                                            if (currentDrawingMode == DrawingMode.ERASER) {
+                                                eraserPositionScreen = offset
+                                                val norm = Offset((offset.x - dstLeft) / dstW, (offset.y - dstTop) / dstH)
+                                                val eraseRadiusNorm = (currentBrushSizeDp * 2.5f * density) / dstW
+                                                val removed = eraseStrokesAt(drawingStrokes, norm, eraseRadiusNorm)
+                                                if (removed) {
+                                                    recordSnapshot()
+                                                }
+                                            } else {
+                                                val norm = Offset(
+                                                    ((offset.x - dstLeft) / dstW).coerceIn(0f, 1f),
+                                                    ((offset.y - dstTop) / dstH).coerceIn(0f, 1f)
                                                 )
-                                            )
+                                                activePointsFraction = listOf(norm)
+                                            }
+                                        },
+                                        onDrag = { change, _ ->
+                                            change.consume()
+                                            if (currentDrawingMode == DrawingMode.ERASER) {
+                                                eraserPositionScreen = change.position
+                                                val norm = Offset((change.position.x - dstLeft) / dstW, (change.position.y - dstTop) / dstH)
+                                                val eraseRadiusNorm = (currentBrushSizeDp * 2.5f * density) / dstW
+                                                eraseStrokesAt(drawingStrokes, norm, eraseRadiusNorm)
+                                            } else {
+                                                val norm = Offset(
+                                                    ((change.position.x - dstLeft) / dstW).coerceIn(0f, 1f),
+                                                    ((change.position.y - dstTop) / dstH).coerceIn(0f, 1f)
+                                                )
+                                                activePointsFraction = activePointsFraction + norm
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            if (currentDrawingMode == DrawingMode.ERASER) {
+                                                eraserPositionScreen = null
+                                            } else if (activePointsFraction.isNotEmpty()) {
+                                                recordSnapshot()
+                                                drawingStrokes.add(
+                                                    DrawingStroke(
+                                                        pointsFraction = activePointsFraction,
+                                                        color = currentBrushColor,
+                                                        strokeWidthDp = currentBrushSizeDp,
+                                                        isHighlighter = currentDrawingMode == DrawingMode.HIGHLIGHTER
+                                                    )
+                                                )
+                                                activePointsFraction = emptyList()
+                                            }
+                                        },
+                                        onDragCancel = {
                                             activePointsFraction = emptyList()
+                                            eraserPositionScreen = null
                                         }
-                                    },
-                                    onDragCancel = {
-                                        activePointsFraction = emptyList()
-                                        eraserPositionScreen = null
-                                    }
-                                )
-                            }
-                        }
-                        // SERBEST VE HASSAS KIRPMA DOKUNMATİK ALGILAYICISI
-                        .pointerInput(activeTab, cropRectFraction, dstLeft, dstTop, dstW, dstH) {
-                            if (activeTab == ImageEditorTab.CROP && dstW > 0 && dstH > 0) {
-                                val touchThreshold = 44.dp.toPx()
-                                detectDragGestures(
-                                    onDragStart = { offset ->
-                                        val cropScreenLeft = dstLeft + cropRectFraction.left * dstW
-                                        val cropScreenTop = dstTop + cropRectFraction.top * dstH
-                                        val cropScreenRight = dstLeft + cropRectFraction.right * dstW
-                                        val cropScreenBottom = dstTop + cropRectFraction.bottom * dstH
+                                    )
+                                }
+                                ImageEditorTab.CROP -> {
+                                    val touchThreshold = 44.dp.toPx()
+                                    detectDragGestures(
+                                        onDragStart = { offset ->
+                                            val r = currentCropRect
+                                            val cropScreenLeft = dstLeft + r.left * dstW
+                                            val cropScreenTop = dstTop + r.top * dstH
+                                            val cropScreenRight = dstLeft + r.right * dstW
+                                            val cropScreenBottom = dstTop + r.bottom * dstH
 
-                                        activeCropHandle = detectCropHandle(
-                                            touch = offset,
-                                            left = cropScreenLeft,
-                                            top = cropScreenTop,
-                                            right = cropScreenRight,
-                                            bottom = cropScreenBottom,
-                                            threshold = touchThreshold
-                                        )
-                                    },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        val dNormX = dragAmount.x / dstW
-                                        val dNormY = dragAmount.y / dstH
+                                            activeCropHandle = detectCropHandle(
+                                                touch = offset,
+                                                left = cropScreenLeft,
+                                                top = cropScreenTop,
+                                                right = cropScreenRight,
+                                                bottom = cropScreenBottom,
+                                                threshold = touchThreshold
+                                            )
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            if (activeCropHandle != CropHandle.NONE) {
+                                                val dNormX = dragAmount.x / dstW
+                                                val dNormY = dragAmount.y / dstH
 
-                                        cropRectFraction = applyCropHandleDrag(
-                                            current = cropRectFraction,
-                                            handle = activeCropHandle,
-                                            dx = dNormX,
-                                            dy = dNormY,
-                                            aspectRatio = selectedAspectRatio.ratio
-                                        )
-                                    },
-                                    onDragEnd = { activeCropHandle = CropHandle.NONE },
-                                    onDragCancel = { activeCropHandle = CropHandle.NONE }
-                                )
+                                                cropRectFraction = applyCropHandleDrag(
+                                                    current = cropRectFraction,
+                                                    handle = activeCropHandle,
+                                                    dx = dNormX,
+                                                    dy = dNormY,
+                                                    aspectRatio = currentAspectRatio,
+                                                    imgRatio = currentImgRatio
+                                                )
+                                            }
+                                        },
+                                        onDragEnd = { activeCropHandle = CropHandle.NONE },
+                                        onDragCancel = { activeCropHandle = CropHandle.NONE }
+                                    )
+                                }
+                                else -> {}
                             }
                         }
                 ) {
@@ -1021,20 +1033,35 @@ fun ImageEditScreen(
                             drawLine(Color.White.copy(alpha = 0.35f), Offset(cLeft, cTop + stepY * 2), Offset(cRight, cTop + stepY * 2), strokeWidth = 1.dp.toPx())
 
                             // 4 Köşe Tutamaçları
-                            val hLen = 28.dp.toPx()
-                            val hStroke = 4.dp.toPx()
+                            val hLen = 30.dp.toPx()
+                            val hStroke = 5.dp.toPx()
                             // Sol üst
-                            drawLine(Color.White, Offset(cLeft, cTop), Offset(cLeft + hLen, cTop), strokeWidth = hStroke)
-                            drawLine(Color.White, Offset(cLeft, cTop), Offset(cLeft, cTop + hLen), strokeWidth = hStroke)
+                            drawLine(Color.White, Offset(cLeft, cTop), Offset(cLeft + hLen, cTop), strokeWidth = hStroke, cap = StrokeCap.Round)
+                            drawLine(Color.White, Offset(cLeft, cTop), Offset(cLeft, cTop + hLen), strokeWidth = hStroke, cap = StrokeCap.Round)
                             // Sağ üst
-                            drawLine(Color.White, Offset(cRight, cTop), Offset(cRight - hLen, cTop), strokeWidth = hStroke)
-                            drawLine(Color.White, Offset(cRight, cTop), Offset(cRight, cTop + hLen), strokeWidth = hStroke)
+                            drawLine(Color.White, Offset(cRight, cTop), Offset(cRight - hLen, cTop), strokeWidth = hStroke, cap = StrokeCap.Round)
+                            drawLine(Color.White, Offset(cRight, cTop), Offset(cRight, cTop + hLen), strokeWidth = hStroke, cap = StrokeCap.Round)
                             // Sol alt
-                            drawLine(Color.White, Offset(cLeft, cBottom), Offset(cLeft + hLen, cBottom), strokeWidth = hStroke)
-                            drawLine(Color.White, Offset(cLeft, cBottom), Offset(cLeft, cBottom - hLen), strokeWidth = hStroke)
+                            drawLine(Color.White, Offset(cLeft, cBottom), Offset(cLeft + hLen, cBottom), strokeWidth = hStroke, cap = StrokeCap.Round)
+                            drawLine(Color.White, Offset(cLeft, cBottom), Offset(cLeft, cBottom - hLen), strokeWidth = hStroke, cap = StrokeCap.Round)
                             // Sağ alt
-                            drawLine(Color.White, Offset(cRight, cBottom), Offset(cRight - hLen, cBottom), strokeWidth = hStroke)
-                            drawLine(Color.White, Offset(cRight, cBottom), Offset(cRight, cBottom - hLen), strokeWidth = hStroke)
+                            drawLine(Color.White, Offset(cRight, cBottom), Offset(cRight - hLen, cBottom), strokeWidth = hStroke, cap = StrokeCap.Round)
+                            drawLine(Color.White, Offset(cRight, cBottom), Offset(cRight, cBottom - hLen), strokeWidth = hStroke, cap = StrokeCap.Round)
+
+                            // 4 Kenar Tutamaç Çizgileri (Geniş, tutması kolay ve belirgin göstergeler)
+                            val edgeBarLen = 36.dp.toPx()
+                            val edgeStroke = 5.dp.toPx()
+                            val midX = (cLeft + cRight) / 2f
+                            val midY = (cTop + cBottom) / 2f
+
+                            // Üst Kenar
+                            drawLine(Color.White, Offset(midX - edgeBarLen / 2f, cTop), Offset(midX + edgeBarLen / 2f, cTop), strokeWidth = edgeStroke, cap = StrokeCap.Round)
+                            // Alt Kenar
+                            drawLine(Color.White, Offset(midX - edgeBarLen / 2f, cBottom), Offset(midX + edgeBarLen / 2f, cBottom), strokeWidth = edgeStroke, cap = StrokeCap.Round)
+                            // Sol Kenar
+                            drawLine(Color.White, Offset(cLeft, midY - edgeBarLen / 2f), Offset(cLeft, midY + edgeBarLen / 2f), strokeWidth = edgeStroke, cap = StrokeCap.Round)
+                            // Sağ Kenar
+                            drawLine(Color.White, Offset(cRight, midY - edgeBarLen / 2f), Offset(cRight, midY + edgeBarLen / 2f), strokeWidth = edgeStroke, cap = StrokeCap.Round)
                         }
                     }
 
@@ -1433,23 +1460,26 @@ private fun detectCropHandle(
 ): CropHandle {
     fun dist(x1: Float, y1: Float, x2: Float, y2: Float) = sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
 
-    // Köşeler
+    // 1. Köşeler (Önce köşeler kontrol edilir)
     if (dist(touch.x, touch.y, left, top) <= threshold) return CropHandle.TOP_LEFT
     if (dist(touch.x, touch.y, right, top) <= threshold) return CropHandle.TOP_RIGHT
     if (dist(touch.x, touch.y, left, bottom) <= threshold) return CropHandle.BOTTOM_LEFT
     if (dist(touch.x, touch.y, right, bottom) <= threshold) return CropHandle.BOTTOM_RIGHT
 
-    // Kenarlar
-    if (touch.x >= left && touch.x <= right) {
+    // 2. Kenarlar (Tüm kenar uzunluğu boyunca geniş yakalama alanı)
+    val inXRange = touch.x in (left - threshold)..(right + threshold)
+    val inYRange = touch.y in (top - threshold)..(bottom + threshold)
+
+    if (inXRange) {
         if (kotlin.math.abs(touch.y - top) <= threshold) return CropHandle.TOP
         if (kotlin.math.abs(touch.y - bottom) <= threshold) return CropHandle.BOTTOM
     }
-    if (touch.y >= top && touch.y <= bottom) {
+    if (inYRange) {
         if (kotlin.math.abs(touch.x - left) <= threshold) return CropHandle.LEFT
         if (kotlin.math.abs(touch.x - right) <= threshold) return CropHandle.RIGHT
     }
 
-    // Orta Alan (Kutuyu taşıma)
+    // 3. Orta Alan (Kutuyu taşıma)
     if (touch.x in left..right && touch.y in top..bottom) return CropHandle.CENTER
 
     return CropHandle.NONE
@@ -1463,52 +1493,138 @@ private fun applyCropHandleDrag(
     handle: CropHandle,
     dx: Float,
     dy: Float,
-    aspectRatio: Float?
+    aspectRatio: Float?,
+    imgRatio: Float = 1f
 ): Rect {
-    val minSize = 0.08f
+    val minSize = 0.05f
     var left = current.left
     var top = current.top
     var right = current.right
     var bottom = current.bottom
 
-    when (handle) {
-        CropHandle.TOP_LEFT -> {
-            left = (left + dx).coerceIn(0f, right - minSize)
-            top = (top + dy).coerceIn(0f, bottom - minSize)
+    if (aspectRatio != null && aspectRatio > 0f && imgRatio > 0f) {
+        val normRatio = aspectRatio / imgRatio
+
+        when (handle) {
+            CropHandle.BOTTOM_RIGHT -> {
+                val newW = (right - left + dx).coerceIn(minSize, 1f - left)
+                val newH = (newW / normRatio).coerceIn(minSize, 1f - top)
+                val finalW = (newH * normRatio).coerceIn(minSize, 1f - left)
+                right = left + finalW
+                bottom = top + newH
+            }
+            CropHandle.BOTTOM_LEFT -> {
+                val newW = (right - left - dx).coerceIn(minSize, right)
+                val newH = (newW / normRatio).coerceIn(minSize, 1f - top)
+                val finalW = (newH * normRatio).coerceIn(minSize, right)
+                left = right - finalW
+                bottom = top + newH
+            }
+            CropHandle.TOP_RIGHT -> {
+                val newW = (right - left + dx).coerceIn(minSize, 1f - left)
+                val newH = (newW / normRatio).coerceIn(minSize, bottom)
+                val finalW = (newH * normRatio).coerceIn(minSize, 1f - left)
+                right = left + finalW
+                top = bottom - newH
+            }
+            CropHandle.TOP_LEFT -> {
+                val newW = (right - left - dx).coerceIn(minSize, right)
+                val newH = (newW / normRatio).coerceIn(minSize, bottom)
+                val finalW = (newH * normRatio).coerceIn(minSize, right)
+                left = right - finalW
+                top = bottom - newH
+            }
+            CropHandle.TOP -> {
+                val newH = (bottom - top - dy).coerceIn(minSize, bottom)
+                val newW = (newH * normRatio).coerceIn(minSize, 1f)
+                val finalH = (newW / normRatio).coerceIn(minSize, bottom)
+                val centerX = (left + right) / 2f
+                val halfW = newW / 2f
+                left = if (centerX - halfW < 0f) 0f else if (centerX + halfW > 1f) 1f - newW else centerX - halfW
+                right = left + newW
+                top = bottom - finalH
+            }
+            CropHandle.BOTTOM -> {
+                val newH = (bottom - top + dy).coerceIn(minSize, 1f - top)
+                val newW = (newH * normRatio).coerceIn(minSize, 1f)
+                val finalH = (newW / normRatio).coerceIn(minSize, 1f - top)
+                val centerX = (left + right) / 2f
+                val halfW = newW / 2f
+                left = if (centerX - halfW < 0f) 0f else if (centerX + halfW > 1f) 1f - newW else centerX - halfW
+                right = left + newW
+                bottom = top + finalH
+            }
+            CropHandle.LEFT -> {
+                val newW = (right - left - dx).coerceIn(minSize, right)
+                val newH = (newW / normRatio).coerceIn(minSize, 1f)
+                val finalW = (newH * normRatio).coerceIn(minSize, right)
+                val centerY = (top + bottom) / 2f
+                val halfH = newH / 2f
+                top = if (centerY - halfH < 0f) 0f else if (centerY + halfH > 1f) 1f - newH else centerY - halfH
+                bottom = top + newH
+                left = right - finalW
+            }
+            CropHandle.RIGHT -> {
+                val newW = (right - left + dx).coerceIn(minSize, 1f - left)
+                val newH = (newW / normRatio).coerceIn(minSize, 1f)
+                val finalW = (newH * normRatio).coerceIn(minSize, 1f - left)
+                val centerY = (top + bottom) / 2f
+                val halfH = newH / 2f
+                top = if (centerY - halfH < 0f) 0f else if (centerY + halfH > 1f) 1f - newH else centerY - halfH
+                bottom = top + newH
+                right = left + finalW
+            }
+            CropHandle.CENTER -> {
+                val width = right - left
+                val height = bottom - top
+                left = (left + dx).coerceIn(0f, 1f - width)
+                right = left + width
+                top = (top + dy).coerceIn(0f, 1f - height)
+                bottom = top + height
+            }
+            CropHandle.NONE -> {}
         }
-        CropHandle.TOP_RIGHT -> {
-            right = (right + dx).coerceIn(left + minSize, 1f)
-            top = (top + dy).coerceIn(0f, bottom - minSize)
+    } else {
+        // SERBEST (FREE) ŞEKİLLENDİRME - Kısıtlamasız, kullanıcı istediği kenar veya köşeyi serbestçe taşır/boyutlandırır
+        when (handle) {
+            CropHandle.TOP_LEFT -> {
+                left = (left + dx).coerceIn(0f, right - minSize)
+                top = (top + dy).coerceIn(0f, bottom - minSize)
+            }
+            CropHandle.TOP_RIGHT -> {
+                right = (right + dx).coerceIn(left + minSize, 1f)
+                top = (top + dy).coerceIn(0f, bottom - minSize)
+            }
+            CropHandle.BOTTOM_LEFT -> {
+                left = (left + dx).coerceIn(0f, right - minSize)
+                bottom = (bottom + dy).coerceIn(top + minSize, 1f)
+            }
+            CropHandle.BOTTOM_RIGHT -> {
+                right = (right + dx).coerceIn(left + minSize, 1f)
+                bottom = (bottom + dy).coerceIn(top + minSize, 1f)
+            }
+            CropHandle.TOP -> {
+                top = (top + dy).coerceIn(0f, bottom - minSize)
+            }
+            CropHandle.BOTTOM -> {
+                bottom = (bottom + dy).coerceIn(top + minSize, 1f)
+            }
+            CropHandle.LEFT -> {
+                left = (left + dx).coerceIn(0f, right - minSize)
+            }
+            CropHandle.RIGHT -> {
+                right = (right + dx).coerceIn(left + minSize, 1f)
+            }
+            CropHandle.CENTER -> {
+                val width = right - left
+                val height = bottom - top
+                left = (left + dx).coerceIn(0f, 1f - width)
+                right = left + width
+                top = (top + dy).coerceIn(0f, 1f - height)
+                bottom = top + height
+            }
+            CropHandle.NONE -> {}
         }
-        CropHandle.BOTTOM_LEFT -> {
-            left = (left + dx).coerceIn(0f, right - minSize)
-            bottom = (bottom + dy).coerceIn(top + minSize, 1f)
-        }
-        CropHandle.BOTTOM_RIGHT -> {
-            right = (right + dx).coerceIn(left + minSize, 1f)
-            bottom = (bottom + dy).coerceIn(top + minSize, 1f)
-        }
-        CropHandle.TOP -> {
-            top = (top + dy).coerceIn(0f, bottom - minSize)
-        }
-        CropHandle.BOTTOM -> {
-            bottom = (bottom + dy).coerceIn(top + minSize, 1f)
-        }
-        CropHandle.LEFT -> {
-            left = (left + dx).coerceIn(0f, right - minSize)
-        }
-        CropHandle.RIGHT -> {
-            right = (right + dx).coerceIn(left + minSize, 1f)
-        }
-        CropHandle.CENTER -> {
-            val width = right - left
-            val height = bottom - top
-            left = (left + dx).coerceIn(0f, 1f - width)
-            right = left + width
-            top = (top + dy).coerceIn(0f, 1f - height)
-            bottom = top + height
-        }
-        CropHandle.NONE -> {}
     }
 
     return Rect(left, top, right, bottom)
