@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -24,6 +25,7 @@ fun AttachmentList(
     onPlayAudio: (String) -> Unit,
     isPlayingAudio: Boolean,
     currentPlayingPath: String?,
+    onImageClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (attachments.isEmpty()) return
@@ -68,12 +70,13 @@ fun AttachmentList(
                     }
                 }
             } else {
-                // Görsel Kartı
+                // Görsel Kartı (Düzenleme için Tıklanabilir)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
+                        .height(220.dp)
                         .clip(RoundedCornerShape(12.dp))
+                        .clickable { onImageClick(path) }
                 ) {
                     AsyncImage(
                         model = File(path),
@@ -81,13 +84,42 @@ fun AttachmentList(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
+
+                    // Düzenleme İpucu Rozeti
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Düzenlemek için dokun",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    // Sil Butonu
                     IconButton(
                         onClick = { onDeleteAttachment(path) },
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(8.dp),
                         colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
                         )
                     ) {
                         Icon(Icons.Default.Close, contentDescription = "Görseli Sil")

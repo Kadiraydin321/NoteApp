@@ -89,8 +89,12 @@ class MainActivity : FragmentActivity() {
                                                 is BiometricResult.AuthenticationFailed -> {
                                                     Toast.makeText(this@MainActivity, "Kimlik doğrulama başarısız", Toast.LENGTH_SHORT).show()
                                                 }
-                                                else -> {
-                                                    Toast.makeText(this@MainActivity, "Biyometrik kilit kullanılamıyor", Toast.LENGTH_SHORT).show()
+                                                is BiometricResult.FeatureUnavailable,
+                                                is BiometricResult.HardwareUnavailable,
+                                                is BiometricResult.NoneEnrolled -> {
+                                                    // Emülatör veya biyometrik donanımı/kaydı olmayan cihazlarda erişime izin ver
+                                                    Toast.makeText(this@MainActivity, "Biyometrik kilit bulunamadı, not açılıyor", Toast.LENGTH_SHORT).show()
+                                                    navController.navigate("note_detail_screen?noteId=${note.id}")
                                                 }
                                             }
                                         }
@@ -146,6 +150,18 @@ class MainActivity : FragmentActivity() {
                             }
                         }
 
+                        // Düzenlenen görsel dosyasını yakala (oldPath, newPath)
+                        val editedImagePair by backStackEntry.savedStateHandle
+                            .getStateFlow<Pair<String, String>?>("edited_image_pair", null)
+                            .collectAsState()
+
+                        LaunchedEffect(editedImagePair) {
+                            editedImagePair?.let { (oldPath, newPath) ->
+                                viewModel.onUpdateAttachment(oldPath, newPath)
+                                backStackEntry.savedStateHandle.remove<Pair<String, String>>("edited_image_pair")
+                            }
+                        }
+
                         NoteDetailScreen(
                             state = state,
                             onTitleChange = viewModel::onTitleChange,
@@ -158,6 +174,15 @@ class MainActivity : FragmentActivity() {
                             onToggleAudioRecording = viewModel::toggleAudioRecording,
                             onToggleAudioPlayback = viewModel::toggleAudioPlayback,
                             onDeleteAttachment = viewModel::onDeleteAttachment,
+                            onImageClick = { imagePath ->
+                                val encodedPath = java.net.URLEncoder.encode(imagePath, java.nio.charset.StandardCharsets.UTF_8.toString())
+                                navController.navigate("image_edit_screen?imagePath=$encodedPath")
+                            },
+                            onDeleteNoteClick = {
+                                viewModel.deleteNote {
+                                    navController.popBackStack()
+                                }
+                            },
                             onAddDrawingClick = {
                                 navController.navigate("drawing_screen")
                             },
@@ -169,6 +194,36 @@ class MainActivity : FragmentActivity() {
                                 navController.popBackStack()
                             },
                             autoAction = autoAction?.ifBlank { null }
+                        )
+                    }
+
+                    composable(
+                        route = "image_edit_screen?imagePath={imagePath}",
+                        arguments = listOf(
+                            navArgument("imagePath") {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            }
+                        )
+                    ) { backStack ->
+                        val rawPath = backStack.arguments?.getString("imagePath") ?: ""
+                        val decodedPath = try {
+                            java.net.URLDecoder.decode(rawPath, java.nio.charset.StandardCharsets.UTF_8.toString())
+                        } catch (_: Exception) {
+                            rawPath
+                        }
+
+                        com.example.noteapp.presentation.imageedit.ImageEditScreen(
+                            imagePath = decodedPath,
+                            onSaveSuccess = { originalPath, newPath ->
+                                navController.previousBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("edited_image_pair", Pair(originalPath, newPath))
+                                navController.popBackStack()
+                            },
+                            onBackClick = {
+                                navController.popBackStack()
+                            }
                         )
                     }
 

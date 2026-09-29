@@ -43,6 +43,25 @@ object FileStorageHelper {
         }
     }
 
+    fun saveEditedImageBitmap(context: Context, bitmap: android.graphics.Bitmap, originalPath: String? = null): String? {
+        return try {
+            val extension = if (originalPath?.endsWith(".png", ignoreCase = true) == true) "png" else "jpg"
+            val fileName = "IMG_EDIT_${System.currentTimeMillis()}.$extension"
+            val file = File(context.filesDir, fileName)
+            FileOutputStream(file).use { out ->
+                if (extension == "png") {
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                } else {
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, out)
+                }
+            }
+            file.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     fun deleteFile(path: String): Boolean {
         return try {
             val file = File(path)

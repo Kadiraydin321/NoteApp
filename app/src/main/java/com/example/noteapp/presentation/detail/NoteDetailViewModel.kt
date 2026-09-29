@@ -159,6 +159,29 @@ class NoteDetailViewModel @Inject constructor(
         )
     }
 
+    fun onUpdateAttachment(oldPath: String, newPath: String) {
+        val updated = _state.value.attachments.map { if (it == oldPath) newPath else it }
+        _state.value = _state.value.copy(attachments = updated)
+        saveNote()
+    }
+
+    fun deleteNote(onDeleted: () -> Unit) {
+        val noteId = _state.value.currentNoteId
+        if (noteId != null && noteId != -1L) {
+            viewModelScope.launch {
+                val note = repository.getNoteById(noteId)
+                if (note != null) {
+                    repository.updateNote(note.copy(isDeleted = true))
+                    alarmScheduler.cancel(noteId)
+                    NotesWidgetProvider.updateAllWidgets(app)
+                }
+                onDeleted()
+            }
+        } else {
+            onDeleted()
+        }
+    }
+
     fun saveNote() {
         val currentState = _state.value
         if (currentState.title.isBlank() && currentState.contentValue.text.isBlank()) return

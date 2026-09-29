@@ -80,6 +80,8 @@ fun NoteDetailScreen(
     onToggleAudioRecording: () -> Unit,
     onToggleAudioPlayback: (String) -> Unit,
     onDeleteAttachment: (String) -> Unit,
+    onImageClick: (String) -> Unit,
+    onDeleteNoteClick: () -> Unit,
     onAddDrawingClick: () -> Unit,
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
@@ -89,6 +91,7 @@ fun NoteDetailScreen(
     val focusRequester = remember { FocusRequester() }
     var isPreviewMode by remember { mutableStateOf(false) }
     var hideMarkdownTokens by remember { mutableStateOf(true) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     // Sayfa Arka Plan Rengi ve Kontrast Hesabı
     val baseNoteColor = if (state.color != 0 && state.color != Color.Transparent.toArgb()) {
@@ -211,6 +214,31 @@ fun NoteDetailScreen(
     val charCount = state.contentValue.text.length
     val readingTime = max(1, (wordCount / 180f).roundToInt().coerceAtLeast(1))
 
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Notu Sil") },
+            text = { Text("Bu not çöp kutusuna taşınacaktır. Onaylıyor musunuz?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        onDeleteNoteClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Sil")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = animatedBgColor,
         contentColor = contentColor,
@@ -282,6 +310,15 @@ fun NoteDetailScreen(
                             imageVector = if (state.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
                             contentDescription = "Kilit",
                             tint = if (state.isLocked) MaterialTheme.colorScheme.primary else contentColor
+                        )
+                    }
+
+                    // Notu Sil Butonu
+                    IconButton(onClick = { showDeleteConfirmDialog = true }) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Notu Sil",
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
                         )
                     }
 
@@ -437,6 +474,7 @@ fun NoteDetailScreen(
                         onPlayAudio = onToggleAudioPlayback,
                         isPlayingAudio = state.isPlayingAudio,
                         currentPlayingPath = state.currentPlayingPath,
+                        onImageClick = onImageClick,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }

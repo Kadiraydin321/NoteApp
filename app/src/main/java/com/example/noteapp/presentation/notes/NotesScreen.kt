@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -79,6 +80,8 @@ fun NotesScreen(
         )
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -93,7 +96,7 @@ fun NotesScreen(
                 HorizontalDivider()
 
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Notes, contentDescription = null) },
+                    icon = { Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = null) },
                     label = { Text("Tüm Notlar") },
                     selected = state.viewMode == NotesViewMode.ALL,
                     onClick = {
@@ -169,6 +172,7 @@ fun NotesScreen(
         }
     ) {
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = {
@@ -284,7 +288,19 @@ fun NotesScreen(
                                 onClick = { onNoteClick(note) },
                                 onPinClick = { onPinNote(note) },
                                 onArchiveClick = { onArchiveNote(note) },
-                                onDeleteClick = { onMoveToTrash(note) },
+                                onDeleteClick = {
+                                    onMoveToTrash(note)
+                                    scope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = "'${note.title.ifBlank { "Not" }}' çöp kutusuna taşındı",
+                                            actionLabel = "Geri Al",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            onRestoreNote(note)
+                                        }
+                                    }
+                                },
                                 onRestoreClick = { onRestoreNote(note) },
                                 onDeletePermanentlyClick = { onDeletePermanently(note) }
                             )
