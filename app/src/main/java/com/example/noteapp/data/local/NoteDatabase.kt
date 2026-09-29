@@ -1,6 +1,8 @@
 package com.example.noteapp.data.local
 
+import android.content.Context
 import androidx.room.Database
+import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.example.noteapp.domain.model.Category
@@ -17,5 +19,18 @@ abstract class NoteDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "notes_db"
+
+        @Volatile
+        private var INSTANCE: NoteDatabase? = null
+
+        fun getInstance(context: Context): NoteDatabase {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: Room.databaseBuilder(
+                    context.applicationContext,
+                    NoteDatabase::class.java,
+                    DATABASE_NAME
+                ).build().also { INSTANCE = it }
+            }
+        }
     }
 }

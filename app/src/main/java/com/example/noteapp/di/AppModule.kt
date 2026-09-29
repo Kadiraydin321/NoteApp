@@ -23,11 +23,7 @@ object AppModule {
     @Provides
     @Singleton
     fun provideNoteDatabase(app: Application): NoteDatabase {
-        return Room.databaseBuilder(
-            app,
-            NoteDatabase::class.java,
-            NoteDatabase.DATABASE_NAME
-        ).build()
+        return NoteDatabase.getInstance(app)
     }
 
     @Provides
@@ -38,8 +34,8 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideNoteRepository(dao: NoteDao): NoteRepository {
-        return NoteRepositoryImpl(dao)
+    fun provideNoteRepository(app: Application, dao: NoteDao): NoteRepository {
+        return NoteRepositoryImpl(app, dao)
     }
 
     @Provides

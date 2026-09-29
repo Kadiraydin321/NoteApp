@@ -33,12 +33,7 @@ class NotesRemoteViewsFactory(
         // Binder iş parçacığında çalışır
         runBlocking {
             try {
-                val db = Room.databaseBuilder(
-                    context,
-                    NoteDatabase::class.java,
-                    NoteDatabase.DATABASE_NAME
-                ).build()
-
+                val db = NoteDatabase.getInstance(context)
                 val filterMode = AppSettingsManager.getWidgetFilterMode(context)
                 val showLocked = AppSettingsManager.getWidgetShowLocked(context)
 
@@ -53,8 +48,6 @@ class NotesRemoteViewsFactory(
                 } else {
                     rawList
                 }
-
-                db.close()
             } catch (e: Exception) {
                 e.printStackTrace()
                 notes = emptyList()
