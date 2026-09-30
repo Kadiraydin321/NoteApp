@@ -10,11 +10,13 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.SizeF
+import android.view.View
 import android.widget.RemoteViews
 import com.example.noteapp.MainActivity
 import com.example.noteapp.R
 import com.example.noteapp.data.settings.AppSettingsManager
 import com.example.noteapp.data.settings.WidgetFilterMode
+import java.util.Collections
 
 class NotesWidgetProvider : AppWidgetProvider() {
 
@@ -41,13 +43,38 @@ class NotesWidgetProvider : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == ACTION_REFRESH_WIDGET) {
-            updateAllWidgets(context)
+        when (intent.action) {
+            ACTION_REFRESH_WIDGET -> {
+                updateAllWidgets(context)
+            }
+            ACTION_TOGGLE_POPUP -> {
+                val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+                if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                    if (openPopups.contains(widgetId)) {
+                        openPopups.remove(widgetId)
+                    } else {
+                        openPopups.add(widgetId)
+                    }
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    updateAppWidget(context, appWidgetManager, widgetId)
+                }
+            }
+            ACTION_CLOSE_POPUP -> {
+                val widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+                if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                    if (openPopups.remove(widgetId)) {
+                        val appWidgetManager = AppWidgetManager.getInstance(context)
+                        updateAppWidget(context, appWidgetManager, widgetId)
+                    }
+                }
+            }
         }
     }
 
     companion object {
         const val ACTION_REFRESH_WIDGET = "com.example.noteapp.ACTION_REFRESH_WIDGET"
+        const val ACTION_TOGGLE_POPUP = "com.example.noteapp.ACTION_TOGGLE_POPUP"
+        const val ACTION_CLOSE_POPUP = "com.example.noteapp.ACTION_CLOSE_POPUP"
         const val EXTRA_NEW_NOTE = "extra_new_note"
         const val EXTRA_ACTION_TYPE = "extra_action_type"
         const val ACTION_TYPE_TEXT = "ACTION_TEXT"
@@ -55,6 +82,23 @@ class NotesWidgetProvider : AppWidgetProvider() {
         const val ACTION_TYPE_IMAGE = "ACTION_IMAGE"
         const val ACTION_TYPE_VOICE = "ACTION_VOICE"
         const val ACTION_TYPE_DRAW = "ACTION_DRAW"
+
+        // Açık olan widget popup menülerini takip eder
+        private val openPopups = Collections.synchronizedSet(mutableSetOf<Int>())
+
+        fun closeAllPopups(context: Context) {
+            if (openPopups.isNotEmpty()) {
+                openPopups.clear()
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                val compNotes = ComponentName(context, NotesWidgetProvider::class.java)
+                val notesIds = appWidgetManager.getAppWidgetIds(compNotes)
+                if (notesIds != null && notesIds.isNotEmpty()) {
+                    for (id in notesIds) {
+                        updateAppWidget(context, appWidgetManager, id)
+                    }
+                }
+            }
+        }
 
         fun updateAppWidget(
             context: Context,
@@ -89,7 +133,7 @@ class NotesWidgetProvider : AppWidgetProvider() {
             appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_notes_list)
         }
 
-        private fun build1x1Views(context: Context, isDark: Boolean, appWidgetId: Int): RemoteViews {
+        internal fun build1x1Views(context: Context, isDark: Boolean, appWidgetId: Int): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_1x1_quick)
             if (isDark) {
                 views.setInt(R.id.widget_1x1_root, "setBackgroundResource", R.drawable.widget_background_dark)
@@ -116,7 +160,7 @@ class NotesWidgetProvider : AppWidgetProvider() {
             return views
         }
 
-        private fun buildBarViews(context: Context, isDark: Boolean, appWidgetId: Int): RemoteViews {
+        internal fun buildBarViews(context: Context, isDark: Boolean, appWidgetId: Int): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_bar_actions)
             if (isDark) {
                 views.setInt(R.id.widget_bar_root, "setBackgroundResource", R.drawable.widget_background_dark)
@@ -139,7 +183,7 @@ class NotesWidgetProvider : AppWidgetProvider() {
             return views
         }
 
-        private fun buildListViews(context: Context, isDark: Boolean, appWidgetId: Int): RemoteViews {
+        internal fun buildListViews(context: Context, isDark: Boolean, appWidgetId: Int): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_notes)
 
             if (isDark) {
@@ -147,16 +191,78 @@ class NotesWidgetProvider : AppWidgetProvider() {
                 views.setTextColor(R.id.widget_title, 0xFFFFFFFF.toInt())
                 views.setTextColor(R.id.widget_subtitle_filter, 0xFFD0BCFF.toInt())
                 views.setTextColor(R.id.widget_empty_view, 0xFFCAC4D0.toInt())
-                views.setInt(R.id.widget_floating_bar, "setBackgroundResource", R.drawable.widget_floating_bar_bg_dark)
-                views.setInt(R.id.widget_btn_add_text, "setBackgroundResource", R.drawable.widget_fab_bg_dark)
+                views.setInt(R.id.widget_bottom_gradient, "setBackgroundResource", R.drawable.widget_bottom_gradient_dark)
+                views.setInt(R.id.widget_popup_container, "setBackgroundResource", R.drawable.widget_popup_bg_dark)
+                views.setInt(R.id.widget_fab_main, "setBackgroundResource", R.drawable.widget_fab_bg_dark)
+                views.setTextColor(R.id.widget_popup_text_image, 0xFFFFFFFF.toInt())
+                views.setTextColor(R.id.widget_popup_text_draw, 0xFFFFFFFF.toInt())
+                views.setTextColor(R.id.widget_popup_text_voice, 0xFFFFFFFF.toInt())
+                views.setTextColor(R.id.widget_popup_text_todo, 0xFFFFFFFF.toInt())
+                views.setTextColor(R.id.widget_popup_text_text, 0xFFFFFFFF.toInt())
             } else {
                 views.setInt(R.id.widget_root, "setBackgroundResource", R.drawable.widget_background)
                 views.setTextColor(R.id.widget_title, 0xFF1C1B1F.toInt())
                 views.setTextColor(R.id.widget_subtitle_filter, 0xFF6750A4.toInt())
                 views.setTextColor(R.id.widget_empty_view, 0xFF79747E.toInt())
-                views.setInt(R.id.widget_floating_bar, "setBackgroundResource", R.drawable.widget_floating_bar_bg)
-                views.setInt(R.id.widget_btn_add_text, "setBackgroundResource", R.drawable.widget_fab_bg)
+                views.setInt(R.id.widget_bottom_gradient, "setBackgroundResource", R.drawable.widget_bottom_gradient)
+                views.setInt(R.id.widget_popup_container, "setBackgroundResource", R.drawable.widget_popup_bg)
+                views.setInt(R.id.widget_fab_main, "setBackgroundResource", R.drawable.widget_fab_bg)
+                views.setTextColor(R.id.widget_popup_text_image, 0xFF1C1B1F.toInt())
+                views.setTextColor(R.id.widget_popup_text_draw, 0xFF1C1B1F.toInt())
+                views.setTextColor(R.id.widget_popup_text_voice, 0xFF1C1B1F.toInt())
+                views.setTextColor(R.id.widget_popup_text_todo, 0xFF1C1B1F.toInt())
+                views.setTextColor(R.id.widget_popup_text_text, 0xFF1C1B1F.toInt())
             }
+
+            // Google Keep Tarzı Tek FAB Butonu ve Açılır Popup Menü Durumu
+            val isPopupOpen = openPopups.contains(appWidgetId)
+            if (isPopupOpen) {
+                views.setViewVisibility(R.id.widget_popup_container, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_scrim, View.VISIBLE)
+                views.setImageViewResource(R.id.widget_fab_icon, R.drawable.ic_widget_close)
+            } else {
+                views.setViewVisibility(R.id.widget_popup_container, View.GONE)
+                views.setViewVisibility(R.id.widget_scrim, View.GONE)
+                views.setImageViewResource(R.id.widget_fab_icon, R.drawable.ic_widget_add_white)
+            }
+
+            // FAB Tıklaması -> Popup Menüsünü Aç / Kapat
+            val toggleIntent = Intent(context, NotesWidgetProvider::class.java).apply {
+                action = ACTION_TOGGLE_POPUP
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            }
+            val togglePendingIntent = PendingIntent.getBroadcast(
+                context,
+                5000 + appWidgetId,
+                toggleIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_fab_main, togglePendingIntent)
+
+            // Scrim (Dışarı tıklama) -> Popup Menüsünü Kapat
+            val scrimIntent = Intent(context, NotesWidgetProvider::class.java).apply {
+                action = ACTION_CLOSE_POPUP
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            }
+            val scrimPendingIntent = PendingIntent.getBroadcast(
+                context,
+                6000 + appWidgetId,
+                scrimIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_scrim, scrimPendingIntent)
+
+            // Popup Menü Seçeneklerini Bağla
+            wireActionButtons(
+                context = context,
+                views = views,
+                appWidgetId = appWidgetId,
+                btnTextId = R.id.widget_popup_item_text,
+                btnTodoId = R.id.widget_popup_item_todo,
+                btnImageId = R.id.widget_popup_item_image,
+                btnVoiceId = R.id.widget_popup_item_voice,
+                btnDrawId = R.id.widget_popup_item_draw
+            )
 
             val filterMode = AppSettingsManager.getWidgetFilterMode(context)
             val subtitle = if (filterMode == WidgetFilterMode.FAVORITES) {
@@ -191,17 +297,6 @@ class NotesWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
             views.setPendingIntentTemplate(R.id.widget_notes_list, clickPendingIntent)
-
-            wireActionButtons(
-                context = context,
-                views = views,
-                appWidgetId = appWidgetId,
-                btnTextId = R.id.widget_btn_add_text,
-                btnTodoId = R.id.widget_btn_add_todo,
-                btnImageId = R.id.widget_btn_add_image,
-                btnVoiceId = R.id.widget_btn_add_voice,
-                btnDrawId = R.id.widget_btn_add_draw
-            )
 
             val refreshIntent = Intent(context, NotesWidgetProvider::class.java).apply {
                 action = ACTION_REFRESH_WIDGET
@@ -295,6 +390,7 @@ class NotesWidgetProvider : AppWidgetProvider() {
                 for (id in quickIds) {
                     QuickNoteWidgetProvider.updateAppWidget(context, appWidgetManager, id)
                 }
+                appWidgetManager.notifyAppWidgetViewDataChanged(quickIds, R.id.widget_notes_list)
             }
         }
     }

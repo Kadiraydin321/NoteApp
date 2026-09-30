@@ -576,6 +576,7 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         isPrivacyShieldActive.value = false
+        NotesWidgetProvider.closeAllPopups(this)
 
         if (wasAppInBackground && settingsManager.settings.value.autoLockOnExit) {
             wasAppInBackground = false
@@ -616,6 +617,7 @@ class MainActivity : FragmentActivity() {
         val actionType = intent.getStringExtra(NotesWidgetProvider.EXTRA_ACTION_TYPE)
         if (actionType != null) {
             intent.removeExtra(NotesWidgetProvider.EXTRA_ACTION_TYPE)
+            NotesWidgetProvider.closeAllPopups(this)
             when (actionType) {
                 NotesWidgetProvider.ACTION_TYPE_TEXT -> onNavigate("note_detail_screen")
                 NotesWidgetProvider.ACTION_TYPE_CHECKLIST -> onNavigate("note_detail_screen?autoAction=checklist")
@@ -629,6 +631,7 @@ class MainActivity : FragmentActivity() {
         // Widget eski + butonuna basıldıysa yeni not ekranı
         if (intent.getBooleanExtra(NotesWidgetProvider.EXTRA_NEW_NOTE, false)) {
             intent.removeExtra(NotesWidgetProvider.EXTRA_NEW_NOTE)
+            NotesWidgetProvider.closeAllPopups(this)
             onNavigate("note_detail_screen")
             return
         }

@@ -2,6 +2,7 @@
 
 package com.example.noteapp.presentation.notes
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -88,6 +90,23 @@ fun NotesScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    val onShareNote: (Note) -> Unit = { note ->
+        val fullText = buildString {
+            if (note.title.isNotBlank()) {
+                appendLine(note.title)
+                appendLine()
+            }
+            append(note.content)
+        }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, note.title)
+            putExtra(Intent.EXTRA_TEXT, fullText)
+        }
+        context.startActivity(Intent.createChooser(intent, "Notu Paylaş"))
+    }
 
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var newCategoryName by remember { mutableStateOf("") }
@@ -599,6 +618,7 @@ fun NotesScreen(
                                             },
                                             onLongClick = { onToggleNoteSelection(note.id) },
                                             onPinClick = { onPinNote(note) },
+                                            onShareClick = { onShareNote(note) },
                                             onArchiveClick = { onArchiveNote(note) },
                                             onDuplicateClick = { onDuplicateNote(note) },
                                             onDeleteClick = {
@@ -640,6 +660,7 @@ fun NotesScreen(
                                             },
                                             onLongClick = { onToggleNoteSelection(note.id) },
                                             onPinClick = { onPinNote(note) },
+                                            onShareClick = { onShareNote(note) },
                                             onArchiveClick = { onArchiveNote(note) },
                                             onDuplicateClick = { onDuplicateNote(note) },
                                             onDeleteClick = {
@@ -681,7 +702,22 @@ fun NotesScreen(
                                             },
                                             onLongClick = { onToggleNoteSelection(note.id) },
                                             onPinClick = { onPinNote(note) },
-                                            onDeleteClick = { onMoveToTrash(note) },
+                                            onShareClick = { onShareNote(note) },
+                                            onDuplicateClick = { onDuplicateNote(note) },
+                                            onArchiveClick = { onArchiveNote(note) },
+                                            onDeleteClick = {
+                                                onMoveToTrash(note)
+                                                scope.launch {
+                                                    val result = snackbarHostState.showSnackbar(
+                                                        message = "'${note.title.ifBlank { "Not" }}' çöp kutusuna taşındı",
+                                                        actionLabel = "Geri Al",
+                                                        duration = SnackbarDuration.Short
+                                                    )
+                                                    if (result == SnackbarResult.ActionPerformed) {
+                                                        onRestoreNote(note)
+                                                    }
+                                                }
+                                            },
                                             onRestoreClick = { onRestoreNote(note) },
                                             onDeletePermanentlyClick = { onDeletePermanently(note) }
                                         )
@@ -967,6 +1003,7 @@ fun NoteCard(
     onPinClick: () -> Unit,
     onArchiveClick: () -> Unit,
     onDuplicateClick: () -> Unit = {},
+    onShareClick: () -> Unit = {},
     onDeleteClick: () -> Unit,
     onRestoreClick: () -> Unit,
     onDeletePermanentlyClick: () -> Unit,
@@ -1128,6 +1165,9 @@ fun NoteCard(
                 Row {
                     when (viewMode) {
                         NotesViewMode.ALL, NotesViewMode.REMINDERS -> {
+                            IconButton(onClick = onShareClick, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Share, contentDescription = "Paylaş", modifier = Modifier.size(17.dp), tint = colorSpec.iconTint)
+                            }
                             IconButton(onClick = onDuplicateClick, modifier = Modifier.size(28.dp)) {
                                 Icon(Icons.Default.ContentCopy, contentDescription = "Çoğalt", modifier = Modifier.size(17.dp), tint = colorSpec.iconTint)
                             }
@@ -1175,6 +1215,9 @@ fun CompactNoteCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     onPinClick: () -> Unit,
+    onShareClick: () -> Unit = {},
+    onDuplicateClick: () -> Unit = {},
+    onArchiveClick: () -> Unit = {},
     onDeleteClick: () -> Unit,
     onRestoreClick: () -> Unit,
     onDeletePermanentlyClick: () -> Unit,
@@ -1264,29 +1307,88 @@ fun CompactNoteCard(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = dateStr,
                     style = MaterialTheme.typography.labelSmall,
-                    color = colorSpec.secondaryColor
+                    color = colorSpec.secondaryColor,
+                    modifier = Modifier.padding(end = 4.dp)
                 )
 
-                if ((viewMode == NotesViewMode.ALL || viewMode == NotesViewMode.REMINDERS) && !isSelectionMode) {
-                    IconButton(
-                        onClick = onPinClick,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
-                            contentDescription = "Sabitle",
-                            tint = if (note.isPinned) MaterialTheme.colorScheme.primary else colorSpec.iconTint,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                } else if (viewMode == NotesViewMode.TRASH) {
-                    IconButton(onClick = onRestoreClick, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.RestoreFromTrash, contentDescription = "Geri Yükle", modifier = Modifier.size(16.dp))
+                if (!isSelectionMode) {
+                    when (viewMode) {
+                        NotesViewMode.ALL, NotesViewMode.REMINDERS -> {
+                            IconButton(
+                                onClick = onPinClick,
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
+                                    contentDescription = "Sabitle",
+                                    tint = if (note.isPinned) MaterialTheme.colorScheme.primary else colorSpec.iconTint,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            IconButton(onClick = onShareClick, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Paylaş",
+                                    tint = colorSpec.iconTint,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            IconButton(onClick = onDuplicateClick, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Çoğalt",
+                                    tint = colorSpec.iconTint,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            IconButton(onClick = onArchiveClick, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Archive,
+                                    contentDescription = "Arşivle",
+                                    tint = colorSpec.iconTint,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            IconButton(onClick = onDeleteClick, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Sil",
+                                    tint = colorSpec.iconTint,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        NotesViewMode.ARCHIVE -> {
+                            IconButton(onClick = onArchiveClick, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Unarchive,
+                                    contentDescription = "Arşivden Çıkar",
+                                    tint = colorSpec.iconTint,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            IconButton(onClick = onDeleteClick, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Sil",
+                                    tint = colorSpec.iconTint,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        NotesViewMode.TRASH -> {
+                            IconButton(onClick = onRestoreClick, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.RestoreFromTrash, contentDescription = "Geri Yükle", modifier = Modifier.size(16.dp))
+                            }
+                            IconButton(onClick = onDeletePermanentlyClick, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.DeleteForever, contentDescription = "Kalıcı Olarak Sil", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     }
                 }
             }

@@ -1,12 +1,12 @@
 package com.example.noteapp.widget
 
-import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
-import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.util.SizeF
 import android.widget.RemoteViews
-import com.example.noteapp.MainActivity
 import com.example.noteapp.R
 import com.example.noteapp.data.settings.AppSettingsManager
 
@@ -23,39 +23,48 @@ class QuickNoteWidgetProvider : AppWidgetProvider() {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
     }
 
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        updateAppWidget(context, appWidgetManager, appWidgetId)
+    }
+
     companion object {
         fun updateAppWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
             appWidgetId: Int
         ) {
-            val views = RemoteViews(context.packageName, R.layout.widget_1x1_quick)
             val isDark = AppSettingsManager.isWidgetDarkTheme(context)
+            val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+            val minWidth = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 60) ?: 60
+            val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 60) ?: 60
 
-            if (isDark) {
-                views.setInt(R.id.widget_1x1_root, "setBackgroundResource", R.drawable.widget_background_dark)
-                views.setInt(R.id.widget_1x1_btn, "setBackgroundResource", R.drawable.widget_fab_bg_dark)
-                views.setTextColor(R.id.widget_1x1_label, 0xFFFFFFFF.toInt())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val views1x1 = NotesWidgetProvider.build1x1Views(context, isDark, appWidgetId)
+                val viewsBar = NotesWidgetProvider.buildBarViews(context, isDark, appWidgetId)
+                val viewsList = NotesWidgetProvider.buildListViews(context, isDark, appWidgetId)
+
+                val viewMapping = mapOf(
+                    SizeF(60f, 60f) to views1x1,
+                    SizeF(160f, 50f) to viewsBar,
+                    SizeF(160f, 130f) to viewsList
+                )
+                appWidgetManager.updateAppWidget(appWidgetId, RemoteViews(viewMapping))
             } else {
-                views.setInt(R.id.widget_1x1_root, "setBackgroundResource", R.drawable.widget_background)
-                views.setInt(R.id.widget_1x1_btn, "setBackgroundResource", R.drawable.widget_fab_bg)
-                views.setTextColor(R.id.widget_1x1_label, 0xFFFFFFFF.toInt())
+                val views = when {
+                    minWidth < 120 && minHeight < 110 -> NotesWidgetProvider.build1x1Views(context, isDark, appWidgetId)
+                    minHeight < 120 -> NotesWidgetProvider.buildBarViews(context, isDark, appWidgetId)
+                    else -> NotesWidgetProvider.buildListViews(context, isDark, appWidgetId)
+                }
+                appWidgetManager.updateAppWidget(appWidgetId, views)
             }
 
-            val clickIntent = Intent(context, MainActivity::class.java).apply {
-                putExtra(NotesWidgetProvider.EXTRA_ACTION_TYPE, NotesWidgetProvider.ACTION_TYPE_TEXT)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            val pendingIntent = PendingIntent.getActivity(
-                context,
-                200 + appWidgetId,
-                clickIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widget_1x1_btn, pendingIntent)
-            views.setOnClickPendingIntent(R.id.widget_1x1_root, pendingIntent)
-
-            appWidgetManager.updateAppWidget(appWidgetId, views)
+            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_notes_list)
         }
     }
 }
