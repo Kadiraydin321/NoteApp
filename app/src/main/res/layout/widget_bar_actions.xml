@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_bar_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/widget_background"
+    android:outlineProvider="background"
+    android:clipToOutline="true"
+    android:paddingHorizontal="10dp"
+    android:paddingVertical="8dp">
+
+    <!-- 1. Liste / Onay Kutusu (To-Do) -->
+    <ImageButton
+        android:id="@+id/widget_bar_btn_todo"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_widget_check"
+        android:contentDescription="Yapılacaklar Listesi"
+        android:scaleType="centerInside" />
+
+    <!-- 2. Çizim Notu -->
+    <ImageButton
+        android:id="@+id/widget_bar_btn_draw"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_widget_draw"
+        android:contentDescription="Çizim Notu"
+        android:scaleType="centerInside" />
+
+    <!-- 3. Ses Notu -->
+    <ImageButton
+        android:id="@+id/widget_bar_btn_voice"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_widget_mic"
+        android:contentDescription="Ses Notu"
+        android:scaleType="centerInside" />
+
+    <!-- 4. Görsel Notu -->
+    <ImageButton
+        android:id="@+id/widget_bar_btn_image"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_widget_image"
+        android:contentDescription="Görsel Notu"
+        android:scaleType="centerInside" />
+
+    <!-- 5. Yeni Metin Notu (+) FAB -->
+    <LinearLayout
+        android:id="@+id/widget_bar_btn_text"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@drawable/widget_fab_bg"
+        android:gravity="center"
+        android:layout_marginStart="6dp">
+
+        <ImageView
+            android:id="@+id/widget_bar_fab_icon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_widget_add"
+            android:contentDescription="Yeni Not" />
+    </LinearLayout>
+
+</LinearLayout>

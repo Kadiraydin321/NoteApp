@@ -5,6 +5,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_background"
+    android:outlineProvider="background"
+    android:clipToOutline="true"
     android:padding="12dp">
 
     <!-- Üst Başlık ve Yenile Butonu -->
@@ -54,11 +56,12 @@
 
     </LinearLayout>
 
-    <!-- Notlar Listesi ve Üzerinde Yüzen (Floating) Keep Tarzı Hızlı Bar -->
+    <!-- Notlar Listesi Alanı -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:layout_marginBottom="8dp">
 
         <ListView
             android:id="@+id/widget_notes_list"
@@ -66,9 +69,7 @@
             android:layout_height="match_parent"
             android:divider="@android:color/transparent"
             android:dividerHeight="8dp"
-            android:scrollbars="none"
-            android:clipToPadding="false"
-            android:paddingBottom="64dp" />
+            android:scrollbars="none" />
 
         <!-- Boş Liste Görünümü -->
         <TextView
@@ -79,85 +80,83 @@
             android:text="Henüz not bulunmuyor.\nAşağıdaki butonlardan hemen ekleyebilirsiniz."
             android:textSize="13sp"
             android:textColor="#79747E"
-            android:visibility="gone"
-            android:paddingBottom="64dp" />
-
-        <!-- Google Keep Tarzı Yüzen (Floating Pill) Hızlı Ekleme Barı -->
-        <LinearLayout
-            android:id="@+id/widget_floating_bar"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_gravity="bottom"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@drawable/widget_floating_bar_bg"
-            android:paddingStart="12dp"
-            android:paddingEnd="6dp"
-            android:layout_marginHorizontal="2dp"
-            android:layout_marginBottom="2dp">
-
-            <!-- 1. Liste / Onay Kutusu (To-Do) -->
-            <ImageButton
-                android:id="@+id/widget_btn_add_todo"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_weight="1"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_widget_check"
-                android:contentDescription="Yapılacaklar Listesi"
-                android:scaleType="centerInside" />
-
-            <!-- 2. Çizim Notu -->
-            <ImageButton
-                android:id="@+id/widget_btn_add_draw"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_weight="1"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_widget_draw"
-                android:contentDescription="Çizim Notu"
-                android:scaleType="centerInside" />
-
-            <!-- 3. Ses Notu -->
-            <ImageButton
-                android:id="@+id/widget_btn_add_voice"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_weight="1"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_widget_mic"
-                android:contentDescription="Ses Notu"
-                android:scaleType="centerInside" />
-
-            <!-- 4. Görsel Notu -->
-            <ImageButton
-                android:id="@+id/widget_btn_add_image"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_weight="1"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_widget_image"
-                android:contentDescription="Görsel Notu"
-                android:scaleType="centerInside" />
-
-            <!-- 5. Yeni Metin Notu (+) Floating FAB Butonu -->
-            <LinearLayout
-                android:id="@+id/widget_btn_add_text"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@drawable/widget_fab_bg"
-                android:gravity="center"
-                android:layout_marginStart="4dp">
-                <ImageView
-                    android:id="@+id/widget_fab_icon"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:src="@drawable/ic_widget_add"
-                    android:contentDescription="Yeni Not" />
-            </LinearLayout>
-
-        </LinearLayout>
+            android:visibility="gone" />
 
     </FrameLayout>
+
+    <!-- Google Keep Tarzı Alt Hızlı Ekleme Barı (Listeyle çakışmaz, kesilme yapmaz) -->
+    <LinearLayout
+        android:id="@+id/widget_floating_bar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/widget_floating_bar_bg"
+        android:outlineProvider="background"
+        android:clipToOutline="true"
+        android:paddingStart="12dp"
+        android:paddingEnd="4dp">
+
+        <!-- 1. Liste / Onay Kutusu (To-Do) -->
+        <ImageButton
+            android:id="@+id/widget_btn_add_todo"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_widget_check"
+            android:contentDescription="Yapılacaklar Listesi"
+            android:scaleType="centerInside" />
+
+        <!-- 2. Çizim Notu -->
+        <ImageButton
+            android:id="@+id/widget_btn_add_draw"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_widget_draw"
+            android:contentDescription="Çizim Notu"
+            android:scaleType="centerInside" />
+
+        <!-- 3. Ses Notu -->
+        <ImageButton
+            android:id="@+id/widget_btn_add_voice"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_widget_mic"
+            android:contentDescription="Ses Notu"
+            android:scaleType="centerInside" />
+
+        <!-- 4. Görsel Notu -->
+        <ImageButton
+            android:id="@+id/widget_btn_add_image"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_widget_image"
+            android:contentDescription="Görsel Notu"
+            android:scaleType="centerInside" />
+
+        <!-- 5. Yeni Metin Notu (+) FAB Butonu -->
+        <LinearLayout
+            android:id="@+id/widget_btn_add_text"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/widget_fab_bg"
+            android:gravity="center"
+            android:layout_marginStart="4dp">
+            <ImageView
+                android:id="@+id/widget_fab_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_widget_add"
+                android:contentDescription="Yeni Not" />
+        </LinearLayout>
+
+    </LinearLayout>
 
 </LinearLayout>

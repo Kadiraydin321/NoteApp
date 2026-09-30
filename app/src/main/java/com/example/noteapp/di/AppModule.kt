@@ -34,8 +34,12 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideNoteRepository(app: Application, dao: NoteDao): NoteRepository {
-        return NoteRepositoryImpl(app, dao)
+    fun provideNoteRepository(
+        app: Application,
+        dao: NoteDao,
+        cryptoManager: com.example.noteapp.data.security.NoteCryptoManager
+    ): NoteRepository {
+        return NoteRepositoryImpl(app, dao, cryptoManager)
     }
 
     @Provides

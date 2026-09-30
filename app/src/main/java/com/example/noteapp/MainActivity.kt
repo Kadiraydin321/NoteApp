@@ -293,8 +293,9 @@ class MainActivity : FragmentActivity() {
                                     navController.navigate("note_detail_screen?noteId=${note.id}")
                                 }
                             },
-                            onAddNoteClick = {
-                                navController.navigate("note_detail_screen")
+                            onAddNoteClick = { action ->
+                                val route = if (action.isNullOrBlank()) "note_detail_screen" else "note_detail_screen?autoAction=$action"
+                                navController.navigate(route)
                             },
                             onPinNote = viewModel::onPinNote,
                             onArchiveNote = viewModel::onArchiveNote,

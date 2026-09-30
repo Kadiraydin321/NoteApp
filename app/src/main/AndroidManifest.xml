@@ -38,7 +38,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- Widget Receiver -->
+        <!-- Main Resizable Widget Receiver -->
         <receiver
             android:name=".widget.NotesWidgetProvider"
             android:exported="true">
@@ -49,6 +49,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/notes_widget_info" />
+        </receiver>
+
+        <!-- 1x1 Quick Note Widget Receiver -->
+        <receiver
+            android:name=".widget.QuickNoteWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_note_widget_info" />
         </receiver>
 
         <!-- Widget RemoteViews Service -->

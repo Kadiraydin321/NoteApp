@@ -18,18 +18,16 @@ import androidx.compose.ui.unit.sp
  * **kalın**, *italik*, ~~üstü çizili~~, ==vurgu== ve # Başlıkları
  * anında canlı olarak şekillendirip gösteren VisualTransformation.
  *
- * [hideSyntaxTokens] true olduğunda, biçimlendirme işaretleri (*, **, ~~, ==)
- * gizlenir; metin temiz ve stilize olarak görünür. Ancak tek başına yazılan
- * veya madde imi olarak kullanılan yıldız işaretleri (* madde, 5 * 3) ASLA gizlenmez.
- *
- * Orijinal metin uzunluğunu değiştirmediği için OffsetMapping.Identity
- * kullanılır; imleç ve seçim konumu asla kaymaz.
+ * Ayrıca [searchQuery] verildiğinde, aranan tüm kelimeleri sarı renkle,
+ * o an seçili olan [activeMatchStartIndex] eşleşmesini ise belirgin turuncuyla vurgular.
  */
 class MarkdownVisualTransformation(
     val hideSyntaxTokens: Boolean = true,
     private val syntaxColor: Color = Color.Gray.copy(alpha = 0.55f),
     private val highlightColor: Color = Color(0xFFFFF59D),
-    private val codeBgColor: Color = Color(0x1F000000)
+    private val codeBgColor: Color = Color(0x1F000000),
+    private val searchQuery: String = "",
+    private val activeMatchStartIndex: Int? = null
 ) : VisualTransformation {
 
     override fun filter(text: AnnotatedString): TransformedText {
@@ -60,7 +58,6 @@ class MarkdownVisualTransformation(
                     range.first,
                     range.last + 1
                 )
-                // # işaretlerini ayara göre gizle veya soluk göster
                 addStyle(
                     tokenStyle,
                     range.first,
@@ -68,104 +65,49 @@ class MarkdownVisualTransformation(
                 )
             }
 
-            // 2. KALIN (BOLD) VE İTALİK (ITALIC) - İç içe, birleşik ve karmaşık durumlar dahil (***, **, *, __, _)
-            val boldTokenRanges = mutableListOf<IntRange>()
-
+            // 2. KALIN (BOLD) VE İTALİK (ITALIC)
             // A. Çift Yıldız Kalın: **metin**
-            // Satır içi, başı ve sonu boşluk olmayan kapalı ** çiftleri
             val boldAsteriskRegex = Regex("(?<!\\\\)\\*\\*(?!\\s)([^\n]+?)(?<!\\s)\\*\\*")
             for (match in boldAsteriskRegex.findAll(raw)) {
                 val range = match.range
                 if (range.last >= range.first + 3) {
                     addStyle(SpanStyle(fontWeight = FontWeight.Bold), range.first + 2, range.last - 1)
-                    val openToken = range.first until (range.first + 2)
-                    val closeToken = (range.last - 1)..range.last
-                    boldTokenRanges.add(openToken)
-                    boldTokenRanges.add(closeToken)
-                    addStyle(tokenStyle, openToken.first, openToken.last + 1)
-                    addStyle(tokenStyle, closeToken.first, closeToken.last + 1)
+                    addStyle(tokenStyle, range.first, range.first + 2)
+                    addStyle(tokenStyle, range.last - 1, range.last + 1)
                 }
             }
 
-            // B. Çift Alt Çizgi Kalın: __metin__
+            // B. Çift Altçizgi Kalın: __metin__
             val boldUnderscoreRegex = Regex("(?<!\\\\)__(?!\\s)([^\n]+?)(?<!\\s)__")
             for (match in boldUnderscoreRegex.findAll(raw)) {
                 val range = match.range
                 if (range.last >= range.first + 3) {
                     addStyle(SpanStyle(fontWeight = FontWeight.Bold), range.first + 2, range.last - 1)
-                    val openToken = range.first until (range.first + 2)
-                    val closeToken = (range.last - 1)..range.last
-                    boldTokenRanges.add(openToken)
-                    boldTokenRanges.add(closeToken)
-                    addStyle(tokenStyle, openToken.first, openToken.last + 1)
-                    addStyle(tokenStyle, closeToken.first, closeToken.last + 1)
+                    addStyle(tokenStyle, range.first, range.first + 2)
+                    addStyle(tokenStyle, range.last - 1, range.last + 1)
                 }
             }
 
             // C. Tek Yıldız İtalik: *metin*
-            // Kalın işaretlerine (boldTokenRanges) ait olmayan ve başı/sonu boşluk veya tek yıldız olmayan yıldız çiftleri
-            fun isIndexInBoldToken(index: Int): Boolean {
-                return boldTokenRanges.any { index in it }
+            val italicAsteriskRegex = Regex("(?<![\\*\\\\])\\*(?!\\s)([^\n\\*]+?)(?<!\\s)\\*(?!\\*)")
+            for (match in italicAsteriskRegex.findAll(raw)) {
+                val range = match.range
+                if (range.last >= range.first + 2) {
+                    addStyle(SpanStyle(fontStyle = FontStyle.Italic), range.first + 1, range.last)
+                    addStyle(tokenStyle, range.first, range.first + 1)
+                    addStyle(tokenStyle, range.last, range.last + 1)
+                }
             }
 
-            var i = 0
-            while (i < raw.length) {
-                if (raw[i] == '*' && !isIndexInBoldToken(i)) {
-                    // Açılış yıldızı kontrolü: sonraki karakter boşluk, yıldız veya satır sonu olmamalı
-                    if (i + 1 < raw.length && raw[i + 1] != ' ' && raw[i + 1] != '\t' && raw[i + 1] != '\n' && raw[i + 1] != '*') {
-                        // Kapanış yıldızı ara
-                        var closeIdx = -1
-                        var j = i + 1
-                        while (j < raw.length && raw[j] != '\n') {
-                            if (raw[j] == '*' && !isIndexInBoldToken(j)) {
-                                // Öncesi boşluk veya yıldız olmamalı
-                                if (raw[j - 1] != ' ' && raw[j - 1] != '\t' && raw[j - 1] != '*') {
-                                    closeIdx = j
-                                    break
-                                }
-                            }
-                            j++
-                        }
-
-                        if (closeIdx != -1 && closeIdx > i + 1) {
-                            addStyle(SpanStyle(fontStyle = FontStyle.Italic), i + 1, closeIdx)
-                            addStyle(tokenStyle, i, i + 1)
-                            addStyle(tokenStyle, closeIdx, closeIdx + 1)
-                            i = closeIdx + 1
-                            continue
-                        }
-                    }
+            // D. Tek Altçizgi İtalik: _metin_
+            val italicUnderscoreRegex = Regex("(?<![_\\\\])_(?!\\s)([^\n_]+?)(?<!\\s)_(?!_)")
+            for (match in italicUnderscoreRegex.findAll(raw)) {
+                val range = match.range
+                if (range.last >= range.first + 2) {
+                    addStyle(SpanStyle(fontStyle = FontStyle.Italic), range.first + 1, range.last)
+                    addStyle(tokenStyle, range.first, range.first + 1)
+                    addStyle(tokenStyle, range.last, range.last + 1)
                 }
-                i++
-            }
-
-            // D. Tek Alt Çizgi İtalik: _metin_
-            var u = 0
-            while (u < raw.length) {
-                if (raw[u] == '_' && !isIndexInBoldToken(u)) {
-                    if (u + 1 < raw.length && raw[u + 1] != ' ' && raw[u + 1] != '\t' && raw[u + 1] != '\n' && raw[u + 1] != '_') {
-                        var closeIdx = -1
-                        var j = u + 1
-                        while (j < raw.length && raw[j] != '\n') {
-                            if (raw[j] == '_' && !isIndexInBoldToken(j)) {
-                                if (raw[j - 1] != ' ' && raw[j - 1] != '\t' && raw[j - 1] != '_') {
-                                    closeIdx = j
-                                    break
-                                }
-                            }
-                            j++
-                        }
-
-                        if (closeIdx != -1 && closeIdx > u + 1) {
-                            addStyle(SpanStyle(fontStyle = FontStyle.Italic), u + 1, closeIdx)
-                            addStyle(tokenStyle, u, u + 1)
-                            addStyle(tokenStyle, closeIdx, closeIdx + 1)
-                            u = closeIdx + 1
-                            continue
-                        }
-                    }
-                }
-                u++
             }
 
             // 3. Üstü Çizili (Strikethrough): ~~metin~~
@@ -212,6 +154,39 @@ class MarkdownVisualTransformation(
                 )
                 addStyle(tokenStyle, range.first, range.first + 1)
                 addStyle(tokenStyle, range.last, range.last + 1)
+            }
+
+            // 6. Not İçi Arama Vurgusu (Search Query Highlighting)
+            if (searchQuery.isNotBlank()) {
+                var searchIdx = raw.indexOf(searchQuery, 0, ignoreCase = true)
+                while (searchIdx >= 0) {
+                    val endIdx = (searchIdx + searchQuery.length).coerceAtMost(raw.length)
+                    val isActive = activeMatchStartIndex != null && searchIdx == activeMatchStartIndex
+
+                    if (isActive) {
+                        // Aktif odaklanılan eşleşme: Belirgin Turuncu arka plan + Kalın yazı
+                        addStyle(
+                            SpanStyle(
+                                background = Color(0xFFFF9800),
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            searchIdx,
+                            endIdx
+                        )
+                    } else {
+                        // Diğer tüm eşleşmeler: Parlak Sarı arka plan
+                        addStyle(
+                            SpanStyle(
+                                background = Color(0xFFFFF176),
+                                color = Color.Black
+                            ),
+                            searchIdx,
+                            endIdx
+                        )
+                    }
+                    searchIdx = raw.indexOf(searchQuery, searchIdx + 1, ignoreCase = true)
+                }
             }
         }
 

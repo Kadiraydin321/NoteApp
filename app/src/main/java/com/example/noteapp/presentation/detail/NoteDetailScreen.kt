@@ -127,6 +127,7 @@ fun NoteDetailScreen(
     val focusRequester = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
     var isPreviewMode by remember { mutableStateOf(false) }
     var hideMarkdownTokens by remember { mutableStateOf(true) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
@@ -227,7 +228,7 @@ fun NoteDetailScreen(
     var currentMatchIndex by remember { mutableIntStateOf(0) }
 
     val searchMatches = remember(state.contentValue.text, searchQuery) {
-        if (searchQuery.length < 2) emptyList<Int>()
+        if (searchQuery.isBlank()) emptyList<Int>()
         else {
             val list = mutableListOf<Int>()
             var idx = state.contentValue.text.indexOf(searchQuery, 0, ignoreCase = true)
@@ -239,15 +240,25 @@ fun NoteDetailScreen(
         }
     }
 
+    val activeMatchStartIndex = if (searchMatches.isNotEmpty() && currentMatchIndex in searchMatches.indices) {
+        searchMatches[currentMatchIndex]
+    } else null
+
     LaunchedEffect(currentMatchIndex, searchMatches) {
         if (searchMatches.isNotEmpty() && currentMatchIndex in searchMatches.indices) {
             val start = searchMatches[currentMatchIndex]
-            val end = start + searchQuery.length
+            val end = (start + searchQuery.length).coerceAtMost(state.contentValue.text.length)
             onContentValueChange(
                 state.contentValue.copy(
                     selection = TextRange(start, end)
                 )
             )
+            // Eşleşmenin konumuna sayfayı yumuşakça kaydır
+            if (state.contentValue.text.isNotEmpty() && scrollState.maxValue > 0) {
+                val ratio = start.toFloat() / state.contentValue.text.length
+                val targetScroll = (ratio * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
+                scrollState.animateScrollTo(targetScroll)
+            }
         }
     }
 
@@ -1177,8 +1188,6 @@ fun NoteDetailScreen(
             }
         }
     ) { padding ->
-        val scrollState = rememberScrollState()
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1313,7 +1322,13 @@ fun NoteDetailScreen(
                                 color = hintColor
                             )
                         },
-                        visualTransformation = remember(hideMarkdownTokens) { MarkdownVisualTransformation(hideSyntaxTokens = hideMarkdownTokens) },
+                        visualTransformation = remember(hideMarkdownTokens, isSearchActive, searchQuery, activeMatchStartIndex) {
+                            MarkdownVisualTransformation(
+                                hideSyntaxTokens = hideMarkdownTokens && !isSearchActive,
+                                searchQuery = if (isSearchActive) searchQuery else "",
+                                activeMatchStartIndex = if (isSearchActive) activeMatchStartIndex else null
+                            )
+                        },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             color = contentColor,
                             lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.25f

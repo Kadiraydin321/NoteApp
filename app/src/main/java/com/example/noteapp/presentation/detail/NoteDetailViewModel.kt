@@ -373,10 +373,46 @@ class NoteDetailViewModel @Inject constructor(
         saveNoteQuietly()
     }
 
+    fun checkAndDiscardIfEmptyOrSave(): Boolean {
+        autoSaveJob?.cancel()
+        val currentState = _state.value
+        val isBlankNote = currentState.title.isBlank() &&
+                currentState.contentValue.text.isBlank() &&
+                currentState.attachments.isEmpty() &&
+                currentState.backgroundImage == null
+
+        val noteId = currentState.currentNoteId ?: 0L
+        if (isBlankNote) {
+            if (noteId != 0L && noteId != -1L) {
+                viewModelScope.launch {
+                    repository.deleteNotesPermanently(listOf(noteId))
+                    alarmScheduler.cancel(noteId)
+                    NotesWidgetProvider.updateAllWidgets(app)
+                }
+            }
+            return true
+        } else {
+            saveNoteQuietly()
+            return false
+        }
+    }
+
     fun saveNoteQuietly() {
         val currentState = _state.value
         val noteId = currentState.currentNoteId ?: 0L
-        if (noteId == 0L && currentState.title.isBlank() && currentState.contentValue.text.isBlank() && currentState.attachments.isEmpty() && currentState.backgroundImage == null) {
+        val isBlankNote = currentState.title.isBlank() &&
+                currentState.contentValue.text.isBlank() &&
+                currentState.attachments.isEmpty() &&
+                currentState.backgroundImage == null
+
+        if (isBlankNote) {
+            if (noteId != 0L && noteId != -1L) {
+                viewModelScope.launch {
+                    repository.deleteNotesPermanently(listOf(noteId))
+                    alarmScheduler.cancel(noteId)
+                    NotesWidgetProvider.updateAllWidgets(app)
+                }
+            }
             return
         }
 
@@ -423,8 +459,7 @@ class NoteDetailViewModel @Inject constructor(
     }
 
     fun saveNote() {
-        autoSaveJob?.cancel()
-        saveNoteQuietly()
+        checkAndDiscardIfEmptyOrSave()
     }
 
     override fun onCleared() {
@@ -433,7 +468,6 @@ class NoteDetailViewModel @Inject constructor(
         if (_state.value.isRecordingAudio) {
             audioRecorder.stop()
         }
-        autoSaveJob?.cancel()
-        saveNoteQuietly()
+        checkAndDiscardIfEmptyOrSave()
     }
 }

@@ -2,10 +2,20 @@
 
 package com.example.noteapp.presentation.notes
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -26,7 +36,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,7 +61,7 @@ fun NotesScreen(
     state: NotesState,
     onSearchChange: (String) -> Unit,
     onNoteClick: (Note) -> Unit,
-    onAddNoteClick: () -> Unit,
+    onAddNoteClick: (autoAction: String?) -> Unit,
     onPinNote: (Note) -> Unit,
     onArchiveNote: (Note) -> Unit,
     onMoveToTrash: (Note) -> Unit,
@@ -83,6 +96,11 @@ fun NotesScreen(
     var showBatchCategoryDialog by remember { mutableStateOf(false) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
+    var isFabExpanded by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = isFabExpanded) {
+        isFabExpanded = false
+    }
 
     val isSelectionMode = state.selectedNoteIds.isNotEmpty()
 
@@ -102,13 +120,37 @@ fun NotesScreen(
             matchesSearch && matchesType
         }
 
-        val comparator = when (state.sortOrder) {
-            NoteSortOrder.MODIFIED_DESC -> compareByDescending<Note> { it.updatedAt }
-            NoteSortOrder.MODIFIED_ASC -> compareBy<Note> { it.updatedAt }
-            NoteSortOrder.CREATED_DESC -> compareByDescending<Note> { it.createdAt }
-            NoteSortOrder.CREATED_ASC -> compareBy<Note> { it.createdAt }
-            NoteSortOrder.TITLE_AZ -> compareBy<Note> { it.title.lowercase() }
-            NoteSortOrder.TITLE_ZA -> compareByDescending<Note> { it.title.lowercase() }
+        val turkishCollator = java.text.Collator.getInstance(Locale("tr", "TR")).apply {
+            strength = java.text.Collator.PRIMARY
+        }
+
+        fun getModifiedTime(note: Note): Long = when {
+            note.updatedAt > 0L -> note.updatedAt
+            note.timestamp > 0L -> note.timestamp
+            else -> note.id
+        }
+
+        fun getCreatedTime(note: Note): Long = when {
+            note.createdAt > 0L -> note.createdAt
+            note.timestamp > 0L -> note.timestamp
+            else -> note.id
+        }
+
+        val comparator: Comparator<Note> = when (state.sortOrder) {
+            NoteSortOrder.MODIFIED_DESC -> compareByDescending { getModifiedTime(it) }
+            NoteSortOrder.MODIFIED_ASC -> compareBy { getModifiedTime(it) }
+            NoteSortOrder.CREATED_DESC -> compareByDescending { getCreatedTime(it) }
+            NoteSortOrder.CREATED_ASC -> compareBy { getCreatedTime(it) }
+            NoteSortOrder.TITLE_AZ -> Comparator { a, b ->
+                val titleA = a.title.ifBlank { a.content }.trim()
+                val titleB = b.title.ifBlank { b.content }.trim()
+                turkishCollator.compare(titleA, titleB)
+            }
+            NoteSortOrder.TITLE_ZA -> Comparator { a, b ->
+                val titleA = a.title.ifBlank { a.content }.trim()
+                val titleB = b.title.ifBlank { b.content }.trim()
+                turkishCollator.compare(titleB, titleA)
+            }
         }
 
         val (pinned, unpinned) = baseFiltered.partition { it.isPinned }
@@ -353,22 +395,92 @@ fun NotesScreen(
                 }
             },
             floatingActionButton = {
-                if (state.viewMode == NotesViewMode.ALL && !isSelectionMode) {
-                    FloatingActionButton(
-                        onClick = onAddNoteClick,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                if ((state.viewMode == NotesViewMode.ALL || state.viewMode == NotesViewMode.REMINDERS) && !isSelectionMode) {
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Yeni Not")
+                        AnimatedVisibility(
+                            visible = isFabExpanded,
+                            enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+                            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom)
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.End,
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                QuickFabOption(
+                                    label = "Resim Notu",
+                                    icon = Icons.Default.Image,
+                                    onClick = {
+                                        isFabExpanded = false
+                                        onAddNoteClick("image")
+                                    }
+                                )
+                                QuickFabOption(
+                                    label = "Çizim Notu",
+                                    icon = Icons.Default.Draw,
+                                    onClick = {
+                                        isFabExpanded = false
+                                        onAddNoteClick("draw")
+                                    }
+                                )
+                                QuickFabOption(
+                                    label = "Sesli Not",
+                                    icon = Icons.Default.Mic,
+                                    onClick = {
+                                        isFabExpanded = false
+                                        onAddNoteClick("voice")
+                                    }
+                                )
+                                QuickFabOption(
+                                    label = "Yapılacaklar Listesi",
+                                    icon = Icons.Default.CheckBox,
+                                    onClick = {
+                                        isFabExpanded = false
+                                        onAddNoteClick("checklist")
+                                    }
+                                )
+                                QuickFabOption(
+                                    label = "Metin Notu",
+                                    icon = Icons.Default.EditNote,
+                                    onClick = {
+                                        isFabExpanded = false
+                                        onAddNoteClick(null)
+                                    }
+                                )
+                            }
+                        }
+
+                        val rotation by animateFloatAsState(
+                            targetValue = if (isFabExpanded) 135f else 0f,
+                            animationSpec = tween(220),
+                            label = "fab_rotation"
+                        )
+                        FloatingActionButton(
+                            onClick = { isFabExpanded = !isFabExpanded },
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            shape = CircleShape
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = if (isFabExpanded) "Kapat" else "Yeni Not Ekle",
+                                modifier = Modifier.rotate(rotation)
+                            )
+                        }
                     }
                 }
             }
         ) { padding ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
             ) {
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
                 // Arama Çubuğu
                 OutlinedTextField(
                     value = state.searchQuery,
@@ -464,122 +576,154 @@ fun NotesScreen(
                     }
                 } else {
                     // Seçilen Listeleme Düzenine Göre Görüntüleme
-                    when (state.layoutMode) {
-                        NotesLayoutMode.STAGGERED_GRID -> {
-                            LazyVerticalStaggeredGrid(
-                                columns = StaggeredGridCells.Fixed(2),
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 100.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalItemSpacing = 12.dp
-                            ) {
-                                items(filteredNotes, key = { it.id }) { note ->
-                                    val isSelected = state.selectedNoteIds.contains(note.id)
-                                    NoteCard(
-                                        note = note,
-                                        viewMode = state.viewMode,
-                                        isSelected = isSelected,
-                                        isSelectionMode = isSelectionMode,
-                                        onClick = {
-                                            if (isSelectionMode) onToggleNoteSelection(note.id)
-                                            else onNoteClick(note)
-                                        },
-                                        onLongClick = { onToggleNoteSelection(note.id) },
-                                        onPinClick = { onPinNote(note) },
-                                        onArchiveClick = { onArchiveNote(note) },
-                                        onDuplicateClick = { onDuplicateNote(note) },
-                                        onDeleteClick = {
-                                            onMoveToTrash(note)
-                                            scope.launch {
-                                                val result = snackbarHostState.showSnackbar(
-                                                    message = "'${note.title.ifBlank { "Not" }}' çöp kutusuna taşındı",
-                                                    actionLabel = "Geri Al",
-                                                    duration = SnackbarDuration.Short
-                                                )
-                                                if (result == SnackbarResult.ActionPerformed) {
-                                                    onRestoreNote(note)
+                    Box(modifier = Modifier.fillMaxSize().weight(1f)) {
+                        when (state.layoutMode) {
+                            NotesLayoutMode.STAGGERED_GRID -> {
+                                LazyVerticalStaggeredGrid(
+                                    columns = StaggeredGridCells.Fixed(2),
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 140.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalItemSpacing = 12.dp
+                                ) {
+                                    items(filteredNotes, key = { it.id }) { note ->
+                                        val isSelected = state.selectedNoteIds.contains(note.id)
+                                        NoteCard(
+                                            note = note,
+                                            viewMode = state.viewMode,
+                                            isSelected = isSelected,
+                                            isSelectionMode = isSelectionMode,
+                                            onClick = {
+                                                if (isSelectionMode) onToggleNoteSelection(note.id)
+                                                else onNoteClick(note)
+                                            },
+                                            onLongClick = { onToggleNoteSelection(note.id) },
+                                            onPinClick = { onPinNote(note) },
+                                            onArchiveClick = { onArchiveNote(note) },
+                                            onDuplicateClick = { onDuplicateNote(note) },
+                                            onDeleteClick = {
+                                                onMoveToTrash(note)
+                                                scope.launch {
+                                                    val result = snackbarHostState.showSnackbar(
+                                                        message = "'${note.title.ifBlank { "Not" }}' çöp kutusuna taşındı",
+                                                        actionLabel = "Geri Al",
+                                                        duration = SnackbarDuration.Short
+                                                    )
+                                                    if (result == SnackbarResult.ActionPerformed) {
+                                                        onRestoreNote(note)
+                                                    }
                                                 }
-                                            }
-                                        },
-                                        onRestoreClick = { onRestoreNote(note) },
-                                        onDeletePermanentlyClick = { onDeletePermanently(note) }
-                                    )
+                                            },
+                                            onRestoreClick = { onRestoreNote(note) },
+                                            onDeletePermanentlyClick = { onDeletePermanently(note) }
+                                        )
+                                    }
+                                }
+                            }
+
+                            NotesLayoutMode.LIST -> {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 140.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    items(filteredNotes, key = { it.id }) { note ->
+                                        val isSelected = state.selectedNoteIds.contains(note.id)
+                                        NoteCard(
+                                            note = note,
+                                            viewMode = state.viewMode,
+                                            isSelected = isSelected,
+                                            isSelectionMode = isSelectionMode,
+                                            onClick = {
+                                                if (isSelectionMode) onToggleNoteSelection(note.id)
+                                                else onNoteClick(note)
+                                            },
+                                            onLongClick = { onToggleNoteSelection(note.id) },
+                                            onPinClick = { onPinNote(note) },
+                                            onArchiveClick = { onArchiveNote(note) },
+                                            onDuplicateClick = { onDuplicateNote(note) },
+                                            onDeleteClick = {
+                                                onMoveToTrash(note)
+                                                scope.launch {
+                                                    val result = snackbarHostState.showSnackbar(
+                                                        message = "'${note.title.ifBlank { "Not" }}' çöp kutusuna taşındı",
+                                                        actionLabel = "Geri Al",
+                                                        duration = SnackbarDuration.Short
+                                                    )
+                                                    if (result == SnackbarResult.ActionPerformed) {
+                                                        onRestoreNote(note)
+                                                    }
+                                                }
+                                            },
+                                            onRestoreClick = { onRestoreNote(note) },
+                                            onDeletePermanentlyClick = { onDeletePermanently(note) }
+                                        )
+                                    }
+                                }
+                            }
+
+                            NotesLayoutMode.COMPACT_LIST -> {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 140.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(filteredNotes, key = { it.id }) { note ->
+                                        val isSelected = state.selectedNoteIds.contains(note.id)
+                                        CompactNoteCard(
+                                            note = note,
+                                            viewMode = state.viewMode,
+                                            isSelected = isSelected,
+                                            isSelectionMode = isSelectionMode,
+                                            onClick = {
+                                                if (isSelectionMode) onToggleNoteSelection(note.id)
+                                                else onNoteClick(note)
+                                            },
+                                            onLongClick = { onToggleNoteSelection(note.id) },
+                                            onPinClick = { onPinNote(note) },
+                                            onDeleteClick = { onMoveToTrash(note) },
+                                            onRestoreClick = { onRestoreNote(note) },
+                                            onDeletePermanentlyClick = { onDeletePermanently(note) }
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        NotesLayoutMode.LIST -> {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 100.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                items(filteredNotes, key = { it.id }) { note ->
-                                    val isSelected = state.selectedNoteIds.contains(note.id)
-                                    NoteCard(
-                                        note = note,
-                                        viewMode = state.viewMode,
-                                        isSelected = isSelected,
-                                        isSelectionMode = isSelectionMode,
-                                        onClick = {
-                                            if (isSelectionMode) onToggleNoteSelection(note.id)
-                                            else onNoteClick(note)
-                                        },
-                                        onLongClick = { onToggleNoteSelection(note.id) },
-                                        onPinClick = { onPinNote(note) },
-                                        onArchiveClick = { onArchiveNote(note) },
-                                        onDuplicateClick = { onDuplicateNote(note) },
-                                        onDeleteClick = {
-                                            onMoveToTrash(note)
-                                            scope.launch {
-                                                val result = snackbarHostState.showSnackbar(
-                                                    message = "'${note.title.ifBlank { "Not" }}' çöp kutusuna taşındı",
-                                                    actionLabel = "Geri Al",
-                                                    duration = SnackbarDuration.Short
-                                                )
-                                                if (result == SnackbarResult.ActionPerformed) {
-                                                    onRestoreNote(note)
-                                                }
-                                            }
-                                        },
-                                        onRestoreClick = { onRestoreNote(note) },
-                                        onDeletePermanentlyClick = { onDeletePermanently(note) }
+                        // Alt kısımda organik, yumuşak geçiş sağlayan gradyan / dalga efekti (kartların kesilmesini önler)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
+                                            MaterialTheme.colorScheme.background
+                                        )
                                     )
-                                }
-                            }
-                        }
-
-                        NotesLayoutMode.COMPACT_LIST -> {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(filteredNotes, key = { it.id }) { note ->
-                                    val isSelected = state.selectedNoteIds.contains(note.id)
-                                    CompactNoteCard(
-                                        note = note,
-                                        viewMode = state.viewMode,
-                                        isSelected = isSelected,
-                                        isSelectionMode = isSelectionMode,
-                                        onClick = {
-                                            if (isSelectionMode) onToggleNoteSelection(note.id)
-                                            else onNoteClick(note)
-                                        },
-                                        onLongClick = { onToggleNoteSelection(note.id) },
-                                        onPinClick = { onPinNote(note) },
-                                        onDeleteClick = { onMoveToTrash(note) },
-                                        onRestoreClick = { onRestoreNote(note) },
-                                        onDeletePermanentlyClick = { onDeletePermanently(note) }
-                                    )
-                                }
-                            }
-                        }
+                                )
+                        )
                     }
                 }
             }
+
+            if (isFabExpanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { isFabExpanded = false }
+                )
+            }
         }
     }
+}
 
     // ==========================================
     // DİYALOGLAR (Kategori Ekleme, Düzenleme, Toplu İşlemler)
@@ -1149,3 +1293,39 @@ fun CompactNoteCard(
         }
     }
 }
+
+@Composable
+private fun QuickFabOption(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 4.dp
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
+        SmallFloatingActionButton(
+            onClick = onClick,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shape = CircleShape
+        ) {
+            Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+

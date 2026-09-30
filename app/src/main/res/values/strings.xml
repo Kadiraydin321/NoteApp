@@ -2,4 +2,5 @@
     <string name="app_name">Modern Note</string>
     <string name="widget_name">Notlar Widget</string>
     <string name="widget_description">Tüm veya favori notlarınızı ana ekranınızda görüntüleyin ve hızlıca yeni not ekleyin.</string>
+    <string name="quick_note_widget_description">Hızlıca yeni metin notu oluşturma kısayolu</string>
 </resources>
