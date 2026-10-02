@@ -100,17 +100,35 @@ fun NotesScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
-    val onShareNote: (Note) -> Unit = { note ->
-        val fullText = buildString {
-            if (note.title.isNotBlank()) appendLine("# ${note.title}\n")
-            append(note.content)
+    val onShareNote: (Note) -> Unit = remember(context) {
+        { note ->
+            val fullText = buildString {
+                if (note.title.isNotBlank()) appendLine("# ${note.title}\n")
+                append(note.content)
+            }
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/markdown"
+                putExtra(Intent.EXTRA_SUBJECT, note.title.ifBlank { "Not" })
+                putExtra(Intent.EXTRA_TEXT, fullText)
+            }
+            context.startActivity(Intent.createChooser(intent, "Markdown Olarak Paylaş"))
         }
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/markdown"
-            putExtra(Intent.EXTRA_SUBJECT, note.title.ifBlank { "Not" })
-            putExtra(Intent.EXTRA_TEXT, fullText)
+    }
+
+    val handleDeleteNote: (Note) -> Unit = remember(scope, snackbarHostState) {
+        { note ->
+            onMoveToTrash(note)
+            scope.launch {
+                val result = snackbarHostState.showSnackbar(
+                    message = "'${note.title.ifBlank { "Not" }}' çöp kutusuna taşındı",
+                    actionLabel = "Geri Al",
+                    duration = SnackbarDuration.Short
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    onRestoreNote(note)
+                }
+            }
         }
-        context.startActivity(Intent.createChooser(intent, "Markdown Olarak Paylaş"))
     }
 
     var showAddCategoryDialog by remember { mutableStateOf(false) }
@@ -697,7 +715,7 @@ fun NotesScreen(
                     }
                 } else {
                     // Seçilen Listeleme Düzenine Göre Görüntüleme
-                    Box(modifier = Modifier.fillMaxSize().weight(1f)) {
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         when (state.layoutMode) {
                             NotesLayoutMode.STAGGERED_GRID -> {
                                 LazyVerticalStaggeredGrid(
@@ -708,7 +726,11 @@ fun NotesScreen(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalItemSpacing = 12.dp
                                 ) {
-                                    items(filteredNotes, key = { it.id }) { note ->
+                                    items(
+                                        items = filteredNotes,
+                                        key = { it.id },
+                                        contentType = { "note_card" }
+                                    ) { note ->
                                         val isSelected = state.selectedNoteIds.contains(note.id)
                                         NoteCard(
                                             note = note,
@@ -723,20 +745,7 @@ fun NotesScreen(
                                             onPinClick = { onPinNote(note) },
                                             onShareClick = { onShareNote(note) },
                                             onArchiveClick = { onArchiveNote(note) },
-                                            onDuplicateClick = { onDuplicateNote(note) },
-                                            onDeleteClick = {
-                                                onMoveToTrash(note)
-                                                scope.launch {
-                                                    val result = snackbarHostState.showSnackbar(
-                                                        message = "'${note.title.ifBlank { "Not" }}' çöp kutusuna taşındı",
-                                                        actionLabel = "Geri Al",
-                                                        duration = SnackbarDuration.Short
-                                                    )
-                                                    if (result == SnackbarResult.ActionPerformed) {
-                                                        onRestoreNote(note)
-                                                    }
-                                                }
-                                            },
+                                            onDeleteClick = { handleDeleteNote(note) },
                                             onRestoreClick = { onRestoreNote(note) },
                                             onDeletePermanentlyClick = { onDeletePermanently(note) }
                                         )
@@ -751,7 +760,11 @@ fun NotesScreen(
                                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 140.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    items(filteredNotes, key = { it.id }) { note ->
+                                    items(
+                                        items = filteredNotes,
+                                        key = { it.id },
+                                        contentType = { "note_card" }
+                                    ) { note ->
                                         val isSelected = state.selectedNoteIds.contains(note.id)
                                         NoteCard(
                                             note = note,
@@ -766,20 +779,7 @@ fun NotesScreen(
                                             onPinClick = { onPinNote(note) },
                                             onShareClick = { onShareNote(note) },
                                             onArchiveClick = { onArchiveNote(note) },
-                                            onDuplicateClick = { onDuplicateNote(note) },
-                                            onDeleteClick = {
-                                                onMoveToTrash(note)
-                                                scope.launch {
-                                                    val result = snackbarHostState.showSnackbar(
-                                                        message = "'${note.title.ifBlank { "Not" }}' çöp kutusuna taşındı",
-                                                        actionLabel = "Geri Al",
-                                                        duration = SnackbarDuration.Short
-                                                    )
-                                                    if (result == SnackbarResult.ActionPerformed) {
-                                                        onRestoreNote(note)
-                                                    }
-                                                }
-                                            },
+                                            onDeleteClick = { handleDeleteNote(note) },
                                             onRestoreClick = { onRestoreNote(note) },
                                             onDeletePermanentlyClick = { onDeletePermanently(note) }
                                         )
@@ -794,7 +794,11 @@ fun NotesScreen(
                                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 140.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    items(filteredNotes, key = { it.id }) { note ->
+                                    items(
+                                        items = filteredNotes,
+                                        key = { it.id },
+                                        contentType = { "compact_note" }
+                                    ) { note ->
                                         val isSelected = state.selectedNoteIds.contains(note.id)
                                         val category = state.categories.find { it.id == note.categoryId }
                                         CompactNoteCard(
@@ -810,21 +814,8 @@ fun NotesScreen(
                                             onLongClick = { onToggleNoteSelection(note.id) },
                                             onPinClick = { onPinNote(note) },
                                             onShareClick = { onShareNote(note) },
-                                            onDuplicateClick = { onDuplicateNote(note) },
                                             onArchiveClick = { onArchiveNote(note) },
-                                            onDeleteClick = {
-                                                onMoveToTrash(note)
-                                                scope.launch {
-                                                    val result = snackbarHostState.showSnackbar(
-                                                        message = "'${note.title.ifBlank { "Not" }}' çöp kutusuna taşındı",
-                                                        actionLabel = "Geri Al",
-                                                        duration = SnackbarDuration.Short
-                                                    )
-                                                    if (result == SnackbarResult.ActionPerformed) {
-                                                        onRestoreNote(note)
-                                                    }
-                                                }
-                                            },
+                                            onDeleteClick = { handleDeleteNote(note) },
                                             onRestoreClick = { onRestoreNote(note) },
                                             onDeletePermanentlyClick = { onDeletePermanently(note) }
                                         )
@@ -1109,37 +1100,64 @@ fun NoteCard(
     onLongClick: () -> Unit = {},
     onPinClick: () -> Unit,
     onArchiveClick: () -> Unit,
-    onDuplicateClick: () -> Unit = {},
     onShareClick: () -> Unit = {},
     onDeleteClick: () -> Unit,
     onRestoreClick: () -> Unit,
     onDeletePermanentlyClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Negatif / Yüksek kontrast renk belirleyicisi
-    val colorSpec = getNoteColorSpec(note.color, MaterialTheme.colorScheme.surfaceVariant)
+    val defaultSurface = MaterialTheme.colorScheme.surfaceVariant
+    val colorSpec = remember(note.color, defaultSurface) {
+        getNoteColorSpec(note.color, defaultSurface)
+    }
+
+    val firstImage = remember(note.attachments) {
+        note.attachments.firstOrNull { !it.endsWith(".mp4") && !it.endsWith(".m4a") }
+    }
+
+    val displayContent = remember(note.content) {
+        if (note.content.isBlank()) ""
+        else {
+            note.content.lineSequence().take(6).joinToString("\n") { line ->
+                val trimmed = line.trimStart()
+                when {
+                    trimmed.startsWith("- [x] ") -> "☑ " + trimmed.removePrefix("- [x] ")
+                    trimmed.startsWith("- [ ] ") -> "☐ " + trimmed.removePrefix("- [ ] ")
+                    else -> line
+                }
+            }
+        }
+    }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .border(
-                width = if (isSelected) 3.dp else 0.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(20.dp)
+            .then(
+                if (isSelected) Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(18.dp))
+                else Modifier
             )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
             containerColor = colorSpec.backgroundColor
         )
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             if (!note.backgroundImage.isNullOrEmpty()) {
+                val context = LocalContext.current
+                val bgRequest = remember(note.backgroundImage) {
+                    coil.request.ImageRequest.Builder(context)
+                        .data(File(note.backgroundImage))
+                        .size(coil.size.Size(360, 360))
+                        .crossfade(false)
+                        .build()
+                }
                 AsyncImage(
-                    model = File(note.backgroundImage),
+                    model = bgRequest,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -1150,161 +1168,200 @@ fun NoteCard(
             Column(
                 modifier = Modifier.padding(14.dp)
             ) {
-            // Seçim Modu Checkbox'ı veya Görsel Eki
-            val firstImage = note.attachments.firstOrNull { !it.endsWith(".mp4") && !it.endsWith(".m4a") }
-            firstImage?.let { imgPath ->
-                AsyncImage(
-                    model = File(imgPath),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(115.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (note.title.isNotEmpty()) {
-                    Text(
-                        text = note.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = colorSpec.contentColor,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
+                // Görsel eki (Varsa) - Downsampled thumbnail
+                firstImage?.let { imgPath ->
+                    val context = LocalContext.current
+                    val imgRequest = remember(imgPath) {
+                        coil.request.ImageRequest.Builder(context)
+                            .data(File(imgPath))
+                            .size(coil.size.Size(360, 240))
+                            .crossfade(false)
+                            .build()
+                    }
+                    AsyncImage(
+                        model = imgRequest,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(115.dp)
+                            .clip(RoundedCornerShape(10.dp))
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                if (isSelectionMode) {
-                    Checkbox(
-                        checked = isSelected,
-                        onCheckedChange = { onClick() },
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else if (viewMode == NotesViewMode.ALL || viewMode == NotesViewMode.REMINDERS) {
-                    IconButton(
-                        onClick = onPinClick,
-                        modifier = Modifier.size(24.dp)
+                // Başlık ve Sabitleme / Seçim
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (note.title.isNotEmpty()) {
+                        Text(
+                            text = note.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = colorSpec.contentColor,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    if (isSelectionMode) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { onClick() },
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else if (viewMode == NotesViewMode.ALL || viewMode == NotesViewMode.REMINDERS) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = onPinClick),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
+                                contentDescription = "Sabitle",
+                                tint = if (note.isPinned) MaterialTheme.colorScheme.primary else colorSpec.iconTint,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Kilitli not veya içerik
+                if (note.isLocked) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
-                            contentDescription = "Sabitle",
-                            tint = if (note.isPinned) MaterialTheme.colorScheme.primary else colorSpec.iconTint
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Kilitli",
+                            tint = colorSpec.contentColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            "Kilitli Not",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colorSpec.contentColor,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
-                }
-            }
-
-            if (note.isLocked) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = "Kilitli",
-                        tint = colorSpec.contentColor,
-                        modifier = Modifier.size(18.dp)
-                    )
+                } else if (displayContent.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        "Kilitli Not",
-                        style = MaterialTheme.typography.bodySmall,
+                        text = displayContent,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = colorSpec.contentColor,
-                        fontWeight = FontWeight.SemiBold
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-            } else if (note.content.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                val displayContent = remember(note.content) {
-                    note.content.lines().joinToString("\n") { line ->
-                        val trimmed = line.trimStart()
-                        when {
-                            trimmed.startsWith("- [x] ") -> "☑ " + trimmed.removePrefix("- [x] ")
-                            trimmed.startsWith("- [ ] ") -> "☐ " + trimmed.removePrefix("- [ ] ")
-                            else -> line
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Alt Çubuk: Göstergeler (sol) ve Hızlı İşlemler (sağ)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (note.reminderTime != null && note.reminderTime > 0) {
+                            Icon(
+                                Icons.Default.Alarm,
+                                contentDescription = "Hatırlatıcı",
+                                modifier = Modifier.size(14.dp),
+                                tint = colorSpec.iconTint
+                            )
+                        }
+                        if (note.attachments.any { it.endsWith(".mp4") || it.endsWith(".m4a") }) {
+                            Icon(
+                                Icons.Default.Mic,
+                                contentDescription = "Ses Kaydı",
+                                modifier = Modifier.size(14.dp),
+                                tint = colorSpec.iconTint
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        when (viewMode) {
+                            NotesViewMode.ALL, NotesViewMode.REMINDERS -> {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onShareClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = "Paylaş", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onDeleteClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
+                                }
+                            }
+                            NotesViewMode.ARCHIVE -> {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onArchiveClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Unarchive, contentDescription = "Arşivden Çıkar", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onDeleteClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
+                                }
+                            }
+                            NotesViewMode.TRASH -> {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onRestoreClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.RestoreFromTrash, contentDescription = "Geri Yükle", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onDeletePermanentlyClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.DeleteForever, contentDescription = "Kalıcı Olarak Sil", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
                         }
                     }
                 }
-                Text(
-                    text = displayContent,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colorSpec.contentColor,
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Alt Butonlar / Göstergeler
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (note.reminderTime != null) {
-                        Icon(
-                            Icons.Default.Alarm,
-                            contentDescription = "Hatırlatıcı",
-                            modifier = Modifier.size(16.dp),
-                            tint = colorSpec.iconTint
-                        )
-                    }
-                    if (note.attachments.any { it.endsWith(".mp4") || it.endsWith(".m4a") }) {
-                        Icon(
-                            Icons.Default.Mic,
-                            contentDescription = "Ses Kaydı",
-                            modifier = Modifier.size(16.dp),
-                            tint = colorSpec.iconTint
-                        )
-                    }
-                }
-
-                Row {
-                    when (viewMode) {
-                        NotesViewMode.ALL, NotesViewMode.REMINDERS -> {
-                            IconButton(onClick = onShareClick, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.Share, contentDescription = "Paylaş", modifier = Modifier.size(15.dp), tint = colorSpec.iconTint)
-                            }
-                            IconButton(onClick = onDuplicateClick, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = "Çoğalt", modifier = Modifier.size(15.dp), tint = colorSpec.iconTint)
-                            }
-                            IconButton(onClick = onArchiveClick, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.Archive, contentDescription = "Arşivle", modifier = Modifier.size(15.dp), tint = colorSpec.iconTint)
-                            }
-                            IconButton(onClick = onDeleteClick, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(15.dp), tint = colorSpec.iconTint)
-                            }
-                        }
-                        NotesViewMode.ARCHIVE -> {
-                            IconButton(onClick = onArchiveClick, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.Unarchive, contentDescription = "Arşivden Çıkar", modifier = Modifier.size(15.dp), tint = colorSpec.iconTint)
-                            }
-                            IconButton(onClick = onDeleteClick, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(15.dp), tint = colorSpec.iconTint)
-                            }
-                        }
-                        NotesViewMode.TRASH -> {
-                            IconButton(onClick = onRestoreClick, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.RestoreFromTrash, contentDescription = "Geri Yükle", modifier = Modifier.size(15.dp), tint = colorSpec.iconTint)
-                            }
-                            IconButton(onClick = onDeletePermanentlyClick, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.DeleteForever, contentDescription = "Kalıcı Olarak Sil", modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                }
-            }
-        }
         }
     }
 }
@@ -1324,25 +1381,28 @@ fun CompactNoteCard(
     onLongClick: () -> Unit = {},
     onPinClick: () -> Unit,
     onShareClick: () -> Unit = {},
-    onDuplicateClick: () -> Unit = {},
     onArchiveClick: () -> Unit = {},
     onDeleteClick: () -> Unit,
     onRestoreClick: () -> Unit,
     onDeletePermanentlyClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val colorSpec = getNoteColorSpec(note.color, MaterialTheme.colorScheme.surfaceVariant)
-    val dateStr = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(note.timestamp))
+    val defaultSurface = MaterialTheme.colorScheme.surfaceVariant
+    val colorSpec = remember(note.color, defaultSurface) {
+        getNoteColorSpec(note.color, defaultSurface)
+    }
+    val dateStr = remember(note.timestamp) {
+        SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(note.timestamp))
+    }
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = colorSpec.backgroundColor,
         modifier = modifier
             .fillMaxWidth()
-            .border(
-                width = if (isSelected) 2.dp else 0.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(16.dp)
+            .then(
+                if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp))
+                else Modifier
             )
             .combinedClickable(
                 onClick = onClick,
@@ -1386,16 +1446,23 @@ fun CompactNoteCard(
                     Spacer(Modifier.width(6.dp))
                 }
 
-                // Başlık ve Kısa Özeti (Tek satırda akıcı birleşim)
+                // Başlık ve Kısa Özeti
+                val titleSnippet = remember(note.title, note.content, note.isLocked) {
+                    val preview = if (!note.isLocked && note.content.isNotBlank()) {
+                        note.content.take(80).replace('\n', ' ').trim()
+                    } else ""
+                    Pair(note.title.ifBlank { "Başlıksız Not" }, preview)
+                }
+
                 Text(
                     text = buildAnnotatedString {
                         withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = colorSpec.contentColor)) {
-                            append(note.title.ifBlank { "Başlıksız Not" })
+                            append(titleSnippet.first)
                         }
-                        if (!note.isLocked && note.content.isNotBlank()) {
+                        if (titleSnippet.second.isNotEmpty()) {
                             withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = colorSpec.secondaryColor)) {
                                 append("  —  ")
-                                append(note.content.replace('\n', ' ').trim())
+                                append(titleSnippet.second)
                             }
                         }
                     },
@@ -1416,13 +1483,12 @@ fun CompactNoteCard(
 
             Spacer(Modifier.height(4.dp))
 
-            // 2. SATIR: Butonlar ve Varsa Etiket/Göstergeler
+            // 2. SATIR: Göstergeler ve Hızlı Aksiyonlar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Sol taraf: Varsa Kategori, Hatırlatıcı veya Medya İkonları
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1447,7 +1513,7 @@ fun CompactNoteCard(
                         Icon(
                             Icons.Default.Notifications,
                             contentDescription = "Hatırlatıcı",
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(13.dp),
                             tint = colorSpec.secondaryColor
                         )
                     }
@@ -1455,7 +1521,7 @@ fun CompactNoteCard(
                         Icon(
                             Icons.Default.Image,
                             contentDescription = "Görsel",
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(13.dp),
                             tint = colorSpec.secondaryColor
                         )
                     }
@@ -1463,100 +1529,93 @@ fun CompactNoteCard(
                         Icon(
                             Icons.Default.Mic,
                             contentDescription = "Ses",
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(13.dp),
                             tint = colorSpec.secondaryColor
                         )
                     }
                 }
 
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
 
-                // Sağ taraf: Aksiyon Butonları
+                // Sağ taraf aksiyon butonları (Lightweight Box + Icon)
                 if (!isSelectionMode) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         when (viewMode) {
                             NotesViewMode.ALL, NotesViewMode.REMINDERS -> {
-                                IconButton(
-                                    onClick = onPinClick,
-                                    modifier = Modifier.size(30.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onPinClick),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
                                         contentDescription = "Sabitle",
                                         tint = if (note.isPinned) MaterialTheme.colorScheme.primary else colorSpec.iconTint,
-                                        modifier = Modifier.size(17.dp)
+                                        modifier = Modifier.size(15.dp)
                                     )
                                 }
-                                IconButton(onClick = onShareClick, modifier = Modifier.size(30.dp)) {
-                                    Icon(
-                                        imageVector = Icons.Default.Share,
-                                        contentDescription = "Paylaş",
-                                        tint = colorSpec.iconTint,
-                                        modifier = Modifier.size(17.dp)
-                                    )
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onShareClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = "Paylaş", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
                                 }
-                                IconButton(onClick = onDuplicateClick, modifier = Modifier.size(30.dp)) {
-                                    Icon(
-                                        imageVector = Icons.Default.ContentCopy,
-                                        contentDescription = "Çoğalt",
-                                        tint = colorSpec.iconTint,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                }
-                                IconButton(onClick = onArchiveClick, modifier = Modifier.size(30.dp)) {
-                                    Icon(
-                                        imageVector = Icons.Default.Archive,
-                                        contentDescription = "Arşivle",
-                                        tint = colorSpec.iconTint,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                }
-                                IconButton(onClick = onDeleteClick, modifier = Modifier.size(30.dp)) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Sil",
-                                        tint = colorSpec.iconTint,
-                                        modifier = Modifier.size(17.dp)
-                                    )
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onDeleteClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
                                 }
                             }
                             NotesViewMode.ARCHIVE -> {
-                                IconButton(onClick = onArchiveClick, modifier = Modifier.size(30.dp)) {
-                                    Icon(
-                                        imageVector = Icons.Default.Unarchive,
-                                        contentDescription = "Arşivden Çıkar",
-                                        tint = colorSpec.iconTint,
-                                        modifier = Modifier.size(17.dp)
-                                    )
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onArchiveClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Unarchive, contentDescription = "Arşivden Çıkar", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
                                 }
-                                IconButton(onClick = onDeleteClick, modifier = Modifier.size(30.dp)) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Sil",
-                                        tint = colorSpec.iconTint,
-                                        modifier = Modifier.size(17.dp)
-                                    )
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onDeleteClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
                                 }
                             }
                             NotesViewMode.TRASH -> {
-                                IconButton(onClick = onRestoreClick, modifier = Modifier.size(30.dp)) {
-                                    Icon(
-                                        Icons.Default.RestoreFromTrash,
-                                        contentDescription = "Geri Yükle",
-                                        tint = colorSpec.iconTint,
-                                        modifier = Modifier.size(17.dp)
-                                    )
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onRestoreClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.RestoreFromTrash, contentDescription = "Geri Yükle", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
                                 }
-                                IconButton(onClick = onDeletePermanentlyClick, modifier = Modifier.size(30.dp)) {
-                                    Icon(
-                                        Icons.Default.DeleteForever,
-                                        contentDescription = "Kalıcı Olarak Sil",
-                                        modifier = Modifier.size(17.dp),
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onDeletePermanentlyClick),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.DeleteForever, contentDescription = "Kalıcı Olarak Sil", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
                                 }
                             }
                         }

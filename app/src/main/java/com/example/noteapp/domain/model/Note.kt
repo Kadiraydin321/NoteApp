@@ -1,8 +1,10 @@
 package com.example.noteapp.domain.model
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+@Immutable
 @Entity(tableName = "notes")
 data class Note(
     @PrimaryKey(autoGenerate = true)
@@ -24,6 +26,7 @@ data class Note(
     val backgroundImage: String? = null // Arka plan görseli
 )
 
+@Immutable
 @Entity(tableName = "categories")
 data class Category(
     @PrimaryKey(autoGenerate = true)

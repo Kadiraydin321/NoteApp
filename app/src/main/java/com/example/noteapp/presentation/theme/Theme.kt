@@ -9,6 +9,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import com.example.noteapp.data.settings.ThemeMode
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class NoteColorSpec(
     val backgroundColor: Color,
     val contentColor: Color,

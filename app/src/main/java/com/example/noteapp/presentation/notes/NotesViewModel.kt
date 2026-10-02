@@ -1,6 +1,7 @@
 package com.example.noteapp.presentation.notes
 
 import android.app.Application
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.noteapp.data.settings.AppSettingsManager
@@ -44,6 +45,7 @@ enum class NoteSortOrder(val title: String) {
     TITLE_ZA("Başlık (Z - A)")
 }
 
+@Immutable
 data class NotesState(
     val notes: List<Note> = emptyList(),
     val categories: List<Category> = emptyList(),
