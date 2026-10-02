@@ -85,4 +85,34 @@ class MarkdownWrapTest {
         applyMarkdownWrap(state, "==", "==", { state = it }, {})
         assertEquals("kelime", state.text)
     }
+
+    @Test
+    fun testChecklistLineBoldAndItalicToggle() {
+        // - [ ] Süt al
+        // "Süt" kelimesi index 6'da başlar, imleç 'ü' üzerinde (index 8)
+        var state = TextFieldValue("- [ ] Süt al\n- [ ] Ekmek al", TextRange(8))
+        applyMarkdownWrap(state, "**", "**", { state = it }, {})
+        assertEquals("- [ ] **Süt** al\n- [ ] Ekmek al", state.text)
+
+        // İtalik ekle -> ***Süt***
+        applyMarkdownWrap(state, "*", "*", { state = it }, {})
+        assertEquals("- [ ] ***Süt*** al\n- [ ] Ekmek al", state.text)
+
+        // İtalik kaldır -> **Süt**
+        applyMarkdownWrap(state, "*", "*", { state = it }, {})
+        assertEquals("- [ ] **Süt** al\n- [ ] Ekmek al", state.text)
+
+        // Kalın kaldır -> Süt
+        applyMarkdownWrap(state, "**", "**", { state = it }, {})
+        assertEquals("- [ ] Süt al\n- [ ] Ekmek al", state.text)
+    }
+
+    @Test
+    fun testChecklistLineSelectionBold() {
+        // - [ ] Süt al
+        // Kullanıcı "Süt" kelimesini seçti (index 6..9)
+        var state = TextFieldValue("- [ ] Süt al\n- [ ] Ekmek al", TextRange(6, 9))
+        applyMarkdownWrap(state, "**", "**", { state = it }, {})
+        assertEquals("- [ ] **Süt** al\n- [ ] Ekmek al", state.text)
+    }
 }

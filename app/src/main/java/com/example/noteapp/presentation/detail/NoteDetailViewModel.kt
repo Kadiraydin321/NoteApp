@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import androidx.compose.ui.text.TextRange
+import java.util.Locale
 import java.util.ArrayDeque
 import javax.inject.Inject
 
@@ -46,10 +48,15 @@ data class NoteDetailState(
     val isRecordingAudio: Boolean = false,
     val isPlayingAudio: Boolean = false,
     val currentPlayingPath: String? = null,
+    val isExtractingText: Boolean = false,
     val isSaved: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val backgroundImage: String? = null
+    val backgroundImage: String? = null,
+    val noteFontSize: Float = 16f,
+    val backlinks: List<Note> = emptyList(),
+    val extractedWikilinks: List<String> = emptyList(),
+    val extractedTags: List<String> = emptyList()
 )
 
 @HiltViewModel
@@ -101,8 +108,11 @@ class NoteDetailViewModel @Inject constructor(
                         attachments = note.attachments,
                         createdAt = if (note.createdAt != 0L) note.createdAt else note.timestamp,
                         updatedAt = if (note.updatedAt != 0L) note.updatedAt else note.timestamp,
-                        backgroundImage = note.backgroundImage
+                        backgroundImage = note.backgroundImage,
+                        extractedWikilinks = extractWikilinks(note.content),
+                        extractedTags = extractHashtags(note.content)
                     )
+                    refreshBacklinks()
                     lastCommittedSnapshot = NoteHistorySnapshot(note.title, initialContent)
                     undoStack.clear()
                     redoStack.clear()
@@ -118,6 +128,13 @@ class NoteDetailViewModel @Inject constructor(
             }
             lastCommittedSnapshot = NoteHistorySnapshot("", TextFieldValue(""))
         }
+        _state.value = _state.value.copy(noteFontSize = settingsManager.settings.value.noteFontSize)
+    }
+
+    fun onFontSizeChange(size: Float) {
+        val clamped = size.coerceIn(12f, 24f)
+        _state.value = _state.value.copy(noteFontSize = clamped)
+        settingsManager.setNoteFontSize(clamped)
     }
 
     fun onTitleChange(title: String) {
@@ -308,6 +325,55 @@ class NoteDetailViewModel @Inject constructor(
         }
     }
 
+    fun startAudioRecording() {
+        if (!_state.value.isRecordingAudio) {
+            toggleAudioRecording()
+        }
+    }
+
+    fun stopAudioRecording() {
+        if (_state.value.isRecordingAudio) {
+            toggleAudioRecording()
+        }
+    }
+
+    fun insertAudioTimestamp(seconds: Int? = null) {
+        val sec = seconds ?: 0
+        val minPart = sec / 60
+        val secPart = sec % 60
+        val tag = String.format(Locale.getDefault(), "[%02d:%02d]", minPart, secPart)
+        val currentTfv = _state.value.contentValue
+        val curPos = currentTfv.selection.start.coerceIn(0, currentTfv.text.length)
+        val newText = StringBuilder(currentTfv.text).insert(curPos, " $tag ").toString()
+        _state.value = _state.value.copy(
+            contentValue = TextFieldValue(newText, selection = TextRange(curPos + tag.length + 2))
+        )
+        onTextOrTitleChanged()
+    }
+
+    fun extractWikilinks(content: String): List<String> {
+        val regex = Regex("\\[\\[([^\\]]+)\\]\\]")
+        return regex.findAll(content).map { it.groupValues[1].trim() }.distinct().toList()
+    }
+
+    fun extractHashtags(content: String): List<String> {
+        val regex = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
+        return regex.findAll(content).map { it.groupValues[1] }.distinct().toList()
+    }
+
+    fun refreshBacklinks() {
+        val title = _state.value.title
+        val currentId = _state.value.currentNoteId ?: -1L
+        if (title.isBlank()) {
+            _state.value = _state.value.copy(backlinks = emptyList())
+            return
+        }
+        viewModelScope.launch {
+            val links = repository.getNotesLinkingTo(title, currentId)
+            _state.value = _state.value.copy(backlinks = links)
+        }
+    }
+
     fun toggleAudioPlayback(path: String) {
         if (_state.value.isPlayingAudio && _state.value.currentPlayingPath == path) {
             audioPlayer.stop()
@@ -351,13 +417,62 @@ class NoteDetailViewModel @Inject constructor(
         return com.example.noteapp.media.ImageBackupManager.hasPreviousVersion(app, path)
     }
 
+    fun extractTextFromImage(imagePath: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isExtractingText = true)
+            val extractedText = com.example.noteapp.media.OcrHelper.extractTextFromImage(app, imagePath)
+            if (!extractedText.isNullOrBlank()) {
+                val currentText = _state.value.contentValue.text
+                val newText = if (currentText.isBlank()) extractedText else "$currentText\n\n[Görselden Çıkarılan Metin]\n$extractedText"
+                _state.value = _state.value.copy(contentValue = androidx.compose.ui.text.input.TextFieldValue(newText))
+                saveNoteQuietly()
+            }
+            _state.value = _state.value.copy(isExtractingText = false)
+            onResult(extractedText)
+        }
+    }
+
+    fun findNoteByTitle(targetTitle: String, onFound: (Long?) -> Unit) {
+        viewModelScope.launch {
+            val allNotes = repository.getAllNotes()
+            val found = allNotes.find { it.title.equals(targetTitle, ignoreCase = true) && !it.isDeleted }
+            if (found != null) {
+                onFound(found.id)
+            } else {
+                val newNote = Note(
+                    title = targetTitle,
+                    content = "# $targetTitle\n\n*Bu not [[${_state.value.title.ifBlank { "Önceki Not" }}]] üzerinden oluşturuldu.*\n",
+                    timestamp = System.currentTimeMillis()
+                )
+                val newId = repository.insertNote(newNote)
+                onFound(newId)
+            }
+        }
+    }
+
+    fun setSharedContent(sharedText: String, sharedTitle: String?) {
+        val currentText = _state.value.contentValue.text
+        val newText = if (currentText.isBlank()) sharedText else "$currentText\n\n$sharedText"
+        
+        var currentTitle = _state.value.title
+        if (currentTitle.isBlank() && !sharedTitle.isNullOrBlank()) {
+            currentTitle = sharedTitle
+        }
+        
+        _state.value = _state.value.copy(
+            contentValue = androidx.compose.ui.text.input.TextFieldValue(newText),
+            title = currentTitle
+        )
+        saveNoteQuietly()
+    }
+
     fun deleteNote(onDeleted: () -> Unit) {
         val noteId = _state.value.currentNoteId
         if (noteId != null && noteId != -1L) {
             viewModelScope.launch {
                 val note = repository.getNoteById(noteId)
                 if (note != null) {
-                    repository.updateNote(note.copy(isDeleted = true))
+                    repository.updateNote(note.copy(isDeleted = true, deletedAt = System.currentTimeMillis()))
                     alarmScheduler.cancel(noteId)
                     NotesWidgetProvider.updateAllWidgets(app)
                 }
@@ -460,6 +575,30 @@ class NoteDetailViewModel @Inject constructor(
 
     fun saveNote() {
         checkAndDiscardIfEmptyOrSave()
+    }
+
+    fun duplicateCurrentNote(onDone: (Long) -> Unit = {}) {
+        viewModelScope.launch {
+            val currentState = _state.value
+            val titleCopy = if (currentState.title.isNotBlank()) "${currentState.title} (Kopya)" else "Kopya Not"
+            val now = System.currentTimeMillis()
+            val newNote = Note(
+                title = titleCopy,
+                content = currentState.contentValue.text,
+                timestamp = now,
+                createdAt = now,
+                updatedAt = now,
+                color = currentState.color,
+                isPinned = false,
+                isLocked = currentState.isLocked,
+                categoryId = currentState.categoryId,
+                attachments = currentState.attachments,
+                backgroundImage = currentState.backgroundImage
+            )
+            val newId = repository.insertNote(newNote)
+            NotesWidgetProvider.updateAllWidgets(app)
+            onDone(newId)
+        }
     }
 
     override fun onCleared() {

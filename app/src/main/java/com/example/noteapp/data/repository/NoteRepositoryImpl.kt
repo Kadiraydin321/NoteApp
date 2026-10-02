@@ -32,6 +32,27 @@ class NoteRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getNoteByTitle(title: String): Note? {
+        val note = dao.getNoteByTitle(title) ?: return null
+        return if (note.isLocked && cryptoManager.isEncrypted(note.content)) {
+            note.copy(content = cryptoManager.decrypt(note.content))
+        } else {
+            note
+        }
+    }
+
+    override suspend fun getNotesLinkingTo(noteTitle: String, excludeId: Long): List<Note> {
+        if (noteTitle.isBlank()) return emptyList()
+        val linkToken = "[[$noteTitle]]"
+        return dao.getNotesLinkingTo(linkToken, noteTitle, excludeId).map { note ->
+            if (note.isLocked && cryptoManager.isEncrypted(note.content)) {
+                note.copy(content = cryptoManager.decrypt(note.content))
+            } else {
+                note
+            }
+        }
+    }
+
     override suspend fun insertNote(note: Note): Long {
         val safeNote = if (note.isLocked && note.content.isNotBlank()) {
             note.copy(content = cryptoManager.encrypt(note.content))
@@ -91,8 +112,13 @@ class NoteRepositoryImpl @Inject constructor(
         NotesWidgetProvider.updateAllWidgets(context)
     }
 
-    override suspend fun moveNotesToTrash(noteIds: List<Long>) {
-        dao.moveNotesToTrash(noteIds)
+    override suspend fun moveNotesToTrash(noteIds: List<Long>, deletedAt: Long) {
+        dao.moveNotesToTrash(noteIds, deletedAt)
+        NotesWidgetProvider.updateAllWidgets(context)
+    }
+
+    override suspend fun cleanUpOldTrashNotes(threshold: Long) {
+        dao.deleteOldTrashNotes(threshold)
         NotesWidgetProvider.updateAllWidgets(context)
     }
 

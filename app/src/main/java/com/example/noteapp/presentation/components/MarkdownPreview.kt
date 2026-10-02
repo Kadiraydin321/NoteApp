@@ -22,6 +22,8 @@ fun MarkdownPreview(
     content: String,
     onContentChange: (String) -> Unit,
     contentColor: Color,
+    onLinkClick: (String) -> Unit = {},
+    fontSize: Float = 16f,
     modifier: Modifier = Modifier
 ) {
     val lines = content.lines()
@@ -43,19 +45,22 @@ fun MarkdownPreview(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Checkbox(
-                            checked = isChecked,
-                            onCheckedChange = { checked ->
-                                val prefix = if (checked) "- [x] " else "- [ ] "
+                        KeepCheckboxIcon(
+                            isChecked = isChecked,
+                            fontSize = fontSize.sp,
+                            contentColor = contentColor,
+                            onToggle = {
+                                val prefix = if (!isChecked) "- [x] " else "- [ ] "
                                 val updatedLines = lines.toMutableList()
                                 updatedLines[index] = prefix + itemText
                                 onContentChange(updatedLines.joinToString("\n"))
                             }
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = parseInlineMarkdown(itemText),
                             style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = fontSize.sp,
                                 textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None,
                                 color = if (isChecked) contentColor.copy(alpha = 0.5f) else contentColor
                             )
@@ -99,27 +104,92 @@ fun MarkdownPreview(
                     )
                 }
 
-                // 5. Alıntı: > Alıntı metni
+                // 5. Alıntı ve Vurgu Kutusu (Notion & Obsidian Callout Block: > [!NOTE], > [!TIP], > [!WARNING])
                 trimmed.startsWith("> ") -> {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Box(
+                    val rawQuote = trimmed.removePrefix("> ").trim()
+                    val isCallout = rawQuote.startsWith("[!NOTE]") ||
+                            rawQuote.startsWith("[!TIP]") ||
+                            rawQuote.startsWith("[!WARNING]") ||
+                            rawQuote.startsWith("[!IMPORTANT]") ||
+                            rawQuote.startsWith("[!CAUTION]")
+
+                    if (isCallout) {
+                        val calloutType = when {
+                            rawQuote.startsWith("[!NOTE]") -> "NOTE"
+                            rawQuote.startsWith("[!TIP]") -> "TIP"
+                            rawQuote.startsWith("[!WARNING]") -> "WARNING"
+                            rawQuote.startsWith("[!IMPORTANT]") -> "IMPORTANT"
+                            else -> "CAUTION"
+                        }
+                        val calloutText = rawQuote.removePrefix("[!$calloutType]").trim()
+                        val calloutColor = when (calloutType) {
+                            "NOTE" -> MaterialTheme.colorScheme.primary
+                            "TIP" -> Color(0xFF4CAF50)
+                            "WARNING" -> Color(0xFFFFA000)
+                            "IMPORTANT" -> Color(0xFF9C27B0)
+                            else -> MaterialTheme.colorScheme.error
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = calloutColor.copy(alpha = 0.12f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, calloutColor.copy(alpha = 0.4f)),
                             modifier = Modifier
-                                .width(4.dp)
-                                .height(24.dp)
-                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = parseInlineMarkdown(trimmed.removePrefix("> ")),
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontStyle = FontStyle.Italic,
-                                color = contentColor.copy(alpha = 0.85f)
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text(
+                                    text = when (calloutType) {
+                                        "NOTE" -> "ℹ️ "
+                                        "TIP" -> "💡 "
+                                        "WARNING" -> "⚠️ "
+                                        "IMPORTANT" -> "⭐ "
+                                        else -> "🚨 "
+                                    },
+                                    fontSize = 16.sp
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column {
+                                    Text(
+                                        text = calloutType,
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = calloutColor
+                                    )
+                                    if (calloutText.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = parseInlineMarkdown(calloutText),
+                                            style = MaterialTheme.typography.bodyMedium.copy(color = contentColor)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .height(24.dp)
+                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
                             )
-                        )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = parseInlineMarkdown(rawQuote),
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontStyle = FontStyle.Italic,
+                                    color = contentColor.copy(alpha = 0.85f)
+                                )
+                            )
+                        }
                     }
                 }
 
@@ -133,9 +203,10 @@ fun MarkdownPreview(
                         verticalAlignment = Alignment.Top
                     ) {
                         Text("• ", style = MaterialTheme.typography.bodyLarge.copy(color = contentColor, fontWeight = FontWeight.Bold))
-                        Text(
+                        MarkdownText(
                             text = parseInlineMarkdown(bulletText),
-                            style = MaterialTheme.typography.bodyLarge.copy(color = contentColor)
+                            style = MaterialTheme.typography.bodyLarge.copy(color = contentColor),
+                            onLinkClick = onLinkClick
                         )
                     }
                 }
@@ -145,15 +216,34 @@ fun MarkdownPreview(
                     if (trimmed.isEmpty()) {
                         Spacer(modifier = Modifier.height(6.dp))
                     } else {
-                        Text(
+                        MarkdownText(
                             text = parseInlineMarkdown(trimmed),
-                            style = MaterialTheme.typography.bodyLarge.copy(color = contentColor)
+                            style = MaterialTheme.typography.bodyLarge.copy(color = contentColor),
+                            onLinkClick = onLinkClick
                         )
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+fun MarkdownText(
+    text: androidx.compose.ui.text.AnnotatedString,
+    style: androidx.compose.ui.text.TextStyle,
+    onLinkClick: (String) -> Unit
+) {
+    androidx.compose.foundation.text.ClickableText(
+        text = text,
+        style = style,
+        onClick = { offset ->
+            text.getStringAnnotations(tag = "backlink", start = offset, end = offset)
+                .firstOrNull()?.let { annotation ->
+                    onLinkClick(annotation.item)
+                }
+        }
+    )
 }
 
 /**
@@ -284,13 +374,27 @@ fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString 
         }
     }
 
-    // 7. Kod: `metin`
+    // 8. Kod: `metin`
     val codeRegex = Regex("`([^`\\n]+?)`")
     for (match in codeRegex.findAll(text)) {
         val range = match.range
         tokenIndices.add(range.first)
         tokenIndices.add(range.last)
         spans.add(Span(range.first + 1, range.last, SpanStyle(fontFamily = FontFamily.Monospace, background = Color(0x1F000000))))
+    }
+
+    // 9. Çift Yönlü Bağlantı (Backlink): [[Note Name]]
+    val linkRegex = Regex("\\[\\[([^\\]\\n]+?)\\]\\]")
+    val stringAnnotations = mutableListOf<Triple<String, String, IntRange>>()
+    for (match in linkRegex.findAll(text)) {
+        val range = match.range
+        val noteName = match.groupValues[1]
+        tokenIndices.add(range.first)
+        tokenIndices.add(range.first + 1)
+        tokenIndices.add(range.last - 1)
+        tokenIndices.add(range.last)
+        spans.add(Span(range.first + 2, range.last - 1, SpanStyle(color = Color(0xFF1E88E5), textDecoration = TextDecoration.Underline, fontWeight = FontWeight.Bold)))
+        stringAnnotations.add(Triple("backlink", noteName, (range.first + 2) until (range.last)))
     }
 
     // Metni oluştururken işaretleri atla ve yeni indeksleri haritalandır
@@ -326,6 +430,28 @@ fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString 
 
             if (newStart != -1 && newEnd != -1 && newEnd > newStart) {
                 addStyle(span.style, newStart, newEnd)
+            }
+        }
+        
+        for (annotation in stringAnnotations) {
+            var newStart = -1
+            for (pos in annotation.third.start until annotation.third.endInclusive + 1) {
+                if (pos < oldToNew.size && oldToNew[pos] != -1) {
+                    newStart = oldToNew[pos]
+                    break
+                }
+            }
+
+            var newEnd = -1
+            for (pos in annotation.third.endInclusive downTo annotation.third.start) {
+                if (pos < oldToNew.size && oldToNew[pos] != -1) {
+                    newEnd = oldToNew[pos] + 1
+                    break
+                }
+            }
+
+            if (newStart != -1 && newEnd != -1 && newEnd > newStart) {
+                addStringAnnotation(tag = annotation.first, annotation = annotation.second, start = newStart, end = newEnd)
             }
         }
     }

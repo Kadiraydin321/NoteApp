@@ -27,7 +27,8 @@ class MarkdownVisualTransformation(
     private val highlightColor: Color = Color(0xFFFFF59D),
     private val codeBgColor: Color = Color(0x1F000000),
     private val searchQuery: String = "",
-    private val activeMatchStartIndex: Int? = null
+    private val activeMatchStartIndex: Int? = null,
+    private val baseFontSize: Float = 16f
 ) : VisualTransformation {
 
     override fun filter(text: AnnotatedString): TransformedText {
@@ -49,9 +50,9 @@ class MarkdownVisualTransformation(
                 val range = match.range
                 val level = match.groupValues[1].length
                 val fontSize = when (level) {
-                    1 -> 22.sp
-                    2 -> 19.sp
-                    else -> 17.sp
+                    1 -> (baseFontSize * 1.38f).sp
+                    2 -> (baseFontSize * 1.22f).sp
+                    else -> (baseFontSize * 1.12f).sp
                 }
                 addStyle(
                     SpanStyle(fontWeight = FontWeight.Bold, fontSize = fontSize),
@@ -156,7 +157,39 @@ class MarkdownVisualTransformation(
                 addStyle(tokenStyle, range.last, range.last + 1)
             }
 
-            // 6. Not İçi Arama Vurgusu (Search Query Highlighting)
+            // 6. Çift Yönlü Bağlantı (Backlink): [[Note Name]]
+            val linkRegex = Regex("\\[\\[([^\\]\\n]+?)\\]\\]")
+            for (match in linkRegex.findAll(raw)) {
+                val range = match.range
+                addStyle(
+                    SpanStyle(
+                        color = Color(0xFF1E88E5),
+                        textDecoration = TextDecoration.Underline,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    range.first + 2,
+                    range.last - 1
+                )
+                addStyle(tokenStyle, range.first, range.first + 2)
+                addStyle(tokenStyle, range.last - 1, range.last + 1)
+            }
+
+            // 7. Alıntı (Blockquote): > metin
+            val quoteRegex = Regex("(?m)^>\\s+(.*)$")
+            for (match in quoteRegex.findAll(raw)) {
+                val range = match.range
+                addStyle(
+                    SpanStyle(
+                        fontStyle = FontStyle.Italic,
+                        color = syntaxColor
+                    ),
+                    range.first + 2,
+                    range.last + 1
+                )
+                addStyle(tokenStyle, range.first, range.first + 2)
+            }
+
+            // 8. Not İçi Arama Vurgusu (Search Query Highlighting)
             if (searchQuery.isNotBlank()) {
                 var searchIdx = raw.indexOf(searchQuery, 0, ignoreCase = true)
                 while (searchIdx >= 0) {

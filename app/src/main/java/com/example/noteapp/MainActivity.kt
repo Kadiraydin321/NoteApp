@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -75,13 +76,9 @@ class MainActivity : FragmentActivity() {
     private var wasAppInBackground = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // Window seviyesinde ekran görüntüsü ve önizleme koruması
-        window.setFlags(
-            android.view.WindowManager.LayoutParams.FLAG_SECURE,
-            android.view.WindowManager.LayoutParams.FLAG_SECURE
-        )
 
         pendingWidgetIntent = intent
 
@@ -93,18 +90,6 @@ class MainActivity : FragmentActivity() {
             var noteToUnlockWithPin by remember { mutableStateOf<Note?>(null) }
             var pinInput by remember { mutableStateOf("") }
             var pinErrorText by remember { mutableStateOf<String?>(null) }
-
-            // Güvenlik: autoLockOnExit aktif ise veya güvenli modda ekran görüntüsü ve uygulama önizlemelerini engelle
-            LaunchedEffect(appSettings.autoLockOnExit) {
-                if (appSettings.autoLockOnExit) {
-                    window.setFlags(
-                        android.view.WindowManager.LayoutParams.FLAG_SECURE,
-                        android.view.WindowManager.LayoutParams.FLAG_SECURE
-                    )
-                } else {
-                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-                }
-            }
 
             NoteAppTheme(
                 themeMode = appSettings.themeMode,
@@ -318,6 +303,7 @@ class MainActivity : FragmentActivity() {
                             onDuplicateNote = viewModel::onDuplicateNote,
                             onFilterTypeChange = viewModel::setFilterType,
                             onSortOrderChange = viewModel::setSortOrder,
+                            onSelectTag = viewModel::onSelectTag,
                             onSettingsClick = {
                                 navController.navigate("settings_screen")
                             }
@@ -325,7 +311,7 @@ class MainActivity : FragmentActivity() {
                     }
 
                     composable(
-                        route = "note_detail_screen?noteId={noteId}&autoAction={autoAction}",
+                        route = "note_detail_screen?noteId={noteId}&autoAction={autoAction}&sharedText={sharedText}&sharedTitle={sharedTitle}",
                         arguments = listOf(
                             navArgument("noteId") {
                                 type = NavType.LongType
@@ -334,12 +320,32 @@ class MainActivity : FragmentActivity() {
                             navArgument("autoAction") {
                                 type = NavType.StringType
                                 defaultValue = ""
+                            },
+                            navArgument("sharedText") {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument("sharedTitle") {
+                                type = NavType.StringType
+                                defaultValue = ""
                             }
                         )
                     ) { backStackEntry ->
                         val viewModel = hiltViewModel<NoteDetailViewModel>()
                         val state by viewModel.state.collectAsState()
                         val autoAction = backStackEntry.arguments?.getString("autoAction")
+                        val sharedText = backStackEntry.arguments?.getString("sharedText")
+                        val sharedTitle = backStackEntry.arguments?.getString("sharedTitle")
+
+                        // Paylaşılan içerik varsa NoteDetailViewModel'e aktar
+                        LaunchedEffect(sharedText, sharedTitle) {
+                            if (!sharedText.isNullOrBlank()) {
+                                viewModel.setSharedContent(sharedText, sharedTitle)
+                                // Argümanları temizle ki rotasyon vs olduğunda tekrar eklemesin
+                                backStackEntry.arguments?.putString("sharedText", "")
+                                backStackEntry.arguments?.putString("sharedTitle", "")
+                            }
+                        }
 
                         // Çizim ekranından dönen çizim dosyasını yakala
                         val savedDrawingPath by backStackEntry.savedStateHandle
@@ -402,9 +408,34 @@ class MainActivity : FragmentActivity() {
                             canRevertImage = { path ->
                                 viewModel.canRevertImage(path)
                             },
+                            onExtractText = { path ->
+                                viewModel.extractTextFromImage(path) { extracted ->
+                                    if (extracted.isNullOrBlank()) {
+                                        android.widget.Toast.makeText(this@MainActivity, "Metin bulunamadı veya okunamadı.", android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        android.widget.Toast.makeText(this@MainActivity, "Metin başarıyla eklendi.", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            isExtractingText = state.isExtractingText,
+                            onLinkClick = { noteTitle ->
+                                viewModel.findNoteByTitle(noteTitle) { foundId ->
+                                    if (foundId != null) {
+                                        navController.navigate("note_detail_screen?noteId=$foundId")
+                                    }
+                                }
+                            },
+                            onNavigateToNote = { targetId ->
+                                navController.navigate("note_detail_screen?noteId=$targetId")
+                            },
                             onDeleteNoteClick = {
                                 viewModel.deleteNote {
                                     navController.popBackStack()
+                                }
+                            },
+                            onDuplicateNote = {
+                                viewModel.duplicateCurrentNote {
+                                    android.widget.Toast.makeText(this@MainActivity, "Notun bir kopyası oluşturuldu", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             },
                             onAddDrawingClick = {
@@ -428,7 +459,8 @@ class MainActivity : FragmentActivity() {
                             },
                             autoAction = autoAction?.ifBlank { null },
                             justEditedImagePath = justEditedImagePath,
-                            onClearJustEditedImage = { justEditedImagePath = null }
+                            onClearJustEditedImage = { justEditedImagePath = null },
+                            onFontSizeChange = viewModel::onFontSizeChange
                         )
                     }
 
@@ -561,15 +593,38 @@ class MainActivity : FragmentActivity() {
 
     override fun onPause() {
         super.onPause()
-        // Sistem diyalogları (izinler, biyometrik vb.) geçici olarak pause yapabileceği için
-        // kalkanı burada değil, yalnızca uygulama tamamen arka plana geçtiğinde (onStop) aktifleştiriyoruz.
+        // Görev yöneticisi (task switcher / recents) anlık görüntüsü tam onPause anında çekilir!
+        // Task switcher önizlemesinde gizli bilgilerin sızmaması için onPause anında SECURE yapıyoruz:
+        val currentRoute = navControllerRef?.currentBackStackEntry?.destination?.route
+        val isDetailRoute = currentRoute?.startsWith("note_detail_screen") == true
+        if (isDetailRoute || settingsManager.settings.value.autoLockOnExit) {
+            window.setFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                android.view.WindowManager.LayoutParams.FLAG_SECURE
+            )
+            isPrivacyShieldActive.value = true
+        }
     }
 
     override fun onStop() {
         super.onStop()
-        if (settingsManager.settings.value.autoLockOnExit) {
-            isPrivacyShieldActive.value = true
-            wasAppInBackground = true
+        wasAppInBackground = true
+        isPrivacyShieldActive.value = true
+        // Kullanıcı uygulamadan ayrıldığında (arka plana geçtiğinde), eğer kilitli bir nottaysa
+        // not ekranını kapatıp ana ekrana dönsün ki tekrar girildiğinde şifresiz açılmasın!
+        navControllerRef?.let { nav ->
+            val currentRoute = nav.currentBackStackEntry?.destination?.route
+            if (currentRoute?.startsWith("note_detail_screen") == true) {
+                val noteId = nav.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
+                if (noteId != -1L) {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        val note = repository.getNoteById(noteId)
+                        if (note != null && note.isLocked) {
+                            nav.popBackStack("notes_screen", inclusive = false)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -577,26 +632,25 @@ class MainActivity : FragmentActivity() {
         super.onResume()
         isPrivacyShieldActive.value = false
         NotesWidgetProvider.closeAllPopups(this)
+        wasAppInBackground = false
 
-        if (wasAppInBackground && settingsManager.settings.value.autoLockOnExit) {
-            wasAppInBackground = false
-            // Eğer widget'tan yeni bir yönlendirme gelmiyorsa ve kilitli bir nottaysak ana ekrana dön
-            if (pendingWidgetIntent == null) {
-                navControllerRef?.let { nav ->
-                    val currentRoute = nav.currentBackStackEntry?.destination?.route
-                    if (currentRoute?.startsWith("note_detail_screen") == true) {
-                        val noteId = nav.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
-                        if (noteId != -1L) {
-                            CoroutineScope(Dispatchers.Main).launch {
-                                val note = repository.getNoteById(noteId)
-                                if (note != null && note.isLocked) {
-                                    nav.popBackStack("notes_screen", inclusive = false)
-                                }
-                            }
-                        }
+        // Kullanıcı uygulamaya geri döndüğünde, kilitli bir notta değilsek FLAG_SECURE'ı temizle:
+        val currentRoute = navControllerRef?.currentBackStackEntry?.destination?.route
+        val isDetailRoute = currentRoute?.startsWith("note_detail_screen") == true
+        if (isDetailRoute) {
+            val noteId = navControllerRef?.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
+            if (noteId != -1L) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    val note = repository.getNoteById(noteId)
+                    if (note == null || !note.isLocked) {
+                        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
                     }
                 }
+            } else {
+                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
             }
+        } else {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
 
@@ -626,6 +680,22 @@ class MainActivity : FragmentActivity() {
                 NotesWidgetProvider.ACTION_TYPE_DRAW -> onNavigate("note_detail_screen?autoAction=draw")
             }
             return
+        }
+
+        // Web Clipper / Paylaşılan Metin (Share Intent)
+        if (intent.action == Intent.ACTION_SEND && "text/plain" == intent.type) {
+            val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
+            val sharedSubject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+            if (!sharedText.isNullOrBlank()) {
+                val encodedText = java.net.URLEncoder.encode(sharedText, "UTF-8")
+                val encodedTitle = java.net.URLEncoder.encode(sharedSubject ?: "", "UTF-8")
+                // Intent action ve verisini temizle ki geri döndüğünde tekrar tetiklenmesin
+                intent.action = Intent.ACTION_MAIN
+                intent.removeExtra(Intent.EXTRA_TEXT)
+                intent.removeExtra(Intent.EXTRA_SUBJECT)
+                onNavigate("note_detail_screen?sharedText=$encodedText&sharedTitle=$encodedTitle")
+                return
+            }
         }
 
         // Widget eski + butonuna basıldıysa yeni not ekranı

@@ -36,7 +36,8 @@ data class AppSettings(
     val masterPin: String? = null,
     val autoLockOnExit: Boolean = true,
     val highContrastNegative: Boolean = true,
-    val lastBackupTimestamp: Long? = null
+    val lastBackupTimestamp: Long? = null,
+    val noteFontSize: Float = 16f
 )
 
 @Singleton
@@ -78,6 +79,8 @@ class AppSettingsManager @Inject constructor(
         val highContrast = prefs.getBoolean(KEY_HIGH_CONTRAST, true)
         val lastBackup = if (prefs.contains(KEY_LAST_BACKUP)) prefs.getLong(KEY_LAST_BACKUP, 0L) else null
 
+        val noteFontSize = prefs.getFloat(KEY_NOTE_FONT_SIZE, 16f).coerceIn(12f, 24f)
+
         return AppSettings(
             widgetFilterMode = filterMode,
             widgetShowLockedNotes = showLocked,
@@ -88,8 +91,15 @@ class AppSettingsManager @Inject constructor(
             masterPin = masterPin,
             autoLockOnExit = autoLock,
             highContrastNegative = highContrast,
-            lastBackupTimestamp = lastBackup
+            lastBackupTimestamp = lastBackup,
+            noteFontSize = noteFontSize
         )
+    }
+
+    fun setNoteFontSize(size: Float) {
+        val clamped = size.coerceIn(12f, 24f)
+        prefs.edit().putFloat(KEY_NOTE_FONT_SIZE, clamped).apply()
+        _settings.value = _settings.value.copy(noteFontSize = clamped)
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -158,6 +168,7 @@ class AppSettingsManager @Inject constructor(
         private const val KEY_AUTO_LOCK = "auto_lock_on_exit"
         private const val KEY_HIGH_CONTRAST = "high_contrast_negative"
         private const val KEY_LAST_BACKUP = "last_backup_timestamp"
+        private const val KEY_NOTE_FONT_SIZE = "key_note_font_size"
 
         // Helper for Widget Service to access synchronously without injection
         fun getWidgetFilterMode(context: Context): WidgetFilterMode {

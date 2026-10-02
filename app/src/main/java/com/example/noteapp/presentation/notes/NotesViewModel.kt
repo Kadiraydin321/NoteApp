@@ -31,7 +31,8 @@ enum class NoteTypeFilter {
     PINNED,
     LOCKED,
     MEDIA,
-    AUDIO
+    AUDIO,
+    REMINDERS
 }
 
 enum class NoteSortOrder(val title: String) {
@@ -52,7 +53,8 @@ data class NotesState(
     val layoutMode: NotesLayoutMode = NotesLayoutMode.STAGGERED_GRID,
     val selectedNoteIds: Set<Long> = emptySet(),
     val filterType: NoteTypeFilter = NoteTypeFilter.ALL,
-    val sortOrder: NoteSortOrder = NoteSortOrder.MODIFIED_DESC
+    val sortOrder: NoteSortOrder = NoteSortOrder.MODIFIED_DESC,
+    val selectedTag: String? = null
 )
 
 @HiltViewModel
@@ -68,9 +70,18 @@ class NotesViewModel @Inject constructor(
     private var notesJob: Job? = null
 
     init {
+        cleanUpTrash()
         loadNotes()
         loadCategories()
         observeSettings()
+    }
+
+    private fun cleanUpTrash() {
+        viewModelScope.launch {
+            val sevenDaysInMillis = 7L * 24L * 60L * 60L * 1000L
+            val threshold = System.currentTimeMillis() - sevenDaysInMillis
+            repository.cleanUpOldTrashNotes(threshold)
+        }
     }
 
     private fun observeSettings() {
@@ -136,6 +147,17 @@ class NotesViewModel @Inject constructor(
     fun onCategorySelect(category: Category?) {
         _state.value = _state.value.copy(selectedCategory = category, selectedNoteIds = emptySet())
         loadNotes()
+    }
+
+    fun onSelectTag(tag: String?) {
+        _state.value = _state.value.copy(selectedTag = tag)
+    }
+
+    fun extractAllHashtags(): List<String> {
+        val regex = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
+        return _state.value.notes.flatMap { note ->
+            regex.findAll("${note.title} ${note.content}").map { it.groupValues[1] }
+        }.distinct().sorted()
     }
 
     // Çoklu Seçim Fonksiyonları
@@ -229,14 +251,14 @@ class NotesViewModel @Inject constructor(
 
     fun onMoveToTrash(note: Note) {
         viewModelScope.launch {
-            repository.updateNote(note.copy(isDeleted = true))
+            repository.updateNote(note.copy(isDeleted = true, deletedAt = System.currentTimeMillis()))
             NotesWidgetProvider.updateAllWidgets(app)
         }
     }
 
     fun onRestoreNote(note: Note) {
         viewModelScope.launch {
-            repository.updateNote(note.copy(isDeleted = false))
+            repository.updateNote(note.copy(isDeleted = false, deletedAt = null))
             NotesWidgetProvider.updateAllWidgets(app)
         }
     }

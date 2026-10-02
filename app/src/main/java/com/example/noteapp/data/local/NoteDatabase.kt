@@ -12,7 +12,7 @@ import com.example.noteapp.domain.model.Note
 
 @Database(
     entities = [Note::class, Category::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -31,6 +31,12 @@ abstract class NoteDatabase : RoomDatabase() {
                 db.execSQL("UPDATE notes SET updatedAt = timestamp WHERE updatedAt = 0")
             }
         }
+        
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notes ADD COLUMN deletedAt INTEGER DEFAULT NULL")
+            }
+        }
 
         @Volatile
         private var INSTANCE: NoteDatabase? = null
@@ -42,7 +48,7 @@ abstract class NoteDatabase : RoomDatabase() {
                     NoteDatabase::class.java,
                     DATABASE_NAME
                 )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build().also { INSTANCE = it }
             }

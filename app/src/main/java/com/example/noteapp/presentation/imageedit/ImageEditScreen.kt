@@ -12,6 +12,7 @@ import android.graphics.RectF as AndroidRectF
 import android.graphics.Typeface
 import androidx.compose.animation.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,6 +47,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -67,13 +69,13 @@ enum class ImageEditorTab(val title: String) {
     ADJUST("Renk & Filtre")
 }
 
-enum class CropAspectRatio(val title: String, val ratio: Float?) {
-    FREE("Serbest", null),
-    SQUARE("1:1", 1f),
-    RATIO_4_3("4:3", 4f / 3f),
-    RATIO_16_9("16:9", 16f / 9f),
-    RATIO_9_16("9:16", 9f / 16f),
-    RATIO_3_4("3:4", 3f / 4f)
+enum class CropAspectRatio(val title: String, val subtitle: String, val ratio: Float?) {
+    FREE("Serbest", "Özel", null),
+    SQUARE("1:1", "Kare", 1f),
+    RATIO_4_3("4:3", "Standart", 4f / 3f),
+    RATIO_16_9("16:9", "Yatay", 16f / 9f),
+    RATIO_9_16("9:16", "Hikaye", 9f / 16f),
+    RATIO_3_4("3:4", "Portre", 3f / 4f)
 }
 
 enum class DrawingMode(val title: String) {
@@ -142,6 +144,8 @@ fun ImageEditScreen(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
+    val configuration = LocalConfiguration.current
+    val isCompactScreen = configuration.screenWidthDp < 400
 
     // Orijinal bitmap'i güvenli şekilde yükle
     var currentBitmap by remember {
@@ -549,18 +553,40 @@ fun ImageEditScreen(
     }
 
     Scaffold(
+        containerColor = Color(0xFF0C0C0E),
         topBar = {
             TopAppBar(
-                title = { Text("Görsel Düzenleyici", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                title = {
+                    Column {
+                        Text("Düzenleyici", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                        Text(activeTab.title, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                    }
+                },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        if (hasChanges) {
-                            showDiscardConfirmDialog = true
-                        } else {
-                            onBackClick()
+                    IconButton(
+                        onClick = {
+                            if (hasChanges) {
+                                showDiscardConfirmDialog = true
+                            } else {
+                                onBackClick()
+                            }
+                        },
+                        modifier = Modifier.padding(start = 4.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFF22222A),
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Geri",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 },
                 actions = {
@@ -575,63 +601,94 @@ fun ImageEditScreen(
                         }
                     }
 
-                    // Geri Al (Undo)
-                    IconButton(
-                        onClick = { handleUndo() },
-                        enabled = undoStack.isNotEmpty()
+                    // Geri & İleri Al (Undo / Redo Kapsülü)
+                    AnimatedVisibility(
+                        visible = undoStack.isNotEmpty() || redoStack.isNotEmpty(),
+                        enter = fadeIn() + expandHorizontally(),
+                        exit = fadeOut() + shrinkHorizontally()
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Undo,
-                            contentDescription = "Geri Al",
-                            tint = if (undoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        )
-                    }
-
-                    // İleri Al (Redo)
-                    IconButton(
-                        onClick = { handleRedo() },
-                        enabled = redoStack.isNotEmpty()
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Redo,
-                            contentDescription = "İleri Al",
-                            tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        )
+                        Surface(
+                            color = Color(0xFF22222A),
+                            shape = CircleShape,
+                            border = BorderStroke(1.dp, Color(0x22FFFFFF)),
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { handleUndo() },
+                                    enabled = undoStack.isNotEmpty(),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Undo,
+                                        contentDescription = "Geri Al",
+                                        tint = if (undoStack.isNotEmpty()) Color.White else Color.White.copy(alpha = 0.25f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { handleRedo() },
+                                    enabled = redoStack.isNotEmpty(),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Redo,
+                                        contentDescription = "İleri Al",
+                                        tint = if (redoStack.isNotEmpty()) Color.White else Color.White.copy(alpha = 0.25f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     // Sıfırla (Reset)
-                    IconButton(
-                        onClick = {
-                            loadScaledBitmap(imagePath, 2560, 2560)?.let { original ->
-                                recordSnapshot()
-                                currentBitmap = original
-                                drawingStrokes.clear()
-                                textOverlays.clear()
-                                brightness = 0f
-                                contrast = 1f
-                                saturation = 1f
-                                selectedFilter = FilterPreset.NONE
-                                cropRectFraction = Rect(0.02f, 0.02f, 0.98f, 0.98f)
-                            }
-                        },
-                        enabled = hasChanges
+                    AnimatedVisibility(
+                        visible = hasChanges,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut()
                     ) {
-                        Icon(Icons.Default.RestartAlt, contentDescription = "Sıfırla")
+                        IconButton(
+                            onClick = {
+                                loadScaledBitmap(imagePath, 2560, 2560)?.let { original ->
+                                    recordSnapshot()
+                                    currentBitmap = original
+                                    drawingStrokes.clear()
+                                    textOverlays.clear()
+                                    brightness = 0f
+                                    contrast = 1f
+                                    saturation = 1f
+                                    selectedFilter = FilterPreset.NONE
+                                    cropRectFraction = Rect(0.02f, 0.02f, 0.98f, 0.98f)
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.RestartAlt, contentDescription = "Sıfırla", tint = Color.White.copy(alpha = 0.85f))
+                        }
                     }
 
-                    // Kaydet
+                    // Kaydet Butonu
                     Button(
                         onClick = { performSave() },
-                        modifier = Modifier.padding(end = 8.dp),
-                        enabled = !isSaving
+                        enabled = !isSaving,
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        contentPadding = if (isCompactScreen) PaddingValues(horizontal = 10.dp, vertical = 6.dp) else PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(end = 6.dp)
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Kaydet")
+                        if (isSaving) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        } else {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            if (!isCompactScreen) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Kaydet", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = Color(0xFF16161A)
                 )
             )
         },
@@ -639,158 +696,215 @@ fun ImageEditScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Aktif Sekmenin Kontrol Paneli
+                // 1. Üst Kontrol Alanı (Yüzen Araç Paneli)
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 2.dp
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    color = Color(0xFF1E2026),
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, Color(0x28FFFFFF)),
+                    shadowElevation = 8.dp,
+                    tonalElevation = 6.dp
                 ) {
-                    when (activeTab) {
-                        ImageEditorTab.CROP -> {
-                            CropControlPanel(
-                                selectedRatio = selectedAspectRatio,
-                                onRatioSelect = { ratio ->
-                                    updateCropAspectRatio(ratio)
-                                },
-                                onRotateLeft = {
-                                    currentBitmap?.let { bmp ->
-                                        recordSnapshot()
-                                        val m = Matrix().apply { postRotate(-90f) }
-                                        currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
-                                        cropRectFraction = Rect(0.02f, 0.02f, 0.98f, 0.98f)
-                                    }
-                                },
-                                onRotateRight = {
-                                    currentBitmap?.let { bmp ->
-                                        recordSnapshot()
-                                        val m = Matrix().apply { postRotate(90f) }
-                                        currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
-                                        cropRectFraction = Rect(0.02f, 0.02f, 0.98f, 0.98f)
-                                    }
-                                },
-                                onFlipHorizontal = {
-                                    currentBitmap?.let { bmp ->
-                                        recordSnapshot()
-                                        val m = Matrix().apply { postScale(-1f, 1f) }
-                                        currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
-                                    }
-                                },
-                                onFlipVertical = {
-                                    currentBitmap?.let { bmp ->
-                                        recordSnapshot()
-                                        val m = Matrix().apply { postScale(1f, -1f) }
-                                        currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
-                                    }
-                                },
-                                onApplyCrop = {
-                                    currentBitmap?.let { bmp ->
-                                        recordSnapshot()
-                                        val cropX = (bmp.width * cropRectFraction.left).roundToInt().coerceIn(0, bmp.width - 1)
-                                        val cropY = (bmp.height * cropRectFraction.top).roundToInt().coerceIn(0, bmp.height - 1)
-                                        val cropW = (bmp.width * cropRectFraction.width).roundToInt().coerceIn(1, bmp.width - cropX)
-                                        val cropH = (bmp.height * cropRectFraction.height).roundToInt().coerceIn(1, bmp.height - cropY)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) {
+                        when (activeTab) {
+                            ImageEditorTab.CROP -> {
+                                CropControlPanel(
+                                    selectedRatio = selectedAspectRatio,
+                                    onRatioSelect = { ratio ->
+                                        updateCropAspectRatio(ratio)
+                                    },
+                                    onRotateLeft = {
+                                        currentBitmap?.let { bmp ->
+                                            recordSnapshot()
+                                            val m = Matrix().apply { postRotate(-90f) }
+                                            currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+                                            cropRectFraction = Rect(0.02f, 0.02f, 0.98f, 0.98f)
+                                        }
+                                    },
+                                    onRotateRight = {
+                                        currentBitmap?.let { bmp ->
+                                            recordSnapshot()
+                                            val m = Matrix().apply { postRotate(90f) }
+                                            currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+                                            cropRectFraction = Rect(0.02f, 0.02f, 0.98f, 0.98f)
+                                        }
+                                    },
+                                    onFlipHorizontal = {
+                                        currentBitmap?.let { bmp ->
+                                            recordSnapshot()
+                                            val m = Matrix().apply { postScale(-1f, 1f) }
+                                            currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+                                        }
+                                    },
+                                    onFlipVertical = {
+                                        currentBitmap?.let { bmp ->
+                                            recordSnapshot()
+                                            val m = Matrix().apply { postScale(1f, -1f) }
+                                            currentBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+                                        }
+                                    },
+                                    onApplyCrop = {
+                                        currentBitmap?.let { bmp ->
+                                            recordSnapshot()
+                                            val cropX = (bmp.width * cropRectFraction.left).roundToInt().coerceIn(0, bmp.width - 1)
+                                            val cropY = (bmp.height * cropRectFraction.top).roundToInt().coerceIn(0, bmp.height - 1)
+                                            val cropW = (bmp.width * cropRectFraction.width).roundToInt().coerceIn(1, bmp.width - cropX)
+                                            val cropH = (bmp.height * cropRectFraction.height).roundToInt().coerceIn(1, bmp.height - cropY)
 
-                                        currentBitmap = Bitmap.createBitmap(bmp, cropX, cropY, cropW, cropH)
-                                        cropRectFraction = Rect(0.02f, 0.02f, 0.98f, 0.98f)
-                                        selectedAspectRatio = CropAspectRatio.FREE
+                                            currentBitmap = Bitmap.createBitmap(bmp, cropX, cropY, cropW, cropH)
+                                            cropRectFraction = Rect(0.02f, 0.02f, 0.98f, 0.98f)
+                                            selectedAspectRatio = CropAspectRatio.FREE
+                                        }
                                     }
-                                }
-                            )
-                        }
+                                )
+                            }
 
-                        ImageEditorTab.DRAW -> {
-                            DrawControlPanel(
-                                currentMode = drawingMode,
-                                onModeSelect = { drawingMode = it },
-                                currentColor = brushColor,
-                                onColorSelect = { brushColor = it },
-                                currentSize = brushSizeDp,
-                                onSizeSelect = { brushSizeDp = it },
-                                paletteColors = paletteColors,
-                                onClearStrokes = {
-                                    if (drawingStrokes.isNotEmpty()) {
-                                        recordSnapshot()
-                                        drawingStrokes.clear()
+                            ImageEditorTab.DRAW -> {
+                                DrawControlPanel(
+                                    currentMode = drawingMode,
+                                    onModeSelect = { drawingMode = it },
+                                    currentColor = brushColor,
+                                    onColorSelect = { brushColor = it },
+                                    currentSize = brushSizeDp,
+                                    onSizeSelect = { brushSizeDp = it },
+                                    paletteColors = paletteColors,
+                                    onClearStrokes = {
+                                        if (drawingStrokes.isNotEmpty()) {
+                                            recordSnapshot()
+                                            drawingStrokes.clear()
+                                        }
                                     }
-                                }
-                            )
-                        }
+                                )
+                            }
 
-                        ImageEditorTab.TEXT -> {
-                            TextControlPanel(
-                                onAddTextClick = {
-                                    textInput = lastDraftText
-                                    editingTextItem = null
-                                    showAddTextDialog = true
-                                },
-                                textCount = textOverlays.size,
-                                onClearAllText = {
-                                    if (textOverlays.isNotEmpty()) {
-                                        recordSnapshot()
-                                        lastDeletedTextItem = textOverlays.lastOrNull()
-                                        textOverlays.clear()
+                            ImageEditorTab.TEXT -> {
+                                TextControlPanel(
+                                    onAddTextClick = {
+                                        textInput = lastDraftText
+                                        editingTextItem = null
+                                        showAddTextDialog = true
+                                    },
+                                    textCount = textOverlays.size,
+                                    onClearAllText = {
+                                        if (textOverlays.isNotEmpty()) {
+                                            recordSnapshot()
+                                            lastDeletedTextItem = textOverlays.lastOrNull()
+                                            textOverlays.clear()
+                                        }
+                                    },
+                                    hasDeletedText = lastDeletedTextItem != null,
+                                    onRestoreLastText = {
+                                        lastDeletedTextItem?.let { restored ->
+                                            recordSnapshot()
+                                            textOverlays.add(restored.copy(id = System.currentTimeMillis()))
+                                            lastDeletedTextItem = null
+                                        }
                                     }
-                                },
-                                hasDeletedText = lastDeletedTextItem != null,
-                                onRestoreLastText = {
-                                    lastDeletedTextItem?.let { restored ->
-                                        recordSnapshot()
-                                        textOverlays.add(restored.copy(id = System.currentTimeMillis()))
-                                        lastDeletedTextItem = null
-                                    }
-                                }
-                            )
-                        }
+                                )
+                            }
 
-                        ImageEditorTab.ADJUST -> {
-                            AdjustControlPanel(
-                                brightness = brightness,
-                                onBrightnessChange = { brightness = it },
-                                contrast = contrast,
-                                onContrastChange = { contrast = it },
-                                saturation = saturation,
-                                onSaturationChange = { saturation = it },
-                                selectedFilter = selectedFilter,
-                                onFilterSelect = { selectedFilter = it },
-                                onApplyAdjustments = {
-                                    currentBitmap?.let { bmp ->
-                                        recordSnapshot()
-                                        currentBitmap = applyColorAdjustmentsToBitmap(bmp, brightness, contrast, saturation, selectedFilter)
+                            ImageEditorTab.ADJUST -> {
+                                AdjustControlPanel(
+                                    brightness = brightness,
+                                    onBrightnessChange = { brightness = it },
+                                    contrast = contrast,
+                                    onContrastChange = { contrast = it },
+                                    saturation = saturation,
+                                    onSaturationChange = { saturation = it },
+                                    selectedFilter = selectedFilter,
+                                    onFilterSelect = { selectedFilter = it },
+                                    onResetAdjustments = {
                                         brightness = 0f
                                         contrast = 1f
                                         saturation = 1f
                                         selectedFilter = FilterPreset.NONE
+                                    },
+                                    onApplyAdjustments = {
+                                        currentBitmap?.let { bmp ->
+                                            recordSnapshot()
+                                            currentBitmap = applyColorAdjustmentsToBitmap(bmp, brightness, contrast, saturation, selectedFilter)
+                                            brightness = 0f
+                                            contrast = 1f
+                                            saturation = 1f
+                                            selectedFilter = FilterPreset.NONE
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
 
-                // Ana Sekmeler
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.height(64.dp)
+                // 2. Yüzen Kapsül Dock (Floating Capsule Dock)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(32.dp),
+                    color = Color(0xFF22252A),
+                    border = BorderStroke(1.dp, Color(0x30FFFFFF)),
+                    shadowElevation = 8.dp,
+                    tonalElevation = 6.dp
                 ) {
-                    ImageEditorTab.values().forEach { tab ->
-                        NavigationBarItem(
-                            selected = activeTab == tab,
-                            onClick = { activeTab = tab },
-                            icon = {
-                                Icon(
-                                    imageVector = when (tab) {
-                                        ImageEditorTab.CROP -> Icons.Default.Crop
-                                        ImageEditorTab.DRAW -> Icons.Default.Draw
-                                        ImageEditorTab.TEXT -> Icons.Default.TextFields
-                                        ImageEditorTab.ADJUST -> Icons.Default.Tune
-                                    },
-                                    contentDescription = tab.title
-                                )
-                            },
-                            label = { Text(tab.title, style = MaterialTheme.typography.labelSmall) }
-                        )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 6.dp, vertical = 5.dp),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        for (tab in ImageEditorTab.values()) {
+                            val isSelected = activeTab == tab
+                            val activeTint = MaterialTheme.colorScheme.primary
+                            val inactiveTint = Color(0xFF9EABB8)
+                            val tabBg = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent
+
+                            Surface(
+                                onClick = { activeTab = tab },
+                                shape = RoundedCornerShape(20.dp),
+                                color = tabBg,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 9.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = when (tab) {
+                                            ImageEditorTab.CROP -> Icons.Default.Crop
+                                            ImageEditorTab.DRAW -> Icons.Default.Edit
+                                            ImageEditorTab.TEXT -> Icons.Default.TextFields
+                                            ImageEditorTab.ADJUST -> Icons.Default.Tune
+                                        },
+                                        contentDescription = tab.title,
+                                        tint = if (isSelected) activeTint else inactiveTint,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                    if (!isCompactScreen || isSelected) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = tab.title,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) activeTint else inactiveTint,
+                                            fontSize = if (isCompactScreen) 10.sp else 11.sp,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1142,51 +1256,105 @@ private fun CropControlPanel(
     onApplyCrop: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // En-Boy Oranı Hap Çipleri
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(CropAspectRatio.values()) { ratio ->
-                FilterChip(
-                    selected = selectedRatio == ratio,
+                val isSelected = selectedRatio == ratio
+                Surface(
                     onClick = { onRatioSelect(ratio) },
-                    label = { Text(ratio.title, style = MaterialTheme.typography.labelSmall) }
-                )
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color(0xFF24242C),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isSelected) MaterialTheme.colorScheme.primary else Color(0x22FFFFFF)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = ratio.title,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else Color(0xFFD4D4DC)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = ratio.subtitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else Color(0xFF888894),
+                            fontSize = 10.sp
+                        )
+                    }
+                }
             }
         }
 
+        // Çevirme & Kırpma Eylemleri
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = onRotateLeft) {
-                    Icon(Icons.AutoMirrored.Filled.RotateLeft, contentDescription = "Sola Döndür")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    onClick = onRotateLeft,
+                    shape = CircleShape,
+                    color = Color(0xFF24242C),
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Filled.RotateLeft, contentDescription = "Sola Döndür", tint = Color.White, modifier = Modifier.size(19.dp))
+                    }
                 }
-                IconButton(onClick = onRotateRight) {
-                    Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = "Sağa Döndür")
+                Surface(
+                    onClick = onRotateRight,
+                    shape = CircleShape,
+                    color = Color(0xFF24242C),
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = "Sağa Döndür", tint = Color.White, modifier = Modifier.size(19.dp))
+                    }
                 }
-                IconButton(onClick = onFlipHorizontal) {
-                    Icon(Icons.Default.Flip, contentDescription = "Yatay Aynala")
+                Surface(
+                    onClick = onFlipHorizontal,
+                    shape = CircleShape,
+                    color = Color(0xFF24242C),
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Flip, contentDescription = "Yatay Aynala", tint = Color.White, modifier = Modifier.size(19.dp))
+                    }
                 }
-                IconButton(onClick = onFlipVertical) {
-                    Icon(Icons.Default.FlipCameraAndroid, contentDescription = "Dikey Aynala")
+                Surface(
+                    onClick = onFlipVertical,
+                    shape = CircleShape,
+                    color = Color(0xFF24242C),
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.FlipCameraAndroid, contentDescription = "Dikey Aynala", tint = Color.White, modifier = Modifier.size(19.dp))
+                    }
                 }
             }
 
             Button(
                 onClick = onApplyCrop,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Icon(Icons.Default.Crop, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Kırpmayı Uygula")
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Kırp", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
     }
@@ -1205,81 +1373,141 @@ private fun DrawControlPanel(
     onClearStrokes: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // Araç Seçici Segmentli Kapsül + Temizle Butonu
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                DrawingMode.values().forEach { mode ->
-                    FilterChip(
-                        selected = currentMode == mode,
-                        onClick = { onModeSelect(mode) },
-                        label = { Text(mode.title) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = when (mode) {
-                                    DrawingMode.PEN -> Icons.Default.Edit
-                                    DrawingMode.HIGHLIGHTER -> Icons.Default.Brush
-                                    DrawingMode.ERASER -> Icons.Default.AutoFixNormal
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
+            Surface(
+                color = Color(0xFF24242C),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(modifier = Modifier.padding(3.dp)) {
+                    DrawingMode.values().forEach { mode ->
+                        val isSelected = currentMode == mode
+                        Surface(
+                            onClick = { onModeSelect(mode) },
+                            shape = RoundedCornerShape(9.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = when (mode) {
+                                        DrawingMode.PEN -> Icons.Default.Edit
+                                        DrawingMode.HIGHLIGHTER -> Icons.Default.Brush
+                                        DrawingMode.ERASER -> Icons.Default.AutoFixNormal
+                                    },
+                                    contentDescription = null,
+                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color(0xFFB0B0BC),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = mode.title,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color(0xFFB0B0BC)
+                                )
+                            }
                         }
-                    )
+                    }
                 }
             }
 
-            TextButton(onClick = onClearStrokes) {
-                Text("Tümünü Temizle", color = MaterialTheme.colorScheme.error)
+            IconButton(onClick = onClearStrokes) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Tüm Çizimleri Temizle",
+                    tint = Color(0xFFEF5350),
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
 
+        // Renk Paleti (Silgi Açıkken Gizlenir)
         if (currentMode != DrawingMode.ERASER) {
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 items(paletteColors) { color ->
+                    val isSelected = currentColor == color
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(if (isSelected) 34.dp else 28.dp)
                             .clip(CircleShape)
                             .background(color)
                             .clickable { onColorSelect(color) }
                             .border(
-                                width = if (currentColor == color) 3.dp else 1.dp,
-                                color = if (currentColor == color) MaterialTheme.colorScheme.primary else Color.Gray,
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = if (isSelected) Color.White else Color(0x44FFFFFF),
                                 shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = if (color == Color.White) Color.Black else Color.White,
+                                modifier = Modifier.size(16.dp)
                             )
-                    )
+                        }
+                    }
                 }
             }
         }
 
+        // Boyut Çubuğu + Anlık Canlı Çap Önizleme Noktası
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = if (currentMode == DrawingMode.ERASER) "Silgi Boyutu:" else "Fırça Kalınlığı:",
-                style = MaterialTheme.typography.labelSmall
-            )
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF24242C)),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size((currentSize.coerceIn(4f, 26f)).dp)
+                        .clip(CircleShape)
+                        .background(if (currentMode == DrawingMode.ERASER) Color.White else currentColor)
+                )
+            }
+
             Spacer(modifier = Modifier.width(8.dp))
+
             Slider(
                 value = currentSize,
                 onValueChange = onSizeSelect,
                 valueRange = 4f..48f,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = Color(0xFF2E2E38)
+                )
             )
+
             Spacer(modifier = Modifier.width(8.dp))
-            Text("${currentSize.roundToInt()}dp", style = MaterialTheme.typography.labelSmall)
+            Text(
+                text = "${currentSize.roundToInt()}dp",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFB0B0BC),
+                modifier = Modifier.width(36.dp),
+                textAlign = TextAlign.End
+            )
         }
     }
 }
@@ -1294,31 +1522,46 @@ private fun TextControlPanel(
     onRestoreLastText: () -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(10.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Button(onClick = onAddTextClick) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Metin Ekle")
-            }
-
-            if (hasDeletedText) {
-                OutlinedButton(onClick = onRestoreLastText) {
-                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Geri Getir")
-                }
-            }
+        Button(
+            onClick = onAddTextClick,
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Yeni Metin Ekle", fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
 
-        if (textCount > 0) {
-            TextButton(onClick = onClearAllText) {
-                Text("Kaldır ($textCount)", color = MaterialTheme.colorScheme.error)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (hasDeletedText) {
+                OutlinedButton(
+                    onClick = onRestoreLastText,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0x33FFFFFF)),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Geri Al", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+
+            if (textCount > 0) {
+                OutlinedButton(
+                    onClick = onClearAllText,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0x33EF5350)),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Kaldır ($textCount)", color = Color(0xFFEF5350), style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
     }
@@ -1335,67 +1578,137 @@ private fun AdjustControlPanel(
     onSaturationChange: (Float) -> Unit,
     selectedFilter: FilterPreset,
     onFilterSelect: (FilterPreset) -> Unit,
+    onResetAdjustments: () -> Unit,
     onApplyAdjustments: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        LazyRow(
+        // Filtre Başlığı ve Sıfırla Butonu
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(FilterPreset.values()) { filter ->
-                FilterChip(
-                    selected = selectedFilter == filter,
-                    onClick = { onFilterSelect(filter) },
-                    label = { Text(filter.title, style = MaterialTheme.typography.labelSmall) }
-                )
+            Text(
+                "Filtreler & Efektler",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFFB0B0BC),
+                fontWeight = FontWeight.SemiBold
+            )
+            val hasAnyAdjustments = brightness != 0f || contrast != 1f || saturation != 1f || selectedFilter != FilterPreset.NONE
+            if (hasAnyAdjustments) {
+                TextButton(
+                    onClick = onResetAdjustments,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Tümünü Sıfırla", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
             }
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Parlaklık", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(72.dp))
-            Slider(
-                value = brightness,
-                onValueChange = onBrightnessChange,
-                valueRange = -100f..100f,
-                modifier = Modifier.weight(1f)
-            )
-            Text("${brightness.roundToInt()}", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+        // Hazır Filtreler
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(FilterPreset.values()) { filter ->
+                val isSelected = selectedFilter == filter
+                Surface(
+                    onClick = { onFilterSelect(filter) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color(0xFF24242C),
+                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color(0x22FFFFFF))
+                ) {
+                    Text(
+                        text = filter.title,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else Color(0xFFD4D4DC),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+            }
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Kontrast", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(72.dp))
-            Slider(
-                value = contrast,
-                onValueChange = onContrastChange,
-                valueRange = 0.5f..2.0f,
-                modifier = Modifier.weight(1f)
-            )
-            Text(String.format("%.1fx", contrast), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
-        }
+        // Kaydırıcılar
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // Parlaklık
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Brightness6, contentDescription = null, tint = Color(0xFFB0B0BC), modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Parlaklık", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB0B0BC), modifier = Modifier.width(60.dp))
+                Slider(
+                    value = brightness,
+                    onValueChange = onBrightnessChange,
+                    valueRange = -100f..100f,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = Color(0xFF2E2E38)
+                    )
+                )
+                Text("${brightness.roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.White, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+            }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Doygunluk", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(72.dp))
-            Slider(
-                value = saturation,
-                onValueChange = onSaturationChange,
-                valueRange = 0.0f..2.0f,
-                modifier = Modifier.weight(1f)
-            )
-            Text(String.format("%.1fx", saturation), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+            // Kontrast
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Contrast, contentDescription = null, tint = Color(0xFFB0B0BC), modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Kontrast", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB0B0BC), modifier = Modifier.width(60.dp))
+                Slider(
+                    value = contrast,
+                    onValueChange = onContrastChange,
+                    valueRange = 0.5f..2.0f,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = Color(0xFF2E2E38)
+                    )
+                )
+                Text(String.format(java.util.Locale.US, "%.1fx", contrast), style = MaterialTheme.typography.labelSmall, color = Color.White, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+            }
+
+            // Doygunluk
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Palette, contentDescription = null, tint = Color(0xFFB0B0BC), modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Doygunluk", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB0B0BC), modifier = Modifier.width(60.dp))
+                Slider(
+                    value = saturation,
+                    onValueChange = onSaturationChange,
+                    valueRange = 0.0f..2.0f,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = Color(0xFF2E2E38)
+                    )
+                )
+                Text(String.format(java.util.Locale.US, "%.1fx", saturation), style = MaterialTheme.typography.labelSmall, color = Color.White, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+            }
         }
 
         Button(
             onClick = onApplyAdjustments,
-            modifier = Modifier.fillMaxWidth()
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(vertical = 8.dp)
         ) {
             Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Renk ve Filtre Ayarlarını Görsele Uygula")
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Ayarları Görsele İşle", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
         }
     }
 }

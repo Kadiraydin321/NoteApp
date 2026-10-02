@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,6 +31,8 @@ fun AttachmentList(
     onImageClick: (String) -> Unit = {},
     onRevertImage: ((String) -> Unit)? = null,
     canRevertImage: ((String) -> Boolean)? = null,
+    onExtractText: ((String) -> Unit)? = null,
+    isExtractingText: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (attachments.isEmpty()) return
@@ -117,13 +120,39 @@ fun AttachmentList(
                         }
                     }
 
-                    // Üst Butonlar (Sil ve Geri Al)
+                    // Üst Butonlar (Sil, Geri Al, OCR)
                     Row(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        if (onExtractText != null) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                shape = CircleShape,
+                                shadowElevation = 2.dp,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { onExtractText(path) },
+                                    modifier = Modifier.fillMaxSize(),
+                                    enabled = !isExtractingText
+                                ) {
+                                    if (isExtractingText) {
+                                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(
+                                            Icons.Default.Search,
+                                            contentDescription = "Metni Çıkar (OCR)",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         if (canRevertImage?.invoke(path) == true && onRevertImage != null) {
                             Surface(
                                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),

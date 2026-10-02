@@ -4,7 +4,10 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Path as AndroidPath
 import android.graphics.RectF
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -36,6 +40,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -104,15 +109,28 @@ val StandardPalette = listOf(
     Color(0xFFE53935), // Kırmızı
     Color(0xFFEC407A), // Pembe
     Color(0xFF8E24AA), // Mor
+    Color(0xFF3F51B5), // İndigo
     Color(0xFF1E88E5), // Mavi
     Color(0xFF03A9F4), // Açık Mavi
     Color(0xFF00ACC1), // Camgöbeği
+    Color(0xFF00897B), // Teal
     Color(0xFF43A047), // Yeşil
     Color(0xFF7CB342), // Açık Yeşil
     Color(0xFFFDD835), // Sarı
     Color(0xFFFB8C00), // Turuncu
+    Color(0xFFD84315), // Koyu Turuncu
     Color(0xFF6D4C41), // Kahverengi
-    Color(0xFF757575)  // Gri
+    Color(0xFF757575), // Gri
+    // Pastel & Not Defteri Estetik Tonları
+    Color(0xFFA29BFE), // Pastel Lavanta
+    Color(0xFF74B9FF), // Pastel Bebek Mavisi
+    Color(0xFF81ECEC), // Pastel Turkuaz
+    Color(0xFF55E6C1), // Pastel Nane
+    Color(0xFFFDCB6E), // Pastel Hardal
+    Color(0xFFFAB1A0), // Pastel Şeftali
+    Color(0xFFFF7675), // Pastel Mercan
+    Color(0xFFFD79A8), // Pastel Pembe
+    Color(0xFF636E72)  // Slate Gri
 )
 
 val HighlighterPalette = listOf(
@@ -121,7 +139,9 @@ val HighlighterPalette = listOf(
     Color(0xFF40C4FF), // Fosforlu Mavi
     Color(0xFFFF4081), // Fosforlu Pembe
     Color(0xFFFF9100), // Fosforlu Turuncu
-    Color(0xFFE040FB)  // Fosforlu Mor
+    Color(0xFFE040FB), // Fosforlu Mor
+    Color(0xFFFF5252), // Fosforlu Mercan
+    Color(0xFF64FFDA)  // Fosforlu Camgöbeği
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,6 +152,8 @@ fun DrawingScreen(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val isCompactScreen = configuration.screenWidthDp < 400
 
     // Tuval Elemanları ve Geçmiş (Undo/Redo)
     var elements by remember { mutableStateOf(listOf<DrawElement>()) }
@@ -332,14 +354,7 @@ fun DrawingScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Çizim & Not Tuvali", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = "${activeTool.title} • ${canvasPattern.title}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text("Çizim", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
@@ -352,212 +367,217 @@ fun DrawingScreen(
                         Icon(Icons.Default.GridOn, contentDescription = "Kağıt Deseni")
                     }
 
-                    // Geri Al (Undo)
-                    IconButton(
-                        onClick = {
-                            if (elements.isNotEmpty()) {
-                                val last = elements.last()
-                                elements = elements.dropLast(1)
-                                redoStack = redoStack + last
-                            }
-                        },
-                        enabled = elements.isNotEmpty()
+                    // Geri / İleri Al Kapsülü (Animated Capsule)
+                    AnimatedVisibility(
+                        visible = elements.isNotEmpty() || redoStack.isNotEmpty(),
+                        enter = fadeIn() + expandHorizontally(),
+                        exit = fadeOut() + shrinkHorizontally()
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Geri Al")
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                            shape = CircleShape,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                            modifier = Modifier.padding(horizontal = 2.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = {
+                                        if (elements.isNotEmpty()) {
+                                            val last = elements.last()
+                                            elements = elements.dropLast(1)
+                                            redoStack = redoStack + last
+                                        }
+                                    },
+                                    enabled = elements.isNotEmpty(),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Undo,
+                                        contentDescription = "Geri Al",
+                                        tint = if (elements.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        if (redoStack.isNotEmpty()) {
+                                            val restored = redoStack.last()
+                                            redoStack = redoStack.dropLast(1)
+                                            elements = elements + restored
+                                        }
+                                    },
+                                    enabled = redoStack.isNotEmpty(),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Redo,
+                                        contentDescription = "İleri Al",
+                                        tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
 
-                    // İleri Al (Redo)
-                    IconButton(
-                        onClick = {
-                            if (redoStack.isNotEmpty()) {
-                                val restored = redoStack.last()
-                                redoStack = redoStack.dropLast(1)
-                                elements = elements + restored
-                            }
-                        },
-                        enabled = redoStack.isNotEmpty()
+                    // Temizle Butonu (Yalnızca tuvalde çizim varsa görünür)
+                    AnimatedVisibility(
+                        visible = elements.isNotEmpty(),
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut()
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "İleri Al")
+                        IconButton(
+                            onClick = { showClearConfirmDialog = true }
+                        ) {
+                            Icon(
+                                Icons.Default.DeleteOutline,
+                                contentDescription = "Temizle",
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
+                            )
+                        }
                     }
 
-                    // Temizle Butonu
-                    IconButton(
-                        onClick = { showClearConfirmDialog = true },
-                        enabled = elements.isNotEmpty()
-                    ) {
-                        Icon(Icons.Default.DeleteOutline, contentDescription = "Temizle")
-                    }
+                    Spacer(modifier = Modifier.width(2.dp))
 
                     // Kaydet
-                    IconButton(
+                    Button(
                         onClick = {
                             val savedPath = saveCanvasToBitmap()
                             if (savedPath != null) {
                                 onDrawingSaved(savedPath)
                             }
                         },
-                        enabled = elements.isNotEmpty()
+                        enabled = elements.isNotEmpty(),
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = if (isCompactScreen) PaddingValues(horizontal = 10.dp, vertical = 4.dp) else PaddingValues(horizontal = 14.dp, vertical = 4.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Done,
-                            contentDescription = "Kaydet",
-                            tint = if (elements.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(18.dp))
+                        if (!isCompactScreen) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Kaydet", fontWeight = FontWeight.SemiBold)
+                        }
                     }
+
+                    Spacer(modifier = Modifier.width(6.dp))
                 }
             )
         },
         bottomBar = {
-            Surface(
-                tonalElevation = 6.dp,
-                shadowElevation = 8.dp,
-                modifier = Modifier.fillMaxWidth()
+            val isAppDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+            val studioBgColor = if (isAppDark) Color(0xFF22252A) else Color(0xFFFFFFFF)
+            val studioBorderColor = if (isAppDark) Color(0x30FFFFFF) else Color(0x18000000)
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                // 1. Üst Kısım: Seçili Araca Göre Hızlı Ayar Kartı (Renkler, Boyutlar, Şekiller)
+                Surface(
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                    shape = RoundedCornerShape(22.dp),
+                    color = studioBgColor,
+                    border = BorderStroke(1.dp, studioBorderColor),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    // 1. Satır: Ana Araç Seçimi (Kalem, Fosforlu, Şekil, Silgi)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Kalem
-                        FilterChip(
-                            selected = activeTool == DrawingTool.PEN,
-                            onClick = { activeTool = DrawingTool.PEN },
-                            label = { Text("Kalem") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
-                        )
-
-                        // Fosforlu Kalem
-                        FilterChip(
-                            selected = activeTool == DrawingTool.HIGHLIGHTER,
-                            onClick = { activeTool = DrawingTool.HIGHLIGHTER },
-                            label = { Text("Fosforlu") },
-                            leadingIcon = {
-                                Icon(Icons.Default.BorderColor, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
-                        )
-
-                        // Şekiller
-                        FilterChip(
-                            selected = activeTool == DrawingTool.SHAPES,
-                            onClick = { activeTool = DrawingTool.SHAPES },
-                            label = { Text("Şekil") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Category, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
-                        )
-
-                        // Silgi
-                        FilterChip(
-                            selected = activeTool == DrawingTool.ERASER,
-                            onClick = { activeTool = DrawingTool.ERASER },
-                            label = { Text("Silgi") },
-                            leadingIcon = {
-                                Icon(Icons.Default.AutoFixNormal, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
-                        )
-                    }
-
-                    // 2. Satır: Seçilen Araca Özel Ayarlar
-                    when (activeTool) {
-                        DrawingTool.PEN -> {
-                            // Kalem Kalınlık ve Renk Paleti
-                            ToolSettingRow(
-                                selectedSize = penStrokeWidth,
-                                onSizeSelected = { penStrokeWidth = it },
-                                sizeOptions = listOf(4f to "Çok İnce", 8f to "İnce", 14f to "Orta", 24f to "Kalın"),
-                                currentColor = penColor,
-                                onColorSelected = { penColor = it },
-                                palette = StandardPalette
-                            )
-                        }
-                        DrawingTool.HIGHLIGHTER -> {
-                            // Fosforlu Kalem Kalınlık ve Canlı Pastel Palet
-                            ToolSettingRow(
-                                selectedSize = highlighterStrokeWidth,
-                                onSizeSelected = { highlighterStrokeWidth = it },
-                                sizeOptions = listOf(20f to "İnce", 32f to "Orta", 48f to "Geniş"),
-                                currentColor = highlighterColor,
-                                onColorSelected = { highlighterColor = it },
-                                palette = HighlighterPalette
-                            )
-                        }
-                        DrawingTool.SHAPES -> {
-                            // Şekil Seçimi ve Dolgu Durumu
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    // Şekil Türleri (Çizgi, Ok, Dikdörtgen, Çember)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        ShapeType.values().forEach { shape ->
-                                            InputChip(
-                                                selected = selectedShapeType == shape,
-                                                onClick = { selectedShapeType = shape },
-                                                label = { Text(shape.title, style = MaterialTheme.typography.bodySmall) }
-                                            )
-                                        }
-                                    }
-
-                                    // Dolgu / Boş Çizim Butonu (Sadece Dikdörtgen ve Çember için)
-                                    if (selectedShapeType == ShapeType.RECTANGLE || selectedShapeType == ShapeType.CIRCLE) {
-                                        FilterChip(
-                                            selected = isShapeFilled,
-                                            onClick = { isShapeFilled = !isShapeFilled },
-                                            label = { Text(if (isShapeFilled) "Dolu" else "Çerçeve", style = MaterialTheme.typography.bodySmall) },
-                                            leadingIcon = {
-                                                Icon(Icons.Default.FormatColorFill, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            }
-                                        )
-                                    }
-                                }
-
-                                // Şekil Renk Paleti
-                                ToolSettingRow(
-                                    selectedSize = shapeStrokeWidth,
-                                    onSizeSelected = { shapeStrokeWidth = it },
-                                    sizeOptions = listOf(4f to "İnce", 8f to "Orta", 14f to "Kalın"),
+                    AnimatedContent(
+                        targetState = activeTool,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(180)) togetherWith fadeOut(animationSpec = tween(120))
+                        },
+                        label = "ActiveToolStudioRow"
+                    ) { tool ->
+                        when (tool) {
+                            DrawingTool.PEN -> {
+                                PenStudioRow(
+                                    strokeWidth = penStrokeWidth,
+                                    onStrokeWidthChange = { penStrokeWidth = it },
                                     currentColor = penColor,
-                                    onColorSelected = { penColor = it },
-                                    palette = StandardPalette
+                                    onColorChange = { penColor = it }
+                                )
+                            }
+                            DrawingTool.HIGHLIGHTER -> {
+                                HighlighterStudioRow(
+                                    strokeWidth = highlighterStrokeWidth,
+                                    onStrokeWidthChange = { highlighterStrokeWidth = it },
+                                    currentColor = highlighterColor,
+                                    onColorChange = { highlighterColor = it }
+                                )
+                            }
+                            DrawingTool.SHAPES -> {
+                                ShapesStudioRow(
+                                    selectedShape = selectedShapeType,
+                                    onShapeSelect = { selectedShapeType = it },
+                                    isFilled = isShapeFilled,
+                                    onToggleFill = { isShapeFilled = !isShapeFilled },
+                                    currentColor = penColor,
+                                    onColorChange = { penColor = it }
+                                )
+                            }
+                            DrawingTool.ERASER -> {
+                                EraserStudioRow(
+                                    strokeWidth = eraserStrokeWidth,
+                                    onStrokeWidthChange = { eraserStrokeWidth = it },
+                                    onClearAll = { showClearConfirmDialog = true }
                                 )
                             }
                         }
-                        DrawingTool.ERASER -> {
-                            // Silgi Kalınlık Seçenekleri ve Bilgi
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                    }
+                }
+
+                // 2. Alt Kısım: Ana Araç Seçim Kapsülü (Kalem, Fosforlu, Şekil, Silgi)
+                Surface(
+                    tonalElevation = 4.dp,
+                    shadowElevation = 8.dp,
+                    shape = RoundedCornerShape(32.dp),
+                    color = studioBgColor,
+                    border = BorderStroke(1.dp, studioBorderColor)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        DrawingTool.values().forEach { tool ->
+                            val isSelected = activeTool == tool
+                            val icon = when (tool) {
+                                DrawingTool.PEN -> Icons.Default.Edit
+                                DrawingTool.HIGHLIGHTER -> Icons.Default.BorderColor
+                                DrawingTool.SHAPES -> Icons.Default.Category
+                                DrawingTool.ERASER -> Icons.Default.AutoFixNormal
+                            }
+
+                            FilledTonalIconButton(
+                                onClick = { activeTool = tool },
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                    contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                modifier = Modifier.size(46.dp)
                             ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf(16f to "İnce", 32f to "Orta", 54f to "Geniş", 80f to "Ekstra").forEach { (size, label) ->
-                                        FilterChip(
-                                            selected = eraserStrokeWidth == size,
-                                            onClick = { eraserStrokeWidth = size },
-                                            label = { Text(label) }
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(icon, contentDescription = tool.title, modifier = Modifier.size(19.dp))
+                                    if (tool != DrawingTool.ERASER) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        val indicatorColor = when (tool) {
+                                            DrawingTool.PEN, DrawingTool.SHAPES -> penColor
+                                            DrawingTool.HIGHLIGHTER -> highlighterColor
+                                            else -> Color.Transparent
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .size(5.dp)
+                                                .clip(CircleShape)
+                                                .background(indicatorColor)
                                         )
                                     }
-                                }
-
-                                TextButton(
-                                    onClick = { showClearConfirmDialog = true },
-                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                                ) {
-                                    Icon(Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Hepsini Sil")
                                 }
                             }
                         }
@@ -570,13 +590,11 @@ fun DrawingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(if (canvasPattern == CanvasPattern.CHALKBOARD) Color(0xFF121212) else Color(0xFFECEFF1))
-                .padding(8.dp)
+                .background(canvasBgColor)
         ) {
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(16.dp))
                     .background(canvasBgColor)
                     .onSizeChanged { canvasSize = it }
                     .pointerInput(activeTool, selectedShapeType, penColor, highlighterColor, isShapeFilled) {
@@ -725,45 +743,81 @@ fun DrawingScreen(
         }
     }
 
-    // Kağıt Deseni Seçim İletişim Kutusu
+    // Kağıt Deseni Seçim İletişim Kutusu (Görsel Kart Izgarası)
     if (showPatternDialog) {
         AlertDialog(
             onDismissRequest = { showPatternDialog = false },
-            title = { Text("Kağıt Şablonu Seç") },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.GridOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Kağıt Şablonu Seç", fontWeight = FontWeight.Bold)
+                }
+            },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CanvasPattern.values().forEach { pattern ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    canvasPattern = pattern
-                                    showPatternDialog = false
-                                }
-                                .padding(vertical = 12.dp, horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = canvasPattern == pattern,
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Notlarınız ve eskizleriniz için bir tuval deseni belirleyin:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // 1. Sıra (Düz, Çizgili, Kareli)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(CanvasPattern.BLANK, CanvasPattern.LINED, CanvasPattern.GRID).forEach { pattern ->
+                            PatternCardItem(
+                                pattern = pattern,
+                                isSelected = canvasPattern == pattern,
                                 onClick = {
                                     canvasPattern = pattern
                                     showPatternDialog = false
-                                }
+                                },
+                                modifier = Modifier.weight(1f)
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Text(pattern.title, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+
+                    // 2. Sıra (Noktalı, Kara Tahta)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(CanvasPattern.DOTS, CanvasPattern.CHALKBOARD).forEach { pattern ->
+                            PatternCardItem(
+                                pattern = pattern,
+                                isSelected = canvasPattern == pattern,
+                                onClick = {
+                                    canvasPattern = pattern
+                                    showPatternDialog = false
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Şablonu Görsele Dahil Et", style = MaterialTheme.typography.bodyMedium)
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text("Şablonu Görsele Dahil Et", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text("Kaydedilen çizime kılavuz çizgileri işlenir", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         Switch(
                             checked = includePatternInExport,
                             onCheckedChange = { includePatternInExport = it }
@@ -773,7 +827,7 @@ fun DrawingScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showPatternDialog = false }) {
-                    Text("Tamam")
+                    Text("Kapat")
                 }
             }
         )
@@ -807,64 +861,503 @@ fun DrawingScreen(
 }
 
 /**
- * Kalınlık ve Renk Paleti Satırı
+ * Kalem Ayar Satırı: Canlı Önizleme + Kalınlık Noktaları + Renk Paleti
  */
 @Composable
-private fun ToolSettingRow(
-    selectedSize: Float,
-    onSizeSelected: (Float) -> Unit,
-    sizeOptions: List<Pair<Float, String>>,
+private fun PenStudioRow(
+    strokeWidth: Float,
+    onStrokeWidthChange: (Float) -> Unit,
     currentColor: Color,
-    onColorSelected: (Color) -> Unit,
-    palette: List<Color>
+    onColorChange: (Color) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Canlı Çizgi Boyutu ve Rengi Önizleme
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
         ) {
-            // Boyut Seçenekleri
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                sizeOptions.forEach { (size, label) ->
-                    FilterChip(
-                        selected = selectedSize == size,
-                        onClick = { onSizeSelected(size) },
-                        label = { Text(label, style = MaterialTheme.typography.bodySmall) }
-                    )
-                }
-            }
-
-            // Aktif Renk Önizleme Rozeti
             Box(
                 modifier = Modifier
-                    .size(24.dp)
+                    .size((strokeWidth * 0.8f).coerceIn(4f, 22f).dp)
                     .clip(CircleShape)
                     .background(currentColor)
-                    .border(1.5.dp, Color.LightGray, CircleShape)
             )
         }
 
-        // Renk Paleti Listesi
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Kalınlık Seçimi (Görsel Noktalar)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(palette) { color ->
+            listOf(4f to 4.dp, 8f to 8.dp, 14f to 12.dp, 24f to 16.dp).forEach { (size, dotDp) ->
+                val isSelected = strokeWidth == size
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                        .clickable { onStrokeWidthChange(size) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(dotDp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .height(24.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Renk Paleti
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            items(StandardPalette) { color ->
+                val isSelected = currentColor == color
+                Box(
+                    modifier = Modifier
+                        .size(if (isSelected) 30.dp else 26.dp)
                         .clip(CircleShape)
                         .background(color)
                         .border(
-                            width = if (currentColor == color) 3.dp else 1.dp,
-                            color = if (currentColor == color) MaterialTheme.colorScheme.primary else Color.LightGray.copy(alpha = 0.6f),
+                            width = if (isSelected) 2.5.dp else 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0x30888888),
                             shape = CircleShape
                         )
-                        .clickable { onColorSelected(color) }
-                )
+                        .clickable { onColorChange(color) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = if (color.luminance() > 0.5f) Color.Black else Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
             }
+        }
+    }
+}
+
+/**
+ * Fosforlu Kalem Ayar Satırı: Canlı Önizleme + Kalınlık + Fosforlu Renkler
+ */
+@Composable
+private fun HighlighterStudioRow(
+    strokeWidth: Float,
+    onStrokeWidthChange: (Float) -> Unit,
+    currentColor: Color,
+    onColorChange: (Color) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Canlı Önizleme
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size((strokeWidth * 0.45f).coerceIn(6f, 22f).dp)
+                    .clip(CircleShape)
+                    .background(currentColor.copy(alpha = 0.7f))
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf(20f to 10.dp, 32f to 14.dp, 48f to 18.dp).forEach { (size, dotDp) ->
+                val isSelected = strokeWidth == size
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                        .clickable { onStrokeWidthChange(size) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(dotDp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .height(24.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            items(HighlighterPalette) { color ->
+                val isSelected = currentColor == color
+                Box(
+                    modifier = Modifier
+                        .size(if (isSelected) 30.dp else 26.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                        .border(
+                            width = if (isSelected) 2.5.dp else 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0x30888888),
+                            shape = CircleShape
+                        )
+                        .clickable { onColorChange(color) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = if (color.luminance() > 0.5f) Color.Black else Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Şekiller Ayar Satırı
+ */
+@Composable
+private fun ShapesStudioRow(
+    selectedShape: ShapeType,
+    onShapeSelect: (ShapeType) -> Unit,
+    isFilled: Boolean,
+    onToggleFill: () -> Unit,
+    currentColor: Color,
+    onColorChange: (Color) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Şekil Seçenekleri Kapsülü
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.padding(end = 4.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ShapeType.values().forEach { shape ->
+                    val isSelected = selectedShape == shape
+                    val icon = when (shape) {
+                        ShapeType.LINE -> Icons.Default.HorizontalRule
+                        ShapeType.ARROW -> Icons.AutoMirrored.Filled.ArrowForward
+                        ShapeType.RECTANGLE -> Icons.Default.CropSquare
+                        ShapeType.CIRCLE -> Icons.Default.RadioButtonUnchecked
+                    }
+                    Surface(
+                        onClick = { onShapeSelect(shape) },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                icon,
+                                contentDescription = shape.title,
+                                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (selectedShape == ShapeType.RECTANGLE || selectedShape == ShapeType.CIRCLE) {
+                    Surface(
+                        onClick = onToggleFill,
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isFilled) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.FormatColorFill,
+                                contentDescription = "Dolgu",
+                                tint = if (isFilled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(6.dp))
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .height(24.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+
+        // Renk Paleti
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            items(StandardPalette) { color ->
+                val isSelected = currentColor == color
+                Box(
+                    modifier = Modifier
+                        .size(if (isSelected) 30.dp else 26.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                        .border(
+                            width = if (isSelected) 2.5.dp else 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0x30888888),
+                            shape = CircleShape
+                        )
+                        .clickable { onColorChange(color) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = if (color.luminance() > 0.5f) Color.Black else Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Kağıt Deseni Kart Bileşeni
+ */
+@Composable
+private fun PatternCardItem(
+    pattern: CanvasPattern,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(1.dp, Color(0x22888888), RoundedCornerShape(8.dp))
+            ) {
+                PatternThumbnailPreview(pattern = pattern)
+                if (isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(3.dp)
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(11.dp)
+                        )
+                    }
+                }
+            }
+            Text(
+                text = pattern.title,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * Kağıt Deseni Küçük Önizleme Tuvali (Mini Canvas Thumbnail)
+ */
+@Composable
+private fun PatternThumbnailPreview(
+    pattern: CanvasPattern,
+    modifier: Modifier = Modifier
+) {
+    val isChalk = pattern == CanvasPattern.CHALKBOARD
+    val bgColor = if (isChalk) Color(0xFF1E1E1E) else Color.White
+    val lineColor = if (isChalk) Color.White.copy(alpha = 0.25f) else Color(0xFF1E88E5).copy(alpha = 0.35f)
+    val gridColor = if (isChalk) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.18f)
+    val dotColor = if (isChalk) Color.White.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.30f)
+
+    Canvas(
+        modifier = modifier
+            .fillMaxSize()
+            .background(bgColor)
+    ) {
+        when (pattern) {
+            CanvasPattern.BLANK -> {}
+            CanvasPattern.LINED -> {
+                val step = 10.dp.toPx()
+                var y = step
+                while (y < size.height) {
+                    drawLine(lineColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+                    y += step
+                }
+            }
+            CanvasPattern.GRID -> {
+                val step = 10.dp.toPx()
+                var x = step
+                while (x < size.width) {
+                    drawLine(gridColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = 0.8f)
+                    x += step
+                }
+                var y = step
+                while (y < size.height) {
+                    drawLine(gridColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 0.8f)
+                    y += step
+                }
+            }
+            CanvasPattern.DOTS -> {
+                val step = 10.dp.toPx()
+                var x = step
+                while (x < size.width) {
+                    var y = step
+                    while (y < size.height) {
+                        drawCircle(dotColor, radius = 1.2f, center = Offset(x, y))
+                        y += step
+                    }
+                    x += step
+                }
+            }
+            CanvasPattern.CHALKBOARD -> {
+                val step = 10.dp.toPx()
+                var y = step
+                while (y < size.height) {
+                    drawLine(lineColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 0.8f)
+                    y += step
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Silgi Ayar Satırı
+ */
+@Composable
+private fun EraserStudioRow(
+    strokeWidth: Float,
+    onStrokeWidthChange: (Float) -> Unit,
+    onClearAll: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf(16f to 10.dp, 32f to 14.dp, 54f to 18.dp, 80f to 22.dp).forEach { (size, dotDp) ->
+                val isSelected = strokeWidth == size
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                        .clickable { onStrokeWidthChange(size) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(dotDp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                }
+            }
+        }
+
+        TextButton(
+            onClick = onClearAll,
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+        ) {
+            Icon(Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("Tuvali Temizle", style = MaterialTheme.typography.labelMedium)
         }
     }
 }

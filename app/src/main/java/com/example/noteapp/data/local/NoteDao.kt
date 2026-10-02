@@ -28,6 +28,12 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE id = :id")
     suspend fun getNoteById(id: Long): Note?
 
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND title = :title LIMIT 1")
+    suspend fun getNoteByTitle(title: String): Note?
+
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 0 AND (content LIKE '%' || :linkToken || '%' OR content LIKE '%' || :rawTitle || '%') AND id != :excludeId")
+    suspend fun getNotesLinkingTo(linkToken: String, rawTitle: String, excludeId: Long): List<Note>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNote(note: Note): Long
 
@@ -65,8 +71,11 @@ interface NoteDao {
     @Query("DELETE FROM categories")
     suspend fun deleteAllCategories()
 
-    @Query("UPDATE notes SET isDeleted = 1 WHERE id IN (:noteIds)")
-    suspend fun moveNotesToTrash(noteIds: List<Long>)
+    @Query("UPDATE notes SET isDeleted = 1, deletedAt = :deletedAt WHERE id IN (:noteIds)")
+    suspend fun moveNotesToTrash(noteIds: List<Long>, deletedAt: Long = System.currentTimeMillis())
+
+    @Query("DELETE FROM notes WHERE isDeleted = 1 AND deletedAt IS NOT NULL AND deletedAt < :threshold")
+    suspend fun deleteOldTrashNotes(threshold: Long)
 
     @Query("UPDATE notes SET categoryId = :categoryId WHERE id IN (:noteIds)")
     suspend fun updateNotesCategory(noteIds: List<Long>, categoryId: Long?)
