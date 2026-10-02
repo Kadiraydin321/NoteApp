@@ -2,13 +2,13 @@
 
 Bu dal (branch), **NoteApp** uygulamasının en güncel derlenmiş Android APK dosyasını barındırmaktadır.
 
-### ⬇️ Doğrudan APK İndir
-Aşağıdaki linke telefonunuzun tarayıcısından tıklayarak doğrudan APK'yı indirebilirsiniz:
+### ⬇️ Doğrudan APK İndir (Süper Akıcı Release Sürümü ⚡)
+Aşağıdaki linke telefonunuzun tarayıcısından tıklayarak doğrudan optimize edilmiş APK'yı indirebilirsiniz:
 
-👉 **[NoteApp-debug.apk İndir (Doğrudan İndirme Linki)](https://github.com/Kadiraydin321/NoteApp/raw/apk/NoteApp-debug.apk)**
+👉 **[NoteApp-release.apk İndir (Ultra Hızlı & Akıcı - Önerilen)](https://github.com/Kadiraydin321/NoteApp/raw/apk/NoteApp-release.apk)**
 
-Alternatif GitHub görünümü:
-👉 **[GitHub Dosya Sayfası](https://github.com/Kadiraydin321/NoteApp/blob/apk/NoteApp-debug.apk)**
+Alternatif Debug APK İndirme:
+👉 **[NoteApp-debug.apk İndir](https://github.com/Kadiraydin321/NoteApp/raw/apk/NoteApp-debug.apk)**
 
 ---
 
