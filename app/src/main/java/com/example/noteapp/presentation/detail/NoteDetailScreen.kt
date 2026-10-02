@@ -375,7 +375,6 @@ fun NoteDetailScreen(
     var revertConfirmPath by remember { mutableStateOf<String?>(null) }
     var showMoreMenu by remember { mutableStateOf(false) }
     var activeToolCategory by remember { mutableStateOf(NoteToolCategory.NONE) }
-    var showShareDialog by remember { mutableStateOf(false) }
     var showOutlineDialog by remember { mutableStateOf(false) }
     var isBacklinksExpanded by rememberSaveable { mutableStateOf(true) }
     var moveCheckedToBottom by rememberSaveable { mutableStateOf(false) }
@@ -970,13 +969,13 @@ fun NoteDetailScreen(
 
                                 HorizontalDivider()
 
-                                // Notu Paylaş
+                                // Markdown Olarak Paylaş
                                 DropdownMenuItem(
-                                    text = { Text("Notu Paylaş") },
+                                    text = { Text("Markdown Olarak Paylaş") },
                                     leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
                                     onClick = {
                                         showMoreMenu = false
-                                        showShareDialog = true
+                                        shareNote(asMarkdown = true)
                                     }
                                 )
 
@@ -2622,123 +2621,7 @@ fun NoteDetailScreen(
         )
     }
 
-    // Paylaşım Seçenekleri Dialogu (Markdown ve Düz Metin)
-    if (showShareDialog) {
-        AlertDialog(
-            onDismissRequest = { showShareDialog = false },
-            icon = { Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            title = { Text("Notu Paylaş") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Paylaşmak istediğiniz biçimi seçin:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
 
-                    // Düz Metin
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                showShareDialog = false
-                                shareNote(asMarkdown = false)
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Description,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Düz Metin Olarak Paylaş",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Standart metin biçiminde tüm uygulamalara gönderin",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    // Markdown (.md)
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                showShareDialog = false
-                                shareNote(asMarkdown = true)
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Code,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Markdown (.md) Olarak Paylaş",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Başlıklar, kontrol listeleri ve etiketler korunur",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showShareDialog = false }) {
-                    Text("İptal")
-                }
-            }
-        )
-    }
 
     // İçindekiler (Outline / Başlıklar) Dialogu
     if (showOutlineDialog) {

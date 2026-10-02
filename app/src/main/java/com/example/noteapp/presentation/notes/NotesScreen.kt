@@ -102,18 +102,15 @@ fun NotesScreen(
 
     val onShareNote: (Note) -> Unit = { note ->
         val fullText = buildString {
-            if (note.title.isNotBlank()) {
-                appendLine(note.title)
-                appendLine()
-            }
+            if (note.title.isNotBlank()) appendLine("# ${note.title}\n")
             append(note.content)
         }
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, note.title)
+            type = "text/markdown"
+            putExtra(Intent.EXTRA_SUBJECT, note.title.ifBlank { "Not" })
             putExtra(Intent.EXTRA_TEXT, fullText)
         }
-        context.startActivity(Intent.createChooser(intent, "Notu Paylaş"))
+        context.startActivity(Intent.createChooser(intent, "Markdown Olarak Paylaş"))
     }
 
     var showAddCategoryDialog by remember { mutableStateOf(false) }
