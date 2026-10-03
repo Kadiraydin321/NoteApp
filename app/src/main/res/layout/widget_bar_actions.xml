@@ -6,8 +6,6 @@
     android:orientation="horizontal"
     android:gravity="center_vertical"
     android:background="@drawable/widget_background"
-    android:outlineProvider="background"
-    android:clipToOutline="true"
     android:paddingHorizontal="10dp"
     android:paddingVertical="8dp">
 
@@ -17,7 +15,7 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:background="@android:color/transparent"
         android:src="@drawable/ic_widget_check"
         android:contentDescription="Yapılacaklar Listesi"
         android:scaleType="centerInside" />
@@ -28,7 +26,7 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:background="@android:color/transparent"
         android:src="@drawable/ic_widget_draw"
         android:contentDescription="Çizim Notu"
         android:scaleType="centerInside" />
@@ -39,7 +37,7 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:background="@android:color/transparent"
         android:src="@drawable/ic_widget_mic"
         android:contentDescription="Ses Notu"
         android:scaleType="centerInside" />
@@ -50,7 +48,7 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:background="@android:color/transparent"
         android:src="@drawable/ic_widget_image"
         android:contentDescription="Görsel Notu"
         android:scaleType="centerInside" />

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Not Defteri Silüeti (Android 13+ Themed Icons) -->
+    <path
+        android:pathData="M34,26 h40 c4.4,0 8,3.6 8,8 v42 c0,4.4 -3.6,8 -8,8 h-40 c-4.4,0 -8,-3.6 -8,-8 v-42 c0,-4.4 3.6,-8 8,-8 z"
+        android:fillColor="#000000" />
+
+</vector>

@@ -4,8 +4,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:outlineProvider="background"
-    android:clipToOutline="true"
     android:padding="8dp">
 
     <LinearLayout

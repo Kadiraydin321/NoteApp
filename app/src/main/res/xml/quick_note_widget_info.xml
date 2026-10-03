@@ -8,6 +8,8 @@
     android:targetCellHeight="1"
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/widget_1x1_quick"
-    android:resizeMode="horizontal|vertical"
+    android:previewLayout="@layout/widget_1x1_quick"
+    android:previewImage="@drawable/ic_launcher"
+    android:resizeMode="none"
     android:widgetCategory="home_screen"
     android:description="@string/quick_note_widget_description" />

@@ -111,26 +111,28 @@ class NotesWidgetProvider : AppWidgetProvider() {
             val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 150) ?: 150
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val views1x1 = build1x1Views(context, isDark, appWidgetId)
                 val viewsBar = buildBarViews(context, isDark, appWidgetId)
                 val viewsList = buildListViews(context, isDark, appWidgetId)
 
                 val viewMapping = mapOf(
-                    SizeF(60f, 60f) to views1x1,
-                    SizeF(160f, 50f) to viewsBar,
-                    SizeF(160f, 130f) to viewsList
+                    SizeF(120f, 60f) to viewsBar,
+                    SizeF(120f, 110f) to viewsList
                 )
                 appWidgetManager.updateAppWidget(appWidgetId, RemoteViews(viewMapping))
             } else {
-                val views = when {
-                    minWidth < 120 && minHeight < 110 -> build1x1Views(context, isDark, appWidgetId)
-                    minHeight < 120 -> buildBarViews(context, isDark, appWidgetId)
-                    else -> buildListViews(context, isDark, appWidgetId)
+                val views = if (minHeight < 110) {
+                    buildBarViews(context, isDark, appWidgetId)
+                } else {
+                    buildListViews(context, isDark, appWidgetId)
                 }
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             }
 
-            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_notes_list)
+            try {
+                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_notes_list)
+            } catch (e: Exception) {
+                // Ignore if in bar mode or view not in layout
+            }
         }
 
         internal fun build1x1Views(context: Context, isDark: Boolean, appWidgetId: Int): RemoteViews {
@@ -390,7 +392,6 @@ class NotesWidgetProvider : AppWidgetProvider() {
                 for (id in quickIds) {
                     QuickNoteWidgetProvider.updateAppWidget(context, appWidgetManager, id)
                 }
-                appWidgetManager.notifyAppWidgetViewDataChanged(quickIds, R.id.widget_notes_list)
             }
         }
     }

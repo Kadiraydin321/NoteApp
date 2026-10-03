@@ -4,8 +4,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:outlineProvider="background"
-    android:clipToOutline="true"
     android:padding="10dp">
 
     <!-- Ana İçerik Dikey Dizilimi -->
@@ -54,7 +52,7 @@
                 android:id="@+id/widget_btn_refresh"
                 android:layout_width="34dp"
                 android:layout_height="34dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:background="@android:color/transparent"
                 android:src="@drawable/ic_widget_refresh"
                 android:contentDescription="Yenile"
                 android:scaleType="centerInside" />
@@ -87,12 +85,14 @@
                 android:visibility="gone" />
 
             <!-- Alt Gradyan Geçişi (Yumuşak sönümleme) -->
-            <View
+            <ImageView
                 android:id="@+id/widget_bottom_gradient"
                 android:layout_width="match_parent"
                 android:layout_height="60dp"
                 android:layout_gravity="bottom"
-                android:background="@drawable/widget_bottom_gradient" />
+                android:src="@drawable/widget_bottom_gradient"
+                android:scaleType="fitXY"
+                android:contentDescription="@null" />
 
         </FrameLayout>
 
@@ -126,7 +126,7 @@
             android:layout_height="36dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="?android:attr/selectableItemBackground"
+            android:background="@android:color/transparent"
             android:paddingHorizontal="10dp">
             <ImageView
                 android:id="@+id/widget_popup_icon_image"
@@ -152,7 +152,7 @@
             android:layout_height="36dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="?android:attr/selectableItemBackground"
+            android:background="@android:color/transparent"
             android:paddingHorizontal="10dp">
             <ImageView
                 android:id="@+id/widget_popup_icon_draw"
@@ -178,7 +178,7 @@
             android:layout_height="36dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="?android:attr/selectableItemBackground"
+            android:background="@android:color/transparent"
             android:paddingHorizontal="10dp">
             <ImageView
                 android:id="@+id/widget_popup_icon_voice"
@@ -204,7 +204,7 @@
             android:layout_height="36dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="?android:attr/selectableItemBackground"
+            android:background="@android:color/transparent"
             android:paddingHorizontal="10dp">
             <ImageView
                 android:id="@+id/widget_popup_icon_todo"
@@ -230,7 +230,7 @@
             android:layout_height="36dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="?android:attr/selectableItemBackground"
+            android:background="@android:color/transparent"
             android:paddingHorizontal="10dp">
             <ImageView
                 android:id="@+id/widget_popup_icon_text"
