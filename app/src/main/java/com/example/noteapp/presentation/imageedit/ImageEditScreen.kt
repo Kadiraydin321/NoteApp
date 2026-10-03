@@ -113,14 +113,44 @@ data class DrawingStroke(
     val isHighlighter: Boolean = false
 )
 
-data class TextOverlayItem(
-    val id: Long = System.currentTimeMillis(),
-    var text: String,
-    var positionFraction: Offset, // 0..1 normalize koordinatlar (görsele sabit)
-    var color: Color = Color.White,
-    var bgColor: Color = Color(0xCC1E1E1E),
-    var fontSizeSp: Float = 28f
-)
+class TextOverlayItem(
+    val id: Long = System.nanoTime(),
+    text: String,
+    positionFraction: Offset, // 0..1 normalize koordinatlar (görsele sabit)
+    color: Color = Color.White,
+    bgColor: Color = Color(0xCC1E1E1E),
+    fontSizeSp: Float = 28f
+) {
+    var text by mutableStateOf(text)
+    var positionFraction by mutableStateOf(positionFraction)
+    var color by mutableStateOf(color)
+    var bgColor by mutableStateOf(bgColor)
+    var fontSizeSp by mutableFloatStateOf(fontSizeSp)
+
+    fun copy(
+        id: Long = this.id,
+        text: String = this.text,
+        positionFraction: Offset = this.positionFraction,
+        color: Color = this.color,
+        bgColor: Color = this.bgColor,
+        fontSizeSp: Float = this.fontSizeSp
+    ): TextOverlayItem = TextOverlayItem(
+        id = id,
+        text = text,
+        positionFraction = positionFraction,
+        color = color,
+        bgColor = bgColor,
+        fontSizeSp = fontSizeSp
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is TextOverlayItem) return false
+        return id == other.id
+    }
+
+    override fun hashCode(): Int = id.hashCode()
+}
 
 /**
  * Geri & İleri Alma için Tüm Düzenleme Durumunun Anlık Görüntüsü
@@ -312,7 +342,7 @@ fun ImageEditScreen(
             }
         }
 
-        // 3. Metin Katmanları (Ekrandaki orantıyla birebir aynı boyutta işlenir)
+        // 3. Metin Katmanları (Ekrandaki orantıyla birebir aynı boyutta ve konumda işlenir)
         val textPaint = AndroidPaint().apply {
             isAntiAlias = true
             typeface = Typeface.DEFAULT_BOLD
@@ -322,31 +352,43 @@ fun ImageEditScreen(
             style = AndroidPaint.Style.FILL
         }
 
+        val canvasW = viewportSize.width.toFloat()
+        val canvasH = viewportSize.height.toFloat()
+        val bmpW = bmp.width.toFloat()
+        val bmpH = bmp.height.toFloat()
+        val screenScale = if (canvasW > 0 && canvasH > 0) min(canvasW / bmpW, canvasH / bmpH) else 1f
+        val textScaleFactor = if (screenScale > 0f) 1f / screenScale else baseScale
+
         textOverlays.forEach { item ->
-            val posX = item.positionFraction.x * bmp.width
-            val posY = item.positionFraction.y * bmp.height
-            val scaledFontSize = item.fontSizeSp * density * baseScale * 0.95f
+            val scaledFontSize = item.fontSizeSp * density * textScaleFactor * 0.95f
             textPaint.textSize = scaledFontSize
             textPaint.color = item.color.toArgb()
 
-            val textBounds = AndroidRect()
-            textPaint.getTextBounds(item.text, 0, item.text.length, textBounds)
+            val fontMetrics = textPaint.fontMetrics
+            val textWidth = textPaint.measureText(item.text)
+            val textHeight = fontMetrics.descent - fontMetrics.ascent
 
-            val padX = 20f * baseScale
-            val padY = 12f * baseScale
+            val padX = 10f * density * textScaleFactor
+            val padY = 6f * density * textScaleFactor
+            val cornerRadius = 8f * density * textScaleFactor
+
+            val boxLeft = item.positionFraction.x * bmp.width
+            val boxTop = item.positionFraction.y * bmp.height
 
             if (item.bgColor != Color.Transparent) {
                 bgPaint.color = item.bgColor.toArgb()
                 val bgRect = AndroidRectF(
-                    posX - padX,
-                    posY - textBounds.height() - padY,
-                    posX + textBounds.width() + padX,
-                    posY + padY
+                    boxLeft,
+                    boxTop,
+                    boxLeft + textWidth + 2 * padX,
+                    boxTop + textHeight + 2 * padY
                 )
-                canvas.drawRoundRect(bgRect, 14f * baseScale, 14f * baseScale, bgPaint)
+                canvas.drawRoundRect(bgRect, cornerRadius, cornerRadius, bgPaint)
             }
 
-            canvas.drawText(item.text, posX, posY, textPaint)
+            val textDrawX = boxLeft + padX
+            val textDrawY = boxTop + padY - fontMetrics.ascent
+            canvas.drawText(item.text, textDrawX, textDrawY, textPaint)
         }
 
         val savedPath = FileStorageHelper.saveEditedImageBitmap(context, resultBitmap, imagePath)
@@ -1179,59 +1221,106 @@ fun ImageEditScreen(
                         }
                     }
 
-                    // METİN KATMANLARI (Görsele Birebir Sabitli, Sürüklenebilir)
+                    // METİN KATMANLARI (Görsele Birebir Sabitli, Akıcı Sürüklenebilir)
                     textOverlays.forEach { item ->
-                        val screenX = dstLeft + item.positionFraction.x * dstW
-                        val screenY = dstTop + item.positionFraction.y * dstH
-
-                        Box(
-                            modifier = Modifier
-                                .offset { IntOffset(screenX.roundToInt(), screenY.roundToInt()) }
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(item.bgColor)
-                                .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                                .pointerInput(item, dstW, dstH) {
-                                    detectDragGestures { change, dragAmount ->
-                                        change.consume()
-                                        val newNormX = (item.positionFraction.x + dragAmount.x / dstW).coerceIn(0f, 0.95f)
-                                        val newNormY = (item.positionFraction.y + dragAmount.y / dstH).coerceIn(0f, 0.95f)
-                                        item.positionFraction = Offset(newNormX, newNormY)
-                                    }
-                                }
-                                .pointerInput(item) {
-                                    detectTapGestures(
-                                        onDoubleTap = {
-                                            editingTextItem = item
-                                            textInput = item.text
-                                            textColor = item.color
-                                            textSizeChoice = item.fontSizeSp
-                                            showAddTextDialog = true
+                        key(item.id) {
+                            Box(
+                                modifier = Modifier
+                                    .offset {
+                                        if (dstW <= 0f || dstH <= 0f) {
+                                            IntOffset.Zero
+                                        } else {
+                                            val screenX = dstLeft + item.positionFraction.x * dstW
+                                            val screenY = dstTop + item.positionFraction.y * dstH
+                                            IntOffset(screenX.roundToInt(), screenY.roundToInt())
                                         }
+                                    }
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(item.bgColor)
+                                    .border(
+                                        width = if (activeTab == ImageEditorTab.TEXT) 1.5.dp else 1.dp,
+                                        color = if (activeTab == ImageEditorTab.TEXT) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.35f),
+                                        shape = RoundedCornerShape(8.dp)
                                     )
-                                }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = item.text,
-                                    color = item.color,
-                                    fontSize = item.fontSizeSp.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                if (activeTab == ImageEditorTab.TEXT) {
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Metni Kaldır",
-                                        tint = Color.White.copy(alpha = 0.8f),
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .clickable {
+                                    .pointerInput(item.id, activeTab, dstW, dstH) {
+                                        if (activeTab == ImageEditorTab.DRAW || activeTab == ImageEditorTab.CROP) return@pointerInput
+                                        detectDragGestures(
+                                            onDragStart = {
                                                 recordSnapshot()
-                                                lastDeletedTextItem = item
-                                                textOverlays.remove(item)
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                if (dstW > 0f && dstH > 0f) {
+                                                    val currentPos = item.positionFraction
+                                                    val newNormX = (currentPos.x + dragAmount.x / dstW).coerceIn(0f, 0.95f)
+                                                    val newNormY = (currentPos.y + dragAmount.y / dstH).coerceIn(0f, 0.95f)
+                                                    item.positionFraction = Offset(newNormX, newNormY)
+                                                }
                                             }
+                                        )
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.pointerInput(item.id) {
+                                        detectTapGestures(
+                                            onDoubleTap = {
+                                                editingTextItem = item
+                                                textInput = item.text
+                                                textColor = item.color
+                                                textBgType = when (item.bgColor) {
+                                                    Color.Transparent -> 0
+                                                    Color(0xCCFFFFFF) -> 2
+                                                    else -> 1
+                                                }
+                                                textSizeChoice = item.fontSizeSp
+                                                showAddTextDialog = true
+                                            }
+                                        )
+                                    }
+                                ) {
+                                    Text(
+                                        text = item.text,
+                                        color = item.color,
+                                        fontSize = item.fontSizeSp.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
+                                    if (activeTab == ImageEditorTab.TEXT) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Metni Düzenle",
+                                            tint = Color.White.copy(alpha = 0.9f),
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clickable {
+                                                    editingTextItem = item
+                                                    textInput = item.text
+                                                    textColor = item.color
+                                                    textBgType = when (item.bgColor) {
+                                                        Color.Transparent -> 0
+                                                        Color(0xCCFFFFFF) -> 2
+                                                        else -> 1
+                                                    }
+                                                    textSizeChoice = item.fontSizeSp
+                                                    showAddTextDialog = true
+                                                }
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Metni Kaldır",
+                                            tint = Color(0xFFFF5252),
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clickable {
+                                                    recordSnapshot()
+                                                    lastDeletedTextItem = item
+                                                    textOverlays.remove(item)
+                                                }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1521,48 +1610,62 @@ private fun TextControlPanel(
     hasDeletedText: Boolean,
     onRestoreLastText: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Button(
-            onClick = onAddTextClick,
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Yeni Metin Ekle", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Button(
+                onClick = onAddTextClick,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Yeni Metin Ekle", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (hasDeletedText) {
+                    OutlinedButton(
+                        onClick = onRestoreLastText,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0x33FFFFFF)),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Geri Al", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                if (textCount > 0) {
+                    OutlinedButton(
+                        onClick = onClearAllText,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0x33EF5350)),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Kaldır ($textCount)", color = Color(0xFFEF5350), style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (hasDeletedText) {
-                OutlinedButton(
-                    onClick = onRestoreLastText,
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0x33FFFFFF)),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Geri Al", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                }
-            }
-
-            if (textCount > 0) {
-                OutlinedButton(
-                    onClick = onClearAllText,
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0x33EF5350)),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Kaldır ($textCount)", color = Color(0xFFEF5350), style = MaterialTheme.typography.labelSmall)
-                }
-            }
+        if (textCount > 0) {
+            Text(
+                text = "💡 Metni parmağınızla tutarak görsel üzerinde istediğiniz yere sürükleyebilirsiniz.",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFB0B0BC),
+                fontSize = 11.sp
+            )
         }
     }
 }

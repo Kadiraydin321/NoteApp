@@ -137,6 +137,8 @@ fun NotesScreen(
     var categoryToDelete by remember { mutableStateOf<Category?>(null) }
     var showBatchCategoryDialog by remember { mutableStateOf(false) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+    var showEmptyTrashConfirm by remember { mutableStateOf(false) }
+    var noteToDeletePermanently by remember { mutableStateOf<Note?>(null) }
     var showSortMenu by remember { mutableStateOf(false) }
     var isFabExpanded by remember { mutableStateOf(false) }
 
@@ -451,8 +453,10 @@ fun NotesScreen(
                         },
                         actions = {
                             if (state.viewMode == NotesViewMode.TRASH) {
-                                TextButton(onClick = onEmptyTrash) {
-                                    Text("Çöpü Boşalt", color = MaterialTheme.colorScheme.error)
+                                if (state.notes.isNotEmpty()) {
+                                    TextButton(onClick = { showEmptyTrashConfirm = true }) {
+                                        Text("Çöpü Boşalt", color = MaterialTheme.colorScheme.error)
+                                    }
                                 }
                             } else {
                                 // Sıralama Butonu
@@ -747,7 +751,7 @@ fun NotesScreen(
                                             onArchiveClick = { onArchiveNote(note) },
                                             onDeleteClick = { handleDeleteNote(note) },
                                             onRestoreClick = { onRestoreNote(note) },
-                                            onDeletePermanentlyClick = { onDeletePermanently(note) }
+                                            onDeletePermanentlyClick = { noteToDeletePermanently = note }
                                         )
                                     }
                                 }
@@ -781,7 +785,7 @@ fun NotesScreen(
                                             onArchiveClick = { onArchiveNote(note) },
                                             onDeleteClick = { handleDeleteNote(note) },
                                             onRestoreClick = { onRestoreNote(note) },
-                                            onDeletePermanentlyClick = { onDeletePermanently(note) }
+                                            onDeletePermanentlyClick = { noteToDeletePermanently = note }
                                         )
                                     }
                                 }
@@ -817,7 +821,7 @@ fun NotesScreen(
                                             onArchiveClick = { onArchiveNote(note) },
                                             onDeleteClick = { handleDeleteNote(note) },
                                             onRestoreClick = { onRestoreNote(note) },
-                                            onDeletePermanentlyClick = { onDeletePermanently(note) }
+                                            onDeletePermanentlyClick = { noteToDeletePermanently = note }
                                         )
                                     }
                                 }
@@ -1078,6 +1082,65 @@ fun NotesScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showBatchDeleteConfirm = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    // 6. Çöp Kutusunu Boşaltma Onay Dialogu
+    if (showEmptyTrashConfirm) {
+        AlertDialog(
+            onDismissRequest = { showEmptyTrashConfirm = false },
+            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Çöp Kutusunu Boşalt") },
+            text = {
+                val count = state.notes.size
+                val countText = if (count > 0) " ($count not)" else ""
+                Text("Çöp kutusundaki tüm notlar$countText kalıcı olarak silinecektir. Bu işlem geri alınamaz.\n\nÇöpü boşaltmak istediğinize emin misiniz?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onEmptyTrash()
+                        showEmptyTrashConfirm = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Çöpü Boşalt", color = MaterialTheme.colorScheme.onError)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEmptyTrashConfirm = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    // 7. Tekil Notu Kalıcı Olarak Silme Onay Dialogu
+    if (noteToDeletePermanently != null) {
+        val note = noteToDeletePermanently!!
+        AlertDialog(
+            onDismissRequest = { noteToDeletePermanently = null },
+            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Notu Kalıcı Olarak Sil") },
+            text = {
+                Text("'${note.title.ifBlank { "Not" }}' kalıcı olarak silinecektir. Bu işlem geri alınamaz.\n\nSilmek istediğinize emin misiniz?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeletePermanently(note)
+                        noteToDeletePermanently = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Kalıcı Olarak Sil", color = MaterialTheme.colorScheme.onError)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { noteToDeletePermanently = null }) {
                     Text("İptal")
                 }
             }
