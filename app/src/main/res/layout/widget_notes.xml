@@ -47,11 +47,22 @@
                     android:textColor="#6750A4" />
             </LinearLayout>
 
+            <!-- Ayarlar Butonu -->
+            <ImageButton
+                android:id="@+id/widget_btn_settings"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="5dp"
+                android:background="@drawable/widget_action_bg"
+                android:src="@drawable/ic_widget_settings"
+                android:contentDescription="Widget Ayarları"
+                android:scaleType="centerInside" />
+
             <!-- Yenile Butonu -->
             <ImageButton
                 android:id="@+id/widget_btn_refresh"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
                 android:background="@drawable/widget_action_bg"
                 android:src="@drawable/ic_widget_refresh"
                 android:contentDescription="Yenile"
@@ -59,21 +70,20 @@
 
             <FrameLayout
                 android:id="@+id/widget_fab_main"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginStart="6dp"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="5dp"
                 android:background="@drawable/widget_fab_bg"
                 android:contentDescription="Yeni not oluştur">
 
                 <ImageView
                     android:id="@+id/widget_fab_icon"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_widget_add_white"
                     android:contentDescription="@null" />
             </FrameLayout>
-
         </LinearLayout>
 
         <!-- Notlar Listesi Alanı -->

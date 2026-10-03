@@ -60,6 +60,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
+import com.example.noteapp.R
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -955,11 +957,19 @@ fun NoteDetailScreen(
 
                         // 1. Sabitleme (Pin) Butonu
                         IconButton(onClick = onTogglePin) {
-                            Icon(
-                                imageVector = if (state.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                contentDescription = if (state.isPinned) "Sabitlemeyi kaldır" else "Sabitle",
-                                tint = pinButtonColor
-                            )
+                            if (state.isPinned) {
+                                Icon(
+                                    imageVector = Icons.Filled.PushPin,
+                                    contentDescription = "Sabitlemeyi kaldır",
+                                    tint = pinButtonColor
+                                )
+                            } else {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_push_pin_off),
+                                    contentDescription = "Sabitle",
+                                    tint = pinButtonColor
+                                )
+                            }
                         }
 
                         // 2. Notu Sil Butonu (Geniş ekranlarda doğrudan üst çubukta, küçük ekranlarda 3 nokta menüsünde)

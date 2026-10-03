@@ -37,6 +37,8 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
+import androidx.compose.ui.res.painterResource
+import com.example.noteapp.R
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -1357,19 +1359,32 @@ fun NoteCard(
                         )
                     } else if (viewMode == NotesViewMode.ALL || viewMode == NotesViewMode.REMINDERS) {
                         Box(
-                                        modifier = Modifier
-                                            .size(48.dp)
-                                            .clip(CircleShape)
-                                            .background(colorSpec.contentColor.copy(alpha = 0.92f))
-                                            .clickable(onClick = onPinClick),
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    colorSpec.contentColor.copy(
+                                        alpha = if (note.isPinned) 0.14f else 0.05f
+                                    )
+                                )
+                                .clickable(onClick = onPinClick),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = if (note.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                contentDescription = if (note.isPinned) "Sabitlemeyi kaldır" else "Sabitle",
-                                tint = colorSpec.backgroundColor.copy(alpha = if (note.isPinned) 1f else 0.66f),
-                                modifier = Modifier.size(16.dp)
-                            )
+                            if (note.isPinned) {
+                                Icon(
+                                    imageVector = Icons.Filled.PushPin,
+                                    contentDescription = "Sabitlemeyi kaldır",
+                                    tint = colorSpec.contentColor.copy(alpha = 0.95f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            } else {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_push_pin_off),
+                                    contentDescription = "Sabitle",
+                                    tint = colorSpec.contentColor.copy(alpha = 0.45f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -1638,18 +1653,31 @@ fun CompactNoteCard(
                             NotesViewMode.ALL, NotesViewMode.REMINDERS -> {
                                 Box(
                                     modifier = Modifier
-                                        .size(48.dp)
+                                        .size(30.dp)
                                         .clip(CircleShape)
-                                        .background(colorSpec.contentColor.copy(alpha = 0.92f))
+                                        .background(
+                                            colorSpec.contentColor.copy(
+                                                alpha = if (note.isPinned) 0.14f else 0.05f
+                                            )
+                                        )
                                         .clickable(onClick = onPinClick),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = if (note.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                        contentDescription = if (note.isPinned) "Sabitlemeyi kaldır" else "Sabitle",
-                                        tint = colorSpec.backgroundColor.copy(alpha = if (note.isPinned) 1f else 0.66f),
-                                        modifier = Modifier.size(15.dp)
-                                    )
+                                    if (note.isPinned) {
+                                        Icon(
+                                            imageVector = Icons.Filled.PushPin,
+                                            contentDescription = "Sabitlemeyi kaldır",
+                                            tint = colorSpec.contentColor.copy(alpha = 0.95f),
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    } else {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_push_pin_off),
+                                            contentDescription = "Sabitle",
+                                            tint = colorSpec.contentColor.copy(alpha = 0.45f),
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
                                 }
                             }
                             NotesViewMode.ARCHIVE -> {

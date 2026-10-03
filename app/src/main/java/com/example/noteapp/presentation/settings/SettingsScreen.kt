@@ -33,12 +33,16 @@ import com.example.noteapp.data.settings.NotesLayoutMode
 import com.example.noteapp.data.settings.ThemeMode
 import com.example.noteapp.data.settings.WidgetFilterMode
 import com.example.noteapp.presentation.detail.NoteColors
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    initialFocusSection: String? = null,
     settings: AppSettings,
     backupUiState: BackupUiState,
     onWidgetFilterChange: (WidgetFilterMode) -> Unit,
@@ -88,6 +92,16 @@ fun SettingsScreen(
         }
     }
 
+    val scrollState = rememberScrollState()
+    val widgetSectionOffsetY = remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(initialFocusSection, widgetSectionOffsetY.intValue) {
+        if (initialFocusSection == "widget" && widgetSectionOffsetY.intValue > 0) {
+            delay(100)
+            scrollState.animateScrollTo(widgetSectionOffsetY.intValue)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -104,7 +118,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
@@ -205,6 +219,11 @@ fun SettingsScreen(
             // BÖLÜM 2: ANA EKRAN WİDGET'I
             // ==========================================
             Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        widgetSectionOffsetY.intValue = coordinates.positionInParent().y.toInt()
+                    },
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {

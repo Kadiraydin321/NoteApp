@@ -567,12 +567,20 @@ class MainActivity : FragmentActivity() {
                         )
                     }
 
-                    composable("settings_screen") {
+                    composable(
+                        route = "settings_screen?focus={focus}",
+                        arguments = listOf(navArgument("focus") {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        })
+                    ) { backStackEntry ->
+                        val focus = backStackEntry.arguments?.getString("focus")
                         val viewModel = hiltViewModel<SettingsViewModel>()
                         val settingsState by viewModel.settings.collectAsState()
                         val backupUiState by viewModel.backupUiState.collectAsState()
 
                         SettingsScreen(
+                            initialFocusSection = focus,
                             settings = settingsState,
                             backupUiState = backupUiState,
                             onWidgetFilterChange = viewModel::setWidgetFilterMode,
@@ -753,6 +761,7 @@ class MainActivity : FragmentActivity() {
                 NotesWidgetProvider.ACTION_TYPE_IMAGE -> onNavigate("note_detail_screen?autoAction=image")
                 NotesWidgetProvider.ACTION_TYPE_VOICE -> onNavigate("note_detail_screen?autoAction=voice")
                 NotesWidgetProvider.ACTION_TYPE_DRAW -> onNavigate("note_detail_screen?autoAction=draw")
+                NotesWidgetProvider.ACTION_TYPE_SETTINGS -> onNavigate("settings_screen?focus=widget")
             }
             return
         }

@@ -75,6 +75,7 @@ class NotesWidgetProvider : AppWidgetProvider() {
         const val ACTION_TYPE_IMAGE = "ACTION_IMAGE"
         const val ACTION_TYPE_VOICE = "ACTION_VOICE"
         const val ACTION_TYPE_DRAW = "ACTION_DRAW"
+        const val ACTION_TYPE_SETTINGS = "ACTION_SETTINGS"
 
         private const val WIDGET_POPUP_PREFS = "widget_popup_state"
         private const val POPUP_TAP_DEBOUNCE_MS = 800L
@@ -216,6 +217,8 @@ class NotesWidgetProvider : AppWidgetProvider() {
 
             if (isDark) {
                 views.setInt(R.id.widget_root, "setBackgroundResource", R.drawable.widget_background_dark)
+                views.setInt(R.id.widget_btn_settings, "setBackgroundResource", R.drawable.widget_action_bg_dark)
+                views.setInt(R.id.widget_btn_settings, "setColorFilter", 0xFFD0BCFF.toInt())
                 views.setInt(R.id.widget_btn_refresh, "setBackgroundResource", R.drawable.widget_action_bg_dark)
                 views.setInt(R.id.widget_btn_refresh, "setColorFilter", 0xFFD0BCFF.toInt())
                 views.setTextColor(R.id.widget_title, 0xFFFFFFFF.toInt())
@@ -230,6 +233,8 @@ class NotesWidgetProvider : AppWidgetProvider() {
                 views.setTextColor(R.id.widget_popup_text_text, 0xFFFFFFFF.toInt())
             } else {
                 views.setInt(R.id.widget_root, "setBackgroundResource", R.drawable.widget_background)
+                views.setInt(R.id.widget_btn_settings, "setBackgroundResource", R.drawable.widget_action_bg)
+                views.setInt(R.id.widget_btn_settings, "setColorFilter", 0xFF49454F.toInt())
                 views.setInt(R.id.widget_btn_refresh, "setBackgroundResource", R.drawable.widget_action_bg)
                 views.setInt(R.id.widget_btn_refresh, "setColorFilter", 0xFF49454F.toInt())
                 views.setTextColor(R.id.widget_title, 0xFF1C1B1F.toInt())
@@ -316,6 +321,18 @@ class NotesWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
             views.setPendingIntentTemplate(R.id.widget_notes_list, clickPendingIntent)
+
+            val settingsIntent = Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_SETTINGS)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val settingsPendingIntent = PendingIntent.getActivity(
+                context,
+                25 + appWidgetId,
+                settingsIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_btn_settings, settingsPendingIntent)
 
             val refreshIntent = Intent(context, NotesWidgetProvider::class.java).apply {
                 action = ACTION_REFRESH_WIDGET
