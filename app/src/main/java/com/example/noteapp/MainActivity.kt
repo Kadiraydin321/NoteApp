@@ -750,8 +750,9 @@ class MainActivity : FragmentActivity() {
     ) {
         if (intent == null) return
 
-        // Widget hızlı aksiyon butonları (Metin, Görsel, Ses, Çizim)
+        // Widget hızlı aksiyon butonları (Metin, Görsel, Ses, Çizim, Ayarlar)
         val actionType = intent.getStringExtra(NotesWidgetProvider.EXTRA_ACTION_TYPE)
+            ?: if (intent.action == NotesWidgetProvider.ACTION_TYPE_SETTINGS) NotesWidgetProvider.ACTION_TYPE_SETTINGS else null
         if (actionType != null) {
             intent.removeExtra(NotesWidgetProvider.EXTRA_ACTION_TYPE)
             NotesWidgetProvider.closeAllPopups(this)

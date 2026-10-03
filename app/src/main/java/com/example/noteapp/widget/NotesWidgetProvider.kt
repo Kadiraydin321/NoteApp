@@ -323,12 +323,14 @@ class NotesWidgetProvider : AppWidgetProvider() {
             views.setPendingIntentTemplate(R.id.widget_notes_list, clickPendingIntent)
 
             val settingsIntent = Intent(context, MainActivity::class.java).apply {
+                action = ACTION_TYPE_SETTINGS
+                data = Uri.parse("noteapp://widget/settings/$appWidgetId")
                 putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_SETTINGS)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             val settingsPendingIntent = PendingIntent.getActivity(
                 context,
-                25 + appWidgetId,
+                9000 + appWidgetId,
                 settingsIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
