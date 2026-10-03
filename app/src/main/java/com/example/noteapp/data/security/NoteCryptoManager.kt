@@ -64,8 +64,6 @@ class NoteCryptoManager @Inject constructor() {
      */
     fun encrypt(plainText: String): String {
         if (plainText.isEmpty()) return plainText
-        if (plainText.startsWith(PREFIX)) return plainText // Zaten şifreli
-
         return try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             val secretKey = getOrCreateSecretKey()
@@ -81,8 +79,7 @@ class NoteCryptoManager @Inject constructor() {
 
             PREFIX + Base64.encodeToString(combined, Base64.NO_WRAP)
         } catch (e: Exception) {
-            e.printStackTrace()
-            plainText
+            throw IllegalStateException("Kilitli not şifrelenemedi; düz metin olarak kaydedilmedi.", e)
         }
     }
 

@@ -106,14 +106,14 @@ fun AttachmentList(
                         ) {
                             val isEdited = canRevertImage?.invoke(path) == true
                             Icon(
-                                imageVector = Icons.Default.Edit,
+                                imageVector = Icons.Default.Search,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isEdited) "Düzenlendi (Geri alınabilir)" else "Düzenlemek için dokun",
+                                text = if (isEdited) "Düzenlendi (Geri alınabilir)" else "Görüntülemek için dokun",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )

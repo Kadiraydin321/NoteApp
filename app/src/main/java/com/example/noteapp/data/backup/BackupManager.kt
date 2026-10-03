@@ -78,7 +78,7 @@ class BackupManager @Inject constructor(
             // 1. Bilgi Dosyası (backup_info.json)
             val infoJson = JSONObject().apply {
                 put("version", 2)
-                put("appName", "Modern Note App")
+                put("appName", "Not Defterim")
                 put("timestamp", System.currentTimeMillis())
                 put("exportDate", SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date()))
                 put("notesCount", notes.size)
@@ -273,8 +273,8 @@ class BackupManager @Inject constructor(
         return Intent(Intent.ACTION_SEND).apply {
             type = if (zipFile.name.endsWith(".notevault")) "application/octet-stream" else "application/zip"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Modern Note App Güvenli Kasa Yedeği")
-            putExtra(Intent.EXTRA_TEXT, "Modern Note App şifreli yedek dosyası ekte yer almaktadır.")
+            putExtra(Intent.EXTRA_SUBJECT, "Not Defterim güvenli kasa yedeği")
+            putExtra(Intent.EXTRA_TEXT, "Not Defterim şifreli yedek dosyası ekte yer almaktadır.")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }

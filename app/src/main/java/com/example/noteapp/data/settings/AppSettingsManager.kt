@@ -2,6 +2,7 @@ package com.example.noteapp.data.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.noteapp.data.security.NoteCryptoManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,7 @@ enum class NotesLayoutMode {
 data class AppSettings(
     val widgetFilterMode: WidgetFilterMode = WidgetFilterMode.ALL,
     val widgetShowLockedNotes: Boolean = false,
+    val widgetShowContent: Boolean = true,
     val defaultNoteColor: Int = 0,
     val dynamicColor: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -42,7 +44,8 @@ data class AppSettings(
 
 @Singleton
 class AppSettingsManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val cryptoManager: NoteCryptoManager
 ) {
     private val prefs: SharedPreferences = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
 
@@ -72,9 +75,21 @@ class AppSettingsManager @Inject constructor(
         }
 
         val showLocked = prefs.getBoolean(KEY_WIDGET_SHOW_LOCKED, false)
+        val widgetShowContent = prefs.getBoolean(KEY_WIDGET_SHOW_CONTENT, true)
         val defaultColor = prefs.getInt(KEY_DEFAULT_COLOR, 0)
         val dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
-        val masterPin = prefs.getString(KEY_MASTER_PIN, null)
+        val storedPin = prefs.getString(KEY_MASTER_PIN, null)
+        val masterPin = when {
+            storedPin.isNullOrBlank() -> null
+            cryptoManager.isEncrypted(storedPin) -> cryptoManager.decrypt(storedPin).takeUnless { it.startsWith("[Korumalı") }
+            else -> runCatching {
+                prefs.edit().putString(KEY_MASTER_PIN, cryptoManager.encrypt(storedPin)).apply()
+                storedPin
+            }.getOrElse {
+                prefs.edit().remove(KEY_MASTER_PIN).apply()
+                null
+            }
+        }
         val autoLock = prefs.getBoolean(KEY_AUTO_LOCK, true)
         val highContrast = prefs.getBoolean(KEY_HIGH_CONTRAST, true)
         val lastBackup = if (prefs.contains(KEY_LAST_BACKUP)) prefs.getLong(KEY_LAST_BACKUP, 0L) else null
@@ -84,6 +99,7 @@ class AppSettingsManager @Inject constructor(
         return AppSettings(
             widgetFilterMode = filterMode,
             widgetShowLockedNotes = showLocked,
+            widgetShowContent = widgetShowContent,
             defaultNoteColor = defaultColor,
             dynamicColor = dynamicColor,
             themeMode = themeMode,
@@ -117,7 +133,7 @@ class AppSettingsManager @Inject constructor(
             prefs.edit().remove(KEY_MASTER_PIN).apply()
             _settings.value = _settings.value.copy(masterPin = null)
         } else {
-            prefs.edit().putString(KEY_MASTER_PIN, pin).apply()
+            prefs.edit().putString(KEY_MASTER_PIN, cryptoManager.encrypt(pin)).apply()
             _settings.value = _settings.value.copy(masterPin = pin)
         }
     }
@@ -147,6 +163,11 @@ class AppSettingsManager @Inject constructor(
         _settings.value = _settings.value.copy(widgetShowLockedNotes = show)
     }
 
+    fun setWidgetShowContent(show: Boolean) {
+        prefs.edit().putBoolean(KEY_WIDGET_SHOW_CONTENT, show).apply()
+        _settings.value = _settings.value.copy(widgetShowContent = show)
+    }
+
     fun setDefaultNoteColor(color: Int) {
         prefs.edit().putInt(KEY_DEFAULT_COLOR, color).apply()
         _settings.value = _settings.value.copy(defaultNoteColor = color)
@@ -160,6 +181,7 @@ class AppSettingsManager @Inject constructor(
     companion object {
         private const val KEY_WIDGET_FILTER_MODE = "widget_filter_mode"
         private const val KEY_WIDGET_SHOW_LOCKED = "widget_show_locked"
+        private const val KEY_WIDGET_SHOW_CONTENT = "widget_show_content"
         private const val KEY_DEFAULT_COLOR = "default_note_color"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_THEME_MODE = "theme_mode"
@@ -180,6 +202,11 @@ class AppSettingsManager @Inject constructor(
         fun getWidgetShowLocked(context: Context): Boolean {
             val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
             return prefs.getBoolean(KEY_WIDGET_SHOW_LOCKED, false)
+        }
+
+        fun getWidgetShowContent(context: Context): Boolean {
+            val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+            return prefs.getBoolean(KEY_WIDGET_SHOW_CONTENT, true)
         }
 
         fun getThemeMode(context: Context): ThemeMode {

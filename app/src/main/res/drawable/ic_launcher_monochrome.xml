@@ -4,10 +4,13 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Not Defteri Silüeti (Android 13+ Themed Icons) -->
     <path
-        android:pathData="M34,26 h40 c4.4,0 8,3.6 8,8 v42 c0,4.4 -3.6,8 -8,8 h-40 c-4.4,0 -8,-3.6 -8,-8 v-42 c0,-4.4 3.6,-8 8,-8 z"
-        android:fillColor="#000000" />
-
+        android:fillColor="#000000"
+        android:pathData="M31,16 L64,16 L80,32 L80,76 C80,80.4 76.4,84 72,84 L31,84 C26.6,84 23,80.4 23,76 L23,24 C23,19.6 26.6,16 31,16 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M64,16 L64,28 C64,30.2 65.8,32 68,32 L80,32 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M68,77 L81,62 C82.7,60 85.6,59.8 87.5,61.6 C89.4,63.4 89.5,66.3 87.7,68.2 L74.8,82.2 L67,84 Z" />
 </vector>

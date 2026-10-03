@@ -13,6 +13,51 @@ import com.example.noteapp.data.settings.WidgetFilterMode
 import com.example.noteapp.domain.model.Note
 import kotlinx.coroutines.runBlocking
 
+private val WIDGET_HEADING_REGEX = Regex("#{1,6}\\s+.*")
+private val WIDGET_HEADING_PREFIX_REGEX = Regex("^#{1,6}\\s+")
+private val WIDGET_CALLOUT_PREFIX_REGEX = Regex("^>\\s+\\[![A-Za-z]+]\\s*", RegexOption.IGNORE_CASE)
+private val WIDGET_WIKI_LINK_REGEX = Regex("\\[\\[([^\\]]+)]]")
+private val WIDGET_MARKDOWN_LINK_REGEX = Regex("\\[([^]]+)]\\([^)]+\\)")
+private val WIDGET_BOLD_REGEX = Regex("(\\*\\*|__)(.+?)\\1")
+private val WIDGET_ITALIC_REGEX = Regex("(\\*|_)([^*_]+)\\1")
+private val WIDGET_STRIKE_REGEX = Regex("~~(.+?)~~")
+private val WIDGET_HIGHLIGHT_REGEX = Regex("==(.+?)==")
+private val WIDGET_INLINE_CODE_REGEX = Regex("`([^`]+)`")
+
+private fun widgetMarkdownExcerpt(raw: String, maxLength: Int = 120): String {
+    var insideCodeBlock = false
+    val plainText = raw.lineSequence().mapNotNull { sourceLine ->
+        val line = sourceLine.trimStart()
+        if (line.startsWith("```")) {
+            insideCodeBlock = !insideCodeBlock
+            return@mapNotNull null
+        }
+        if (line.isBlank()) return@mapNotNull null
+
+        var display = when {
+            WIDGET_HEADING_REGEX.matches(line) -> line.replaceFirst(WIDGET_HEADING_PREFIX_REGEX, "")
+            line.startsWith("- [x] ", ignoreCase = true) -> "☑ " + line.drop(6)
+            line.startsWith("- [ ] ") -> "☐ " + line.removePrefix("- [ ] ")
+            line.startsWith("> [!", ignoreCase = true) -> line.replaceFirst(WIDGET_CALLOUT_PREFIX_REGEX, "")
+            line.startsWith("> ") -> "“${line.removePrefix("> ")}”"
+            line.startsWith("- ") -> "• " + line.removePrefix("- ")
+            else -> line
+        }
+        display = display
+            .replace(WIDGET_WIKI_LINK_REGEX, "$1")
+            .replace(WIDGET_MARKDOWN_LINK_REGEX, "$1")
+            .replace(WIDGET_BOLD_REGEX, "$2")
+            .replace(WIDGET_ITALIC_REGEX, "$2")
+            .replace(WIDGET_STRIKE_REGEX, "$1")
+            .replace(WIDGET_HIGHLIGHT_REGEX, "$1")
+            .replace(WIDGET_INLINE_CODE_REGEX, "$1")
+
+        if (insideCodeBlock) "⌘ $display" else display
+    }.joinToString("\n")
+
+    return plainText.take(maxLength).trim().ifBlank { "İçerik yok" }
+}
+
 class NotesWidgetService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory {
         return NotesRemoteViewsFactory(applicationContext)
@@ -36,7 +81,6 @@ class NotesRemoteViewsFactory(
                 val db = NoteDatabase.getInstance(context)
                 val filterMode = AppSettingsManager.getWidgetFilterMode(context)
                 val showLocked = AppSettingsManager.getWidgetShowLocked(context)
-
                 val rawList = if (filterMode == WidgetFilterMode.FAVORITES) {
                     db.noteDao.getPinnedNotesList()
                 } else {
@@ -75,20 +119,15 @@ class NotesRemoteViewsFactory(
 
         // İçerik özeti (Onay kutusu işaretlerini güzelleştir: [x] -> ☑, [ ] -> ☐)
         if (note.isLocked) {
-            views.setTextViewText(R.id.widget_item_content, "🔒 Bu not kilitli (Görüntülemek için dokunun)")
+            views.setTextViewText(R.id.widget_item_content, "Kilitli not · Görüntülemek için dokunun")
             views.setViewVisibility(R.id.widget_item_lock, View.VISIBLE)
+        } else if (AppSettingsManager.getWidgetShowContent(context)) {
+            views.setTextViewText(R.id.widget_item_content, widgetMarkdownExcerpt(note.content))
+            views.setViewVisibility(R.id.widget_item_content, View.VISIBLE)
+            views.setViewVisibility(R.id.widget_item_lock, View.GONE)
         } else {
-            val formattedContent = note.content
-                .replace("- [x] ", "☑ ")
-                .replace("- [ ] ", "☐ ")
-                .replace("- [X] ", "☑ ")
-
-            val contentText = if (formattedContent.isNotBlank()) {
-                formattedContent.replace("\n", "  •  ").take(120)
-            } else {
-                "İçerik yok"
-            }
-            views.setTextViewText(R.id.widget_item_content, contentText)
+            views.setTextViewText(R.id.widget_item_content, "")
+            views.setViewVisibility(R.id.widget_item_content, View.GONE)
             views.setViewVisibility(R.id.widget_item_lock, View.GONE)
         }
 
@@ -99,9 +138,10 @@ class NotesRemoteViewsFactory(
         )
 
         // Yuvarlak Köşeli Arka Plan Renklendirmesi (Radius 20dp asla bozulmaz)
-        val defaultCardColor = if (isDark) 0xFF2B2930.toInt() else 0xFFFFFFFF.toInt()
-        val cardColor = if (note.color != 0) note.color else defaultCardColor
+        val cardColor = if (isDark) 0xFF24252B.toInt() else 0xFFFAFAFC.toInt()
+        val accentColor = if (note.color != 0) note.color else if (isDark) 0xFFD0BCFF.toInt() else 0xFF6750A4.toInt()
         views.setInt(R.id.widget_item_bg_image, "setColorFilter", cardColor)
+        views.setInt(R.id.widget_item_accent, "setColorFilter", accentColor)
 
         // Metin rengini arka plan parlaklığına (luminance) göre zıt yap
         val r = android.graphics.Color.red(cardColor) / 255.0

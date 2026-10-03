@@ -5,6 +5,7 @@ import android.graphics.Paint
 import android.graphics.Path as AndroidPath
 import android.graphics.RectF
 import androidx.compose.animation.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +49,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.example.noteapp.media.FileStorageHelper
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.math.*
 
 /**
@@ -148,7 +154,8 @@ val HighlighterPalette = listOf(
 @Composable
 fun DrawingScreen(
     onDrawingSaved: (String) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    drawingPath: String? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -158,6 +165,62 @@ fun DrawingScreen(
     // Tuval Elemanları ve Geçmiş (Undo/Redo)
     var elements by remember { mutableStateOf(listOf<DrawElement>()) }
     var redoStack by remember { mutableStateOf(listOf<DrawElement>()) }
+    var canvasPattern by remember { mutableStateOf(CanvasPattern.BLANK) }
+    var draftHistoryId by rememberSaveable { mutableStateOf(java.util.UUID.randomUUID().toString()) }
+    val sessionHistoryKey = drawingPath ?: "draft_$draftHistoryId"
+
+    fun historyFile(path: String) = File(context.noBackupFilesDir, "drawing_${path.hashCode().toUInt().toString(16)}.json")
+    LaunchedEffect(sessionHistoryKey) {
+        val path = sessionHistoryKey
+        val file = historyFile(path)
+        runCatching {
+            val data = JSONObject(file.readText())
+            if (System.currentTimeMillis() - data.getLong("updated") > 60 * 60 * 1000L) {
+                file.delete()
+                return@runCatching
+            }
+            val loaded = mutableListOf<DrawElement>()
+            val array = data.getJSONArray("elements")
+            for (i in 0 until array.length()) {
+                val item = array.getJSONObject(i)
+                when (item.getString("type")) {
+                    "path" -> {
+                        val points = item.getJSONArray("points")
+                        loaded += DrawElement.FreeHand((0 until points.length()).map { idx ->
+                            val p = points.getJSONObject(idx); Offset(p.getDouble("x").toFloat(), p.getDouble("y").toFloat())
+                        }, Color(item.getLong("color").toULong()), item.getDouble("width").toFloat(), item.getDouble("alpha").toFloat(), item.getBoolean("eraser"))
+                    }
+                    "shape" -> loaded += DrawElement.Shape(
+                        ShapeType.valueOf(item.getString("shape")),
+                        Offset(item.getDouble("sx").toFloat(), item.getDouble("sy").toFloat()),
+                        Offset(item.getDouble("ex").toFloat(), item.getDouble("ey").toFloat()),
+                        Color(item.getLong("color").toULong()), item.getDouble("width").toFloat(), item.getDouble("alpha").toFloat(), item.getBoolean("filled")
+                    )
+                }
+            }
+            elements = loaded
+            canvasPattern = CanvasPattern.valueOf(data.optString("pattern", CanvasPattern.BLANK.name))
+        }.onFailure { file.delete() }
+    }
+    LaunchedEffect(elements, canvasPattern, sessionHistoryKey) {
+        val path = sessionHistoryKey
+        kotlinx.coroutines.delay(350)
+        runCatching {
+            val array = JSONArray()
+            elements.forEach { element ->
+                val item = JSONObject()
+                when (element) {
+                    is DrawElement.FreeHand -> {
+                        item.put("type", "path").put("color", element.color.value.toLong()).put("width", element.strokeWidth).put("alpha", element.alpha).put("eraser", element.isEraser)
+                        val points = JSONArray(); element.points.forEach { points.put(JSONObject().put("x", it.x).put("y", it.y)) }; item.put("points", points)
+                    }
+                    is DrawElement.Shape -> item.put("type", "shape").put("shape", element.shapeType.name).put("sx", element.start.x).put("sy", element.start.y).put("ex", element.end.x).put("ey", element.end.y).put("color", element.color.value.toLong()).put("width", element.strokeWidth).put("alpha", element.alpha).put("filled", element.isFilled)
+                }
+                array.put(item)
+            }
+            historyFile(path).writeText(JSONObject().put("updated", System.currentTimeMillis()).put("pattern", canvasPattern.name).put("elements", array).toString())
+        }
+    }
 
     // Aktif Araç ve Ayarları
     var activeTool by remember { mutableStateOf(DrawingTool.PEN) }
@@ -173,7 +236,6 @@ fun DrawingScreen(
     var shapeStrokeWidth by remember { mutableFloatStateOf(8f) }
 
     // Kağıt Deseni
-    var canvasPattern by remember { mutableStateOf(CanvasPattern.BLANK) }
     var showPatternDialog by remember { mutableStateOf(false) }
     var includePatternInExport by remember { mutableStateOf(true) }
 
@@ -347,8 +409,35 @@ fun DrawingScreen(
             }
         }
 
-        return FileStorageHelper.saveDrawingBitmap(context, bitmap)
+        // Düzenleme yeni dosyaya yazılır. Böylece not eki yolu değişir ve görsel önbelleği eski bitmap'i göstermez.
+        val savedPath = FileStorageHelper.saveDrawingBitmap(context, bitmap) ?: return null
+        runCatching {
+            val array = JSONArray()
+            elements.forEach { element ->
+                val item = JSONObject()
+                when (element) {
+                    is DrawElement.FreeHand -> {
+                        item.put("type", "path").put("color", element.color.value.toLong()).put("width", element.strokeWidth).put("alpha", element.alpha).put("eraser", element.isEraser)
+                        val points = JSONArray(); element.points.forEach { points.put(JSONObject().put("x", it.x).put("y", it.y)) }; item.put("points", points)
+                    }
+                    is DrawElement.Shape -> item.put("type", "shape").put("shape", element.shapeType.name).put("sx", element.start.x).put("sy", element.start.y).put("ex", element.end.x).put("ey", element.end.y).put("color", element.color.value.toLong()).put("width", element.strokeWidth).put("alpha", element.alpha).put("filled", element.isFilled)
+                }
+                array.put(item)
+            }
+            historyFile(savedPath).writeText(JSONObject().put("updated", System.currentTimeMillis()).put("pattern", canvasPattern.name).put("elements", array).toString())
+            if (drawingPath == null) historyFile(sessionHistoryKey).delete()
+        }
+        return savedPath
     }
+
+    val exitDrawing: () -> Unit = {
+        if (elements.isNotEmpty()) {
+            saveCanvasToBitmap()?.let(onDrawingSaved)
+        } else {
+            onBackClick()
+        }
+    }
+    BackHandler { exitDrawing() }
 
     Scaffold(
         topBar = {
@@ -357,7 +446,7 @@ fun DrawingScreen(
                     Text("Çizim", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = exitDrawing) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 },
@@ -438,25 +527,6 @@ fun DrawingScreen(
                     }
 
                     Spacer(modifier = Modifier.width(2.dp))
-
-                    // Kaydet
-                    Button(
-                        onClick = {
-                            val savedPath = saveCanvasToBitmap()
-                            if (savedPath != null) {
-                                onDrawingSaved(savedPath)
-                            }
-                        },
-                        enabled = elements.isNotEmpty(),
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = if (isCompactScreen) PaddingValues(horizontal = 10.dp, vertical = 4.dp) else PaddingValues(horizontal = 14.dp, vertical = 4.dp)
-                    ) {
-                        Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(18.dp))
-                        if (!isCompactScreen) {
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Kaydet", fontWeight = FontWeight.SemiBold)
-                        }
-                    }
 
                     Spacer(modifier = Modifier.width(6.dp))
                 }

@@ -35,18 +35,24 @@ import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +63,7 @@ import coil.compose.AsyncImage
 import com.example.noteapp.data.settings.NotesLayoutMode
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
+import com.example.noteapp.presentation.components.parseMarkdownCardPreview
 import com.example.noteapp.presentation.theme.getNoteColorSpec
 import kotlinx.coroutines.launch
 import java.io.File
@@ -99,6 +106,8 @@ fun NotesScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val screenDensity = LocalDensity.current
+    val homeGlowColor = MaterialTheme.colorScheme.primary
 
     val onShareNote: (Note) -> Unit = remember(context) {
         { note ->
@@ -137,6 +146,7 @@ fun NotesScreen(
     var categoryToDelete by remember { mutableStateOf<Category?>(null) }
     var showBatchCategoryDialog by remember { mutableStateOf(false) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+    var showSelectionActionsMenu by remember { mutableStateOf(false) }
     var showEmptyTrashConfirm by remember { mutableStateOf(false) }
     var noteToDeletePermanently by remember { mutableStateOf<Note?>(null) }
     var showSortMenu by remember { mutableStateOf(false) }
@@ -147,6 +157,8 @@ fun NotesScreen(
     }
 
     val isSelectionMode = state.selectedNoteIds.isNotEmpty()
+    val reserveFabSpace = !isSelectionMode &&
+            (state.viewMode == NotesViewMode.ALL || state.viewMode == NotesViewMode.REMINDERS)
 
     val gridState = rememberLazyStaggeredGridState()
     val listState = rememberLazyListState()
@@ -158,70 +170,9 @@ fun NotesScreen(
         compactListState.scrollToItem(0)
     }
 
-    // Metin İçi `#etiket` ve İç İçe Etiketlerin Taranması (Bear / Obsidian Stili)
-    val allHashtags = remember(state.notes) {
-        val regex = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
-        state.notes.flatMap { note ->
-            regex.findAll("${note.title} ${note.content}").map { it.groupValues[1] }
-        }.distinct().sorted()
-    }
-
-    // Filtrelenmiş ve Sıralanmış Notlar Listesi
-    val filteredNotes = remember(state.notes, state.searchQuery, state.filterType, state.selectedCategory, state.sortOrder, state.selectedTag) {
-        val baseFiltered = state.notes.filter { note ->
-            val matchesSearch = state.searchQuery.isBlank() ||
-                    note.title.contains(state.searchQuery, ignoreCase = true) ||
-                    note.content.contains(state.searchQuery, ignoreCase = true)
-            val matchesType = when (state.filterType) {
-                NoteTypeFilter.ALL -> true
-                NoteTypeFilter.PINNED -> note.isPinned
-                NoteTypeFilter.LOCKED -> note.isLocked
-                NoteTypeFilter.MEDIA -> note.attachments.any { !it.endsWith(".mp4") && !it.endsWith(".m4a") }
-                NoteTypeFilter.AUDIO -> note.attachments.any { it.endsWith(".mp4") || it.endsWith(".m4a") }
-                NoteTypeFilter.REMINDERS -> note.reminderTime != null && note.reminderTime > 0
-            }
-            val matchesTag = state.selectedTag == null ||
-                    note.content.contains("#${state.selectedTag}", ignoreCase = true) ||
-                    note.title.contains("#${state.selectedTag}", ignoreCase = true)
-            matchesSearch && matchesType && matchesTag
-        }
-
-        val turkishCollator = java.text.Collator.getInstance(Locale("tr", "TR")).apply {
-            strength = java.text.Collator.PRIMARY
-        }
-
-        fun getModifiedTime(note: Note): Long = when {
-            note.updatedAt > 0L -> note.updatedAt
-            note.timestamp > 0L -> note.timestamp
-            else -> note.id
-        }
-
-        fun getCreatedTime(note: Note): Long = when {
-            note.createdAt > 0L -> note.createdAt
-            note.timestamp > 0L -> note.timestamp
-            else -> note.id
-        }
-
-        val comparator: Comparator<Note> = when (state.sortOrder) {
-            NoteSortOrder.MODIFIED_DESC -> compareByDescending { getModifiedTime(it) }
-            NoteSortOrder.MODIFIED_ASC -> compareBy { getModifiedTime(it) }
-            NoteSortOrder.CREATED_DESC -> compareByDescending { getCreatedTime(it) }
-            NoteSortOrder.CREATED_ASC -> compareBy { getCreatedTime(it) }
-            NoteSortOrder.TITLE_AZ -> Comparator { a, b ->
-                val titleA = a.title.ifBlank { a.content }.trim()
-                val titleB = b.title.ifBlank { b.content }.trim()
-                turkishCollator.compare(titleA, titleB)
-            }
-            NoteSortOrder.TITLE_ZA -> Comparator { a, b ->
-                val titleA = a.title.ifBlank { a.content }.trim()
-                val titleB = b.title.ifBlank { b.content }.trim()
-                turkishCollator.compare(titleB, titleA)
-            }
-        }
-
-        val (pinned, unpinned) = baseFiltered.partition { it.isPinned }
-        pinned.sortedWith(comparator) + unpinned.sortedWith(comparator)
-    }
+    val allHashtags = state.allHashtags
+    val filteredNotes = state.filteredNotes
+    val selectedNotes = filteredNotes.filter { it.id in state.selectedNoteIds }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -231,7 +182,7 @@ fun NotesScreen(
             ) {
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    "Modern Note",
+                    "Not Defterim",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
@@ -241,7 +192,9 @@ fun NotesScreen(
                 NavigationDrawerItem(
                     icon = { Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = null) },
                     label = { Text("Tüm Notlar") },
-                    selected = state.viewMode == NotesViewMode.ALL && state.selectedCategory == null,
+                    selected = state.viewMode == NotesViewMode.ALL &&
+                            state.filterType == NoteTypeFilter.ALL &&
+                            state.selectedCategory == null && state.selectedTag == null,
                     onClick = {
                         onViewModeChange(NotesViewMode.ALL)
                         scope.launch { drawerState.close() }
@@ -353,13 +306,39 @@ fun NotesScreen(
                     NavigationDrawerItem(
                         icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
                         label = { Text(category.name) },
-                        selected = state.selectedCategory?.id == category.id,
+                        selected = state.viewMode == NotesViewMode.ALL &&
+                                state.filterType == NoteTypeFilter.ALL &&
+                                state.selectedTag == null && state.selectedCategory?.id == category.id,
                         onClick = {
                             onCategorySelect(category)
                             scope.launch { drawerState.close() }
                         },
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
                     )
+                }
+
+                if (allHashtags.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text(
+                        "Metin Etiketleri",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                    )
+                    allHashtags.forEach { tag ->
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
+                            label = { Text("#$tag") },
+                            selected = state.viewMode == NotesViewMode.ALL &&
+                                    state.filterType == NoteTypeFilter.ALL &&
+                                    state.selectedCategory == null && state.selectedTag == tag,
+                            onClick = {
+                                onSelectTag(if (state.selectedTag == tag) null else tag)
+                                scope.launch { drawerState.close() }
+                            },
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                        )
+                    }
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -407,23 +386,59 @@ fun NotesScreen(
                                     contentDescription = "Tümünü Seç"
                                 )
                             }
-                            // Kategori Ata
-                            if (state.viewMode == NotesViewMode.ALL) {
-                                IconButton(onClick = { showBatchCategoryDialog = true }) {
-                                    Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Kategori Ata")
-                                }
+                            if (state.viewMode == NotesViewMode.ALL || state.viewMode == NotesViewMode.REMINDERS) {
                                 // Sabitle / Kaldır
                                 IconButton(onClick = onTogglePinForSelected) {
                                     Icon(Icons.Default.PushPin, contentDescription = "Sabitle")
                                 }
                             }
-                            // Toplu Sil
-                            IconButton(onClick = { showBatchDeleteConfirm = true }) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Seçilenleri Sil",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
+                            Box {
+                                IconButton(onClick = { showSelectionActionsMenu = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "Seçili not işlemleri")
+                                }
+                                DropdownMenu(
+                                    expanded = showSelectionActionsMenu,
+                                    onDismissRequest = { showSelectionActionsMenu = false }
+                                ) {
+                                    if (state.viewMode == NotesViewMode.ALL && state.selectedNoteIds.size == 1) {
+                                        DropdownMenuItem(
+                                            text = { Text("Paylaş") },
+                                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                            onClick = {
+                                                selectedNotes.singleOrNull()?.let(onShareNote)
+                                                showSelectionActionsMenu = false
+                                                onClearSelection()
+                                            }
+                                        )
+                                    }
+                                    if (state.viewMode == NotesViewMode.ALL) {
+                                        DropdownMenuItem(
+                                            text = { Text("Etiketle / kategori ata") },
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
+                                            onClick = {
+                                                showSelectionActionsMenu = false
+                                                showBatchCategoryDialog = true
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Arşivle") },
+                                            leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                                            onClick = {
+                                                selectedNotes.forEach(onArchiveNote)
+                                                showSelectionActionsMenu = false
+                                                onClearSelection()
+                                            }
+                                        )
+                                    }
+                                    DropdownMenuItem(
+                                        text = { Text(if (state.viewMode == NotesViewMode.TRASH) "Kalıcı sil" else "Sil") },
+                                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                        onClick = {
+                                            showSelectionActionsMenu = false
+                                            showBatchDeleteConfirm = true
+                                        }
+                                    )
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -623,84 +638,27 @@ fun NotesScreen(
                     singleLine = true
                 )
 
-                // Hızlı Tür Filtreleri (Tümü, Sabitli, Kilitli, Görselli, Sesli)
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    item {
-                        FilterChip(
-                            selected = state.filterType == NoteTypeFilter.ALL,
-                            onClick = { onFilterTypeChange(NoteTypeFilter.ALL) },
-                            label = { Text("Tümü") }
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = state.filterType == NoteTypeFilter.PINNED,
-                            onClick = { onFilterTypeChange(NoteTypeFilter.PINNED) },
-                            label = { Text("Sabitlenenler") },
-                            leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = state.filterType == NoteTypeFilter.LOCKED,
-                            onClick = { onFilterTypeChange(NoteTypeFilter.LOCKED) },
-                            label = { Text("Kilitliler") },
-                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = state.filterType == NoteTypeFilter.MEDIA,
-                            onClick = { onFilterTypeChange(NoteTypeFilter.MEDIA) },
-                            label = { Text("Görselli") },
-                            leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = state.filterType == NoteTypeFilter.AUDIO,
-                            onClick = { onFilterTypeChange(NoteTypeFilter.AUDIO) },
-                            label = { Text("Sesli") },
-                            leadingIcon = { Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = state.filterType == NoteTypeFilter.REMINDERS,
-                            onClick = { onFilterTypeChange(NoteTypeFilter.REMINDERS) },
-                            label = { Text("Hatırlatıcılar") },
-                            leadingIcon = { Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        )
-                    }
-
-                    // Dinamik Hashtag Çipleri (Bear & Obsidian Çıkarımı)
-                    items(allHashtags) { tag ->
-                        FilterChip(
-                            selected = state.selectedTag == tag,
-                            onClick = {
-                                if (state.selectedTag == tag) onSelectTag(null)
-                                else onSelectTag(tag)
-                            },
-                            label = { Text("#$tag") },
-                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                        )
-                    }
-
-                    // Kategori Çipleri (Yan yana akış)
-                    if (state.viewMode == NotesViewMode.ALL) {
-                        items(state.categories) { category ->
+                if (state.viewMode == NotesViewMode.ALL) {
+                    // Genel görünüm filtreleri arşiv ve çöp kutusunda anlamlı değil.
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
                             FilterChip(
-                                selected = state.selectedCategory?.id == category.id,
-                                onClick = {
-                                    if (state.selectedCategory?.id == category.id) onCategorySelect(null)
-                                    else onCategorySelect(category)
-                                },
-                                label = { Text("#${category.name}") }
+                                selected = state.filterType == NoteTypeFilter.ALL,
+                                onClick = { onFilterTypeChange(NoteTypeFilter.ALL) },
+                                label = { Text("Tümü") }
+                            )
+                        }
+                        item {
+                            FilterChip(
+                                selected = state.filterType == NoteTypeFilter.PINNED,
+                                onClick = { onFilterTypeChange(NoteTypeFilter.PINNED) },
+                                label = { Text("Sabitlenenler") },
+                                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null, modifier = Modifier.size(16.dp)) }
                             )
                         }
                     }
@@ -711,11 +669,69 @@ fun NotesScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = if (state.searchQuery.isEmpty()) "Gösterilecek not bulunamadı" else "Sonuç bulunamadı",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.padding(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (state.searchQuery.isNotEmpty()) Icons.Default.SearchOff else when (state.viewMode) {
+                                    NotesViewMode.ALL -> Icons.AutoMirrored.Filled.Notes
+                                    NotesViewMode.REMINDERS -> Icons.Default.NotificationsNone
+                                    NotesViewMode.ARCHIVE -> Icons.Default.Archive
+                                    NotesViewMode.TRASH -> Icons.Default.DeleteOutline
+                                },
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                                modifier = Modifier.size(38.dp)
+                            )
+                            Text(
+                                text = if (state.searchQuery.isNotEmpty()) "Sonuç bulunamadı" else when (state.viewMode) {
+                                    NotesViewMode.ALL -> "Burada henüz not yok"
+                                    NotesViewMode.REMINDERS -> "Hatırlatıcı yok"
+                                    NotesViewMode.ARCHIVE -> "Arşiv boş"
+                                    NotesViewMode.TRASH -> "Çöp kutusu boş"
+                                },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            if (state.searchQuery.isNotEmpty()) {
+                                Text(
+                                    "Başka bir arama sözcüğü deneyin.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else if (state.viewMode == NotesViewMode.ALL) {
+                                Text(
+                                    "Aklındaki fikri kaydetmeye başlayabilirsin.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                FilledTonalButton(onClick = { onAddNoteClick(null) }) {
+                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("İlk notunu oluştur")
+                                }
+                            } else if (state.viewMode == NotesViewMode.ARCHIVE) {
+                                Text(
+                                    "Arşivlediğin notlar burada tutulur.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else if (state.viewMode == NotesViewMode.TRASH) {
+                                Text(
+                                    "Sildiğin notlar burada 7 gün boyunca kalır.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else if (state.viewMode == NotesViewMode.REMINDERS) {
+                                Text(
+                                    "Hatırlatıcı eklediğin notlar burada görünür.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 } else {
                     // Seçilen Listeleme Düzenine Göre Görüntüleme
@@ -726,17 +742,18 @@ fun NotesScreen(
                                     columns = StaggeredGridCells.Adaptive(minSize = 160.dp),
                                     state = gridState,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 140.dp),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (reserveFabSpace) 88.dp else 16.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalItemSpacing = 12.dp
                                 ) {
-                                    items(
+                                items(
                                         items = filteredNotes,
                                         key = { it.id },
                                         contentType = { "note_card" }
                                     ) { note ->
                                         val isSelected = state.selectedNoteIds.contains(note.id)
                                         NoteCard(
+                                            modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
                                             viewMode = state.viewMode,
                                             isSelected = isSelected,
@@ -761,7 +778,7 @@ fun NotesScreen(
                                 LazyColumn(
                                     state = listState,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 140.dp),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (reserveFabSpace) 88.dp else 16.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     items(
@@ -771,6 +788,7 @@ fun NotesScreen(
                                     ) { note ->
                                         val isSelected = state.selectedNoteIds.contains(note.id)
                                         NoteCard(
+                                            modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
                                             viewMode = state.viewMode,
                                             isSelected = isSelected,
@@ -795,7 +813,7 @@ fun NotesScreen(
                                 LazyColumn(
                                     state = compactListState,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 140.dp),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = if (reserveFabSpace) 88.dp else 16.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(
@@ -806,6 +824,7 @@ fun NotesScreen(
                                         val isSelected = state.selectedNoteIds.contains(note.id)
                                         val category = state.categories.find { it.id == note.categoryId }
                                         CompactNoteCard(
+                                            modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
                                             categoryName = category?.name,
                                             viewMode = state.viewMode,
@@ -828,22 +847,50 @@ fun NotesScreen(
                             }
                         }
 
-                        // Alt kısımda organik, yumuşak geçiş sağlayan gradyan / dalga efekti (kartların kesilmesini önler)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .align(Alignment.BottomCenter)
-                                .background(
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.Transparent,
-                                            MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
-                                            MaterialTheme.colorScheme.background
+                        if (reserveFabSpace) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(104.dp)
+                                    .align(Alignment.BottomCenter)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colorStops = arrayOf(
+                                                0.00f to Color.Transparent,
+                                                0.34f to MaterialTheme.colorScheme.background.copy(alpha = 0.12f),
+                                                0.72f to MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
+                                                1.00f to MaterialTheme.colorScheme.background
+                                            )
                                         )
                                     )
-                                )
-                        )
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(116.dp)
+                                    .align(Alignment.BottomCenter)
+                                    .drawBehind {
+                                        val glowRadius = with(screenDensity) { 142.dp.toPx() }
+                                        val glowCenter = androidx.compose.ui.geometry.Offset(
+                                            x = size.width - with(screenDensity) { 30.dp.toPx() },
+                                            y = size.height - with(screenDensity) { 42.dp.toPx() }
+                                        )
+                                        drawRect(
+                                            brush = Brush.radialGradient(
+                                                colors = listOf(
+                                                    homeGlowColor.copy(alpha = 0.13f),
+                                                    homeGlowColor.copy(alpha = 0.045f),
+                                                    Color.Transparent
+                                                ),
+                                                center = glowCenter,
+                                                radius = glowRadius
+                                            )
+                                        )
+                                    }
+                            )
+                        }
+
                     }
                 }
             }
@@ -1148,6 +1195,44 @@ fun NotesScreen(
     }
 }
 
+@Composable
+private fun NoteActionIcon(
+    icon: ImageVector,
+    description: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(tint.copy(alpha = 0.12f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = description, modifier = Modifier.size(19.dp), tint = tint)
+    }
+}
+
+private fun noteActionErrorColor(cardColor: Color): Color =
+    if (cardColor.luminance() < 0.48f) Color(0xFFFF8A80) else Color(0xFFB3261E)
+
+@Composable
+private fun noteEntranceModifier(noteId: Long): Modifier {
+    var hasEntered by rememberSaveable(noteId) { mutableStateOf(false) }
+    val progress by animateFloatAsState(
+        targetValue = if (hasEntered) 1f else 0f,
+        animationSpec = tween(durationMillis = 360),
+        label = "note_entry_$noteId"
+    )
+    val entranceDistance = with(androidx.compose.ui.platform.LocalDensity.current) { 26.dp.toPx() }
+    LaunchedEffect(noteId) { hasEntered = true }
+    return Modifier.graphicsLayer {
+        alpha = progress
+        translationY = entranceDistance * (1f - progress)
+    }
+}
+
 /**
  * Kart Görünümü (Staggered Grid ve Detaylı Liste için)
  * getNoteColorSpec ile karanlık/aydınlık temada zıt (negatif) ve yüksek kontrastlı renkleri kullanır.
@@ -1179,17 +1264,7 @@ fun NoteCard(
     }
 
     val displayContent = remember(note.content) {
-        if (note.content.isBlank()) ""
-        else {
-            note.content.lineSequence().take(6).joinToString("\n") { line ->
-                val trimmed = line.trimStart()
-                when {
-                    trimmed.startsWith("- [x] ") -> "☑ " + trimmed.removePrefix("- [x] ")
-                    trimmed.startsWith("- [ ] ") -> "☐ " + trimmed.removePrefix("- [ ] ")
-                    else -> line
-                }
-            }
-        }
+        parseMarkdownCardPreview(note.content)
     }
 
     Card(
@@ -1269,6 +1344,9 @@ fun NoteCard(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
+                    } else {
+                        // Başlık olmayınca sabitleme düğmesi satırın başına düşmesin.
+                        Spacer(modifier = Modifier.weight(1f))
                     }
 
                     if (isSelectionMode) {
@@ -1279,16 +1357,17 @@ fun NoteCard(
                         )
                     } else if (viewMode == NotesViewMode.ALL || viewMode == NotesViewMode.REMINDERS) {
                         Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .clickable(onClick = onPinClick),
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(CircleShape)
+                                            .background(colorSpec.contentColor.copy(alpha = 0.92f))
+                                            .clickable(onClick = onPinClick),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
-                                contentDescription = "Sabitle",
-                                tint = if (note.isPinned) MaterialTheme.colorScheme.primary else colorSpec.iconTint,
+                                imageVector = if (note.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                contentDescription = if (note.isPinned) "Sabitlemeyi kaldır" else "Sabitle",
+                                tint = colorSpec.backgroundColor.copy(alpha = if (note.isPinned) 1f else 0.66f),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -1361,65 +1440,14 @@ fun NoteCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         when (viewMode) {
-                            NotesViewMode.ALL, NotesViewMode.REMINDERS -> {
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onShareClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Share, contentDescription = "Paylaş", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onDeleteClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
-                                }
-                            }
+                            NotesViewMode.ALL, NotesViewMode.REMINDERS -> Unit
                             NotesViewMode.ARCHIVE -> {
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onArchiveClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Unarchive, contentDescription = "Arşivden Çıkar", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onDeleteClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
-                                }
+                                NoteActionIcon(Icons.Default.Unarchive, "Arşivden çıkar", colorSpec.iconTint, onArchiveClick)
+                                NoteActionIcon(Icons.Default.Delete, "Çöp kutusuna taşı", noteActionErrorColor(colorSpec.backgroundColor), onDeleteClick)
                             }
                             NotesViewMode.TRASH -> {
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onRestoreClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.RestoreFromTrash, contentDescription = "Geri Yükle", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onDeletePermanentlyClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.DeleteForever, contentDescription = "Kalıcı Olarak Sil", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
-                                }
+                                NoteActionIcon(Icons.Default.RestoreFromTrash, "Notu geri yükle", MaterialTheme.colorScheme.primary, onRestoreClick)
+                                NoteActionIcon(Icons.Default.DeleteForever, "Kalıcı olarak sil", noteActionErrorColor(colorSpec.backgroundColor), onDeletePermanentlyClick)
                             }
                         }
                     }
@@ -1512,8 +1540,8 @@ fun CompactNoteCard(
                 // Başlık ve Kısa Özeti
                 val titleSnippet = remember(note.title, note.content, note.isLocked) {
                     val preview = if (!note.isLocked && note.content.isNotBlank()) {
-                        note.content.take(80).replace('\n', ' ').trim()
-                    } else ""
+                        parseMarkdownCardPreview(note.content, lineLimit = 1)
+                    } else androidx.compose.ui.text.AnnotatedString("")
                     Pair(note.title.ifBlank { "Başlıksız Not" }, preview)
                 }
 
@@ -1522,7 +1550,7 @@ fun CompactNoteCard(
                         withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = colorSpec.contentColor)) {
                             append(titleSnippet.first)
                         }
-                        if (titleSnippet.second.isNotEmpty()) {
+                        if (titleSnippet.second.text.isNotEmpty()) {
                             withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = colorSpec.secondaryColor)) {
                                 append("  —  ")
                                 append(titleSnippet.second)
@@ -1610,76 +1638,27 @@ fun CompactNoteCard(
                             NotesViewMode.ALL, NotesViewMode.REMINDERS -> {
                                 Box(
                                     modifier = Modifier
-                                        .size(26.dp)
+                                        .size(48.dp)
                                         .clip(CircleShape)
+                                        .background(colorSpec.contentColor.copy(alpha = 0.92f))
                                         .clickable(onClick = onPinClick),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
-                                        contentDescription = "Sabitle",
-                                        tint = if (note.isPinned) MaterialTheme.colorScheme.primary else colorSpec.iconTint,
+                                        imageVector = if (note.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                        contentDescription = if (note.isPinned) "Sabitlemeyi kaldır" else "Sabitle",
+                                        tint = colorSpec.backgroundColor.copy(alpha = if (note.isPinned) 1f else 0.66f),
                                         modifier = Modifier.size(15.dp)
                                     )
                                 }
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onShareClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Share, contentDescription = "Paylaş", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onDeleteClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
-                                }
                             }
                             NotesViewMode.ARCHIVE -> {
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onArchiveClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Unarchive, contentDescription = "Arşivden Çıkar", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onDeleteClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
-                                }
+                                NoteActionIcon(Icons.Default.Unarchive, "Arşivden çıkar", colorSpec.iconTint, onArchiveClick)
+                                NoteActionIcon(Icons.Default.Delete, "Çöp kutusuna taşı", MaterialTheme.colorScheme.error, onDeleteClick)
                             }
                             NotesViewMode.TRASH -> {
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onRestoreClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.RestoreFromTrash, contentDescription = "Geri Yükle", modifier = Modifier.size(14.dp), tint = colorSpec.iconTint)
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onDeletePermanentlyClick),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.DeleteForever, contentDescription = "Kalıcı Olarak Sil", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
-                                }
+                                NoteActionIcon(Icons.Default.RestoreFromTrash, "Notu geri yükle", MaterialTheme.colorScheme.primary, onRestoreClick)
+                                NoteActionIcon(Icons.Default.DeleteForever, "Kalıcı olarak sil", MaterialTheme.colorScheme.error, onDeletePermanentlyClick)
                             }
                         }
                     }
@@ -1723,4 +1702,3 @@ private fun QuickFabOption(
         }
     }
 }
-

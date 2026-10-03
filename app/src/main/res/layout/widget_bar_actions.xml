@@ -9,29 +9,34 @@
     android:paddingHorizontal="10dp"
     android:paddingVertical="8dp">
 
-    <!-- 1. Liste / Onay Kutusu (To-Do) -->
+    <!-- Metin ilk sırada kalır; küçük boyutta daima görünür. -->
+    <LinearLayout
+        android:id="@+id/widget_bar_btn_text"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@drawable/widget_fab_bg"
+        android:gravity="center"
+        android:layout_marginEnd="6dp">
+        <ImageView
+            android:id="@+id/widget_bar_fab_icon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_widget_add"
+            android:contentDescription="Yeni Not" />
+    </LinearLayout>
+
+    <!-- Fotoğraf -->
     <ImageButton
-        android:id="@+id/widget_bar_btn_todo"
+        android:id="@+id/widget_bar_btn_image"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
         android:background="@android:color/transparent"
-        android:src="@drawable/ic_widget_check"
-        android:contentDescription="Yapılacaklar Listesi"
+        android:src="@drawable/ic_widget_image"
+        android:contentDescription="Fotoğraf Notu"
         android:scaleType="centerInside" />
 
-    <!-- 2. Çizim Notu -->
-    <ImageButton
-        android:id="@+id/widget_bar_btn_draw"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:background="@android:color/transparent"
-        android:src="@drawable/ic_widget_draw"
-        android:contentDescription="Çizim Notu"
-        android:scaleType="centerInside" />
-
-    <!-- 3. Ses Notu -->
+    <!-- Ses -->
     <ImageButton
         android:id="@+id/widget_bar_btn_voice"
         android:layout_width="0dp"
@@ -42,32 +47,25 @@
         android:contentDescription="Ses Notu"
         android:scaleType="centerInside" />
 
-    <!-- 4. Görsel Notu -->
+    <!-- Küçük alanlarda sonradan kırpılacak seçenekler -->
     <ImageButton
-        android:id="@+id/widget_bar_btn_image"
+        android:id="@+id/widget_bar_btn_draw"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
         android:background="@android:color/transparent"
-        android:src="@drawable/ic_widget_image"
-        android:contentDescription="Görsel Notu"
+        android:src="@drawable/ic_widget_draw"
+        android:contentDescription="Çizim Notu"
         android:scaleType="centerInside" />
 
-    <!-- 5. Yeni Metin Notu (+) FAB -->
-    <LinearLayout
-        android:id="@+id/widget_bar_btn_text"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:background="@drawable/widget_fab_bg"
-        android:gravity="center"
-        android:layout_marginStart="6dp">
-
-        <ImageView
-            android:id="@+id/widget_bar_fab_icon"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:src="@drawable/ic_widget_add"
-            android:contentDescription="Yeni Not" />
-    </LinearLayout>
+    <ImageButton
+        android:id="@+id/widget_bar_btn_todo"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="@android:color/transparent"
+        android:src="@drawable/ic_widget_check"
+        android:contentDescription="Yapılacaklar Listesi"
+        android:scaleType="centerInside" />
 
 </LinearLayout>

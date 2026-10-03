@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -32,8 +33,52 @@ fun MarkdownPreview(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        lines.forEachIndexed { index, line ->
+        var index = 0
+        while (index < lines.size) {
+            val lineIndex = index
+            val line = lines[lineIndex]
             val trimmed = line.trimStart()
+
+            if (trimmed.startsWith("```")) {
+                val language = trimmed.removePrefix("```").trim()
+                val codeStart = lineIndex + 1
+                var codeEnd = codeStart
+                while (codeEnd < lines.size && !lines[codeEnd].trimStart().startsWith("```")) {
+                    codeEnd++
+                }
+                val code = lines.subList(codeStart, codeEnd).joinToString("\n")
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        if (language.isNotEmpty()) {
+                            Text(
+                                text = language,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+                        MarkdownText(
+                            text = parseInlineMarkdown(code),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = fontSize.sp,
+                                color = contentColor
+                            ),
+                            onLinkClick = onLinkClick
+                        )
+                    }
+                }
+                index = if (codeEnd < lines.size) codeEnd + 1 else lines.size
+                continue
+            }
 
             when {
                 // 1. Checkbox: - [ ] veya - [x]
@@ -52,7 +97,7 @@ fun MarkdownPreview(
                             onToggle = {
                                 val prefix = if (!isChecked) "- [x] " else "- [ ] "
                                 val updatedLines = lines.toMutableList()
-                                updatedLines[index] = prefix + itemText
+                                updatedLines[lineIndex] = prefix + itemText
                                 onContentChange(updatedLines.joinToString("\n"))
                             }
                         )
@@ -69,35 +114,20 @@ fun MarkdownPreview(
                 }
 
                 // 2. Başlık 1: # Başlık
-                trimmed.startsWith("# ") -> {
+                PREVIEW_HEADING_REGEX.matches(trimmed) -> {
+                    val heading = PREVIEW_HEADING_REGEX.matchEntire(trimmed)!!
+                    val level = heading.groupValues[1].length
+                    val headingSize = when (level) {
+                        1 -> fontSize * 1.5f
+                        2 -> fontSize * 1.3f
+                        3 -> fontSize * 1.15f
+                        else -> fontSize
+                    }
                     Text(
-                        text = parseInlineMarkdown(trimmed.removePrefix("# ")),
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = contentColor
-                        ),
-                        modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
-                    )
-                }
-
-                // 3. Başlık 2: ## Başlık
-                trimmed.startsWith("## ") -> {
-                    Text(
-                        text = parseInlineMarkdown(trimmed.removePrefix("## ")),
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = contentColor
-                        ),
-                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
-                    )
-                }
-
-                // 4. Başlık 3: ### Başlık
-                trimmed.startsWith("### ") -> {
-                    Text(
-                        text = parseInlineMarkdown(trimmed.removePrefix("### ")),
+                        text = parseInlineMarkdown(heading.groupValues[2]),
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = if (level <= 2) FontWeight.Bold else FontWeight.SemiBold,
+                            fontSize = headingSize.sp,
                             color = contentColor
                         ),
                         modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
@@ -205,7 +235,28 @@ fun MarkdownPreview(
                         Text("• ", style = MaterialTheme.typography.bodyLarge.copy(color = contentColor, fontWeight = FontWeight.Bold))
                         MarkdownText(
                             text = parseInlineMarkdown(bulletText),
-                            style = MaterialTheme.typography.bodyLarge.copy(color = contentColor),
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = fontSize.sp, color = contentColor),
+                            onLinkClick = onLinkClick
+                        )
+                    }
+                }
+
+                PREVIEW_NUMBERED_ITEM_REGEX.matches(trimmed) -> {
+                    val item = PREVIEW_NUMBERED_ITEM_REGEX.matchEntire(trimmed)!!
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = "${item.groupValues[1]}. ",
+                            style = MaterialTheme.typography.bodyLarge.copy(color = contentColor)
+                        )
+                        MarkdownText(
+                            text = parseInlineMarkdown(item.groupValues[2]),
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = fontSize.sp,
+                                color = contentColor
+                            ),
                             onLinkClick = onLinkClick
                         )
                     }
@@ -218,15 +269,80 @@ fun MarkdownPreview(
                     } else {
                         MarkdownText(
                             text = parseInlineMarkdown(trimmed),
-                            style = MaterialTheme.typography.bodyLarge.copy(color = contentColor),
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = fontSize.sp, color = contentColor),
                             onLinkClick = onLinkClick
                         )
                     }
                 }
             }
+            index++
         }
     }
 }
+
+/** Creates a compact, styled excerpt for note cards while removing block Markdown markers. */
+fun parseMarkdownCardPreview(content: String, lineLimit: Int = 6): androidx.compose.ui.text.AnnotatedString {
+    if (content.isEmpty() || lineLimit <= 0) return buildAnnotatedString { }
+
+    return buildAnnotatedString {
+        var insideCodeBlock = false
+        var emittedLine = false
+        var lineStart = 0
+        var lineCount = 0
+        // A note card only shows a few lines. Scan those lines directly instead of
+        // splitting the full note body (which can be very large) on every card bind.
+        while (lineStart <= content.length && lineCount < lineLimit) {
+            val lineEnd = content.indexOf('\n', lineStart).let { if (it == -1) content.length else it }
+            val rawLine = content.substring(lineStart, lineEnd).take(MAX_CARD_PREVIEW_LINE_LENGTH)
+            lineCount++
+            val trimmed = rawLine.trimStart()
+            if (trimmed.startsWith("```")) {
+                insideCodeBlock = !insideCodeBlock
+                lineStart = lineEnd + 1
+                continue
+            }
+
+            val displayLine = when {
+                PREVIEW_HEADING_LINE_REGEX.matches(trimmed) -> trimmed.replaceFirst(PREVIEW_HEADING_PREFIX_REGEX, "")
+                trimmed.startsWith("- [x] ", ignoreCase = true) -> "☑ " + trimmed.drop(6)
+                trimmed.startsWith("- [ ] ") -> "☐ " + trimmed.removePrefix("- [ ] ")
+                trimmed.startsWith("> [!", ignoreCase = true) ->
+                    trimmed.replaceFirst(PREVIEW_CALLOUT_PREFIX_REGEX, "").trim()
+                trimmed.startsWith("> ") -> trimmed.removePrefix("> ")
+                trimmed.startsWith("- ") -> "• " + trimmed.removePrefix("- ")
+                else -> rawLine
+            }
+
+            if (displayLine.isNotBlank()) {
+                if (emittedLine) append("\n")
+                emittedLine = true
+                if (insideCodeBlock) {
+                    withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color(0x1F000000))) {
+                        append(displayLine)
+                    }
+                } else {
+                    append(parseInlineMarkdown(displayLine))
+                }
+            }
+
+            if (lineEnd == content.length) break
+            lineStart = lineEnd + 1
+        }
+    }
+}
+
+private const val MAX_CARD_PREVIEW_LINE_LENGTH = 240
+private val PREVIEW_HEADING_REGEX = Regex("^(#{1,6})\\s+(.+)$")
+private val PREVIEW_NUMBERED_ITEM_REGEX = Regex("^(\\d+)[.)]\\s+(.+)$")
+private val PREVIEW_HEADING_LINE_REGEX = Regex("#{1,6}\\s+.*")
+private val PREVIEW_HEADING_PREFIX_REGEX = Regex("^#{1,6}\\s+")
+private val PREVIEW_CALLOUT_PREFIX_REGEX = Regex("^>\\s+\\[![A-Za-z]+]\\s*", RegexOption.IGNORE_CASE)
+private val INLINE_BOLD_ASTERISK_REGEX = Regex("(?<!\\\\)\\*\\*(?!\\s)([^\\n]+?)(?<!\\s)\\*\\*")
+private val INLINE_BOLD_UNDERSCORE_REGEX = Regex("(?<!\\\\)__(?!\\s)([^\\n]+?)(?<!\\s)__")
+private val INLINE_STRIKE_REGEX = Regex("~~([^~\\n]+?)~~")
+private val INLINE_HIGHLIGHT_REGEX = Regex("==([^=\\n]+?)==")
+private val INLINE_CODE_REGEX = Regex("`([^`\\n]+?)`")
+private val INLINE_WIKI_LINK_REGEX = Regex("\\[\\[([^\\]\\n]+?)\\]\\]")
 
 @Composable
 fun MarkdownText(
@@ -259,8 +375,7 @@ fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString 
     val boldTokenRanges = mutableListOf<IntRange>()
 
     // 1. Çift Yıldız Kalın: **metin**
-    val boldAsteriskRegex = Regex("(?<!\\\\)\\*\\*(?!\\s)([^\n]+?)(?<!\\s)\\*\\*")
-    for (match in boldAsteriskRegex.findAll(text)) {
+    for (match in INLINE_BOLD_ASTERISK_REGEX.findAll(text)) {
         val range = match.range
         if (range.last >= range.first + 3) {
             val openToken = range.first until (range.first + 2)
@@ -274,8 +389,7 @@ fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString 
     }
 
     // 2. Çift Alt Çizgi Kalın: __metin__
-    val boldUnderscoreRegex = Regex("(?<!\\\\)__(?!\\s)([^\n]+?)(?<!\\s)__")
-    for (match in boldUnderscoreRegex.findAll(text)) {
+    for (match in INLINE_BOLD_UNDERSCORE_REGEX.findAll(text)) {
         val range = match.range
         if (range.last >= range.first + 3) {
             val openToken = range.first until (range.first + 2)
@@ -349,8 +463,7 @@ fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString 
     }
 
     // 5. Üstü Çizili: ~~metin~~
-    val strikeRegex = Regex("~~([^~\\n]+?)~~")
-    for (match in strikeRegex.findAll(text)) {
+    for (match in INLINE_STRIKE_REGEX.findAll(text)) {
         val range = match.range
         if (range.last >= range.first + 3) {
             tokenIndices.add(range.first)
@@ -362,8 +475,7 @@ fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString 
     }
 
     // 6. Fosforlu Vurgu: ==metin==
-    val highlightRegex = Regex("==([^=\\n]+?)==")
-    for (match in highlightRegex.findAll(text)) {
+    for (match in INLINE_HIGHLIGHT_REGEX.findAll(text)) {
         val range = match.range
         if (range.last >= range.first + 3) {
             tokenIndices.add(range.first)
@@ -375,8 +487,7 @@ fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString 
     }
 
     // 8. Kod: `metin`
-    val codeRegex = Regex("`([^`\\n]+?)`")
-    for (match in codeRegex.findAll(text)) {
+    for (match in INLINE_CODE_REGEX.findAll(text)) {
         val range = match.range
         tokenIndices.add(range.first)
         tokenIndices.add(range.last)
@@ -384,9 +495,8 @@ fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString 
     }
 
     // 9. Çift Yönlü Bağlantı (Backlink): [[Note Name]]
-    val linkRegex = Regex("\\[\\[([^\\]\\n]+?)\\]\\]")
     val stringAnnotations = mutableListOf<Triple<String, String, IntRange>>()
-    for (match in linkRegex.findAll(text)) {
+    for (match in INLINE_WIKI_LINK_REGEX.findAll(text)) {
         val range = match.range
         val noteName = match.groupValues[1]
         tokenIndices.add(range.first)

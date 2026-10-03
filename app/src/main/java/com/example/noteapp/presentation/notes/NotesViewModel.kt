@@ -12,12 +12,15 @@ import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 enum class NotesViewMode {
@@ -45,9 +48,13 @@ enum class NoteSortOrder(val title: String) {
     TITLE_ZA("Başlık (Z - A)")
 }
 
+private val hashtagRegex = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
+
 @Immutable
 data class NotesState(
     val notes: List<Note> = emptyList(),
+    val filteredNotes: List<Note> = emptyList(),
+    val allHashtags: List<String> = emptyList(),
     val categories: List<Category> = emptyList(),
     val selectedCategory: Category? = null,
     val searchQuery: String = "",
@@ -70,11 +77,16 @@ class NotesViewModel @Inject constructor(
     val state: StateFlow<NotesState> = _state.asStateFlow()
 
     private var notesJob: Job? = null
+    private var derivedNotesJob: Job? = null
+    private var hashtagSourcesJob: Job? = null
+    private var hashtagsJob: Job? = null
+    private var hashtagSourceNotes: List<Note>? = null
 
     init {
         cleanUpTrash()
         loadNotes()
         loadCategories()
+        loadHashtags()
         observeSettings()
     }
 
@@ -97,20 +109,32 @@ class NotesViewModel @Inject constructor(
     }
 
     fun setFilterType(filter: NoteTypeFilter) {
-        _state.value = _state.value.copy(filterType = filter)
+        _state.value = _state.value.copy(
+            viewMode = NotesViewMode.ALL,
+            filterType = filter,
+            selectedCategory = null,
+            selectedTag = null,
+            selectedNoteIds = emptySet()
+        )
+        loadNotes()
+        recalculateNotes()
     }
 
     fun setSortOrder(order: NoteSortOrder) {
         _state.value = _state.value.copy(sortOrder = order)
+        recalculateNotes()
     }
 
     fun setViewMode(mode: NotesViewMode) {
         _state.value = _state.value.copy(
             viewMode = mode,
+            filterType = NoteTypeFilter.ALL,
             selectedCategory = null,
+            selectedTag = null,
             selectedNoteIds = emptySet()
         )
         loadNotes()
+        recalculateNotes()
     }
 
     private fun loadNotes() {
@@ -118,10 +142,31 @@ class NotesViewModel @Inject constructor(
         val flow = when (_state.value.viewMode) {
             NotesViewMode.ALL -> {
                 val cat = _state.value.selectedCategory
-                if (cat != null) repository.getNotesByCategory(cat.id)
-                else repository.getActiveNotes()
+                val tag = _state.value.selectedTag
+                if (cat == null && tag == null) {
+                    repository.getActiveNotes()
+                } else {
+                    combine(
+                        repository.getActiveNotes(),
+                        repository.getArchivedNotes()
+                    ) { activeNotes, archivedNotes ->
+                        (activeNotes + archivedNotes)
+                            .distinctBy { it.id }
+                            .filter { note ->
+                                (cat == null || note.categoryId == cat.id) &&
+                                        (tag == null ||
+                                                note.content.contains("#$tag", ignoreCase = true) ||
+                                                note.title.contains("#$tag", ignoreCase = true))
+                            }
+                    }
+                }
             }
-            NotesViewMode.REMINDERS -> repository.getActiveNotes()
+            NotesViewMode.REMINDERS -> combine(
+                repository.getActiveNotes(),
+                repository.getArchivedNotes()
+            ) { activeNotes, archivedNotes ->
+                (activeNotes + archivedNotes).distinctBy { it.id }
+            }
             NotesViewMode.ARCHIVE -> repository.getArchivedNotes()
             NotesViewMode.TRASH -> repository.getTrashNotes()
         }
@@ -133,7 +178,18 @@ class NotesViewModel @Inject constructor(
                 notes
             }
             _state.value = _state.value.copy(notes = finalNotes)
+            recalculateNotes()
         }.launchIn(viewModelScope)
+    }
+
+    private fun loadHashtags() {
+        hashtagSourcesJob?.cancel()
+        hashtagSourcesJob = combine(
+            repository.getActiveNotes(),
+            repository.getArchivedNotes()
+        ) { activeNotes, archivedNotes ->
+            (activeNotes + archivedNotes).distinctBy { it.id }
+        }.onEach(::updateHashtagCache).launchIn(viewModelScope)
     }
 
     private fun loadCategories() {
@@ -144,21 +200,117 @@ class NotesViewModel @Inject constructor(
 
     fun onSearchQueryChanged(query: String) {
         _state.value = _state.value.copy(searchQuery = query)
+        recalculateNotes()
     }
 
     fun onCategorySelect(category: Category?) {
-        _state.value = _state.value.copy(selectedCategory = category, selectedNoteIds = emptySet())
+        _state.value = _state.value.copy(
+            viewMode = NotesViewMode.ALL,
+            filterType = NoteTypeFilter.ALL,
+            selectedCategory = category,
+            selectedTag = null,
+            selectedNoteIds = emptySet()
+        )
         loadNotes()
+        recalculateNotes()
     }
 
     fun onSelectTag(tag: String?) {
-        _state.value = _state.value.copy(selectedTag = tag)
+        _state.value = _state.value.copy(
+            viewMode = NotesViewMode.ALL,
+            filterType = NoteTypeFilter.ALL,
+            selectedCategory = null,
+            selectedTag = tag,
+            selectedNoteIds = emptySet()
+        )
+        loadNotes()
+        recalculateNotes()
+    }
+
+    /** Run full-text matching, tag extraction, and sorting away from the UI thread. */
+    private fun recalculateNotes() {
+        derivedNotesJob?.cancel()
+        val snapshot = _state.value
+        derivedNotesJob = viewModelScope.launch {
+            val visibleNotes = withContext(Dispatchers.Default) {
+                val filtered = snapshot.notes.filter { note ->
+                    val matchesSearch = snapshot.searchQuery.isBlank() ||
+                            note.title.contains(snapshot.searchQuery, ignoreCase = true) ||
+                            note.content.contains(snapshot.searchQuery, ignoreCase = true)
+                    val matchesType = when (snapshot.filterType) {
+                        NoteTypeFilter.ALL -> true
+                        NoteTypeFilter.PINNED -> note.isPinned
+                        NoteTypeFilter.LOCKED -> note.isLocked
+                        NoteTypeFilter.MEDIA -> note.attachments.any { !it.endsWith(".mp4") && !it.endsWith(".m4a") }
+                        NoteTypeFilter.AUDIO -> note.attachments.any { it.endsWith(".mp4") || it.endsWith(".m4a") }
+                        NoteTypeFilter.REMINDERS -> note.reminderTime != null && note.reminderTime > 0
+                    }
+                    val matchesTag = snapshot.selectedTag == null ||
+                            note.content.contains("#${snapshot.selectedTag}", ignoreCase = true) ||
+                            note.title.contains("#${snapshot.selectedTag}", ignoreCase = true)
+                    matchesSearch && matchesType && matchesTag
+                }
+
+                val turkishCollator = java.text.Collator.getInstance(java.util.Locale("tr", "TR")).apply {
+                    strength = java.text.Collator.PRIMARY
+                }
+                fun modifiedTime(note: Note): Long = when {
+                    note.updatedAt > 0L -> note.updatedAt
+                    note.timestamp > 0L -> note.timestamp
+                    else -> note.id
+                }
+                fun createdTime(note: Note): Long = when {
+                    note.createdAt > 0L -> note.createdAt
+                    note.timestamp > 0L -> note.timestamp
+                    else -> note.id
+                }
+                val comparator: Comparator<Note> = when (snapshot.sortOrder) {
+                    NoteSortOrder.MODIFIED_DESC -> compareByDescending { modifiedTime(it) }
+                    NoteSortOrder.MODIFIED_ASC -> compareBy { modifiedTime(it) }
+                    NoteSortOrder.CREATED_DESC -> compareByDescending { createdTime(it) }
+                    NoteSortOrder.CREATED_ASC -> compareBy { createdTime(it) }
+                    NoteSortOrder.TITLE_AZ -> Comparator { a, b ->
+                        turkishCollator.compare(a.title.ifBlank { a.content }.trim(), b.title.ifBlank { b.content }.trim())
+                    }
+                    NoteSortOrder.TITLE_ZA -> Comparator { a, b ->
+                        turkishCollator.compare(b.title.ifBlank { b.content }.trim(), a.title.ifBlank { a.content }.trim())
+                    }
+                }
+                val (pinned, unpinned) = filtered.partition { it.isPinned }
+                pinned.sortedWith(comparator) + unpinned.sortedWith(comparator)
+            }
+
+            val latest = _state.value
+            if (latest.notes === snapshot.notes &&
+                latest.searchQuery == snapshot.searchQuery &&
+                latest.filterType == snapshot.filterType &&
+                latest.sortOrder == snapshot.sortOrder &&
+                latest.selectedTag == snapshot.selectedTag
+            ) {
+                _state.value = latest.copy(filteredNotes = visibleNotes)
+            }
+        }
+    }
+
+    private fun updateHashtagCache(notes: List<Note>) {
+        if (hashtagSourceNotes === notes) return
+        hashtagSourceNotes = notes
+        hashtagsJob?.cancel()
+        hashtagsJob = viewModelScope.launch {
+            val tags = withContext(Dispatchers.Default) {
+                notes.flatMap { note ->
+                    hashtagRegex.findAll("${note.title} ${note.content}").map { it.groupValues[1] }
+                }.distinct().sorted()
+            }
+            if (_state.value.notes === notes) {
+                _state.value = _state.value.copy(allHashtags = tags)
+            }
+        }
     }
 
     fun extractAllHashtags(): List<String> {
-        val regex = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
         return _state.value.notes.flatMap { note ->
-            regex.findAll("${note.title} ${note.content}").map { it.groupValues[1] }
+            hashtagRegex.findAll("${note.title} ${note.content}").map { it.groupValues[1] }
         }.distinct().sorted()
     }
 

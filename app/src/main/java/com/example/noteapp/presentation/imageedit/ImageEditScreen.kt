@@ -11,6 +11,7 @@ import android.graphics.Rect as AndroidRect
 import android.graphics.RectF as AndroidRectF
 import android.graphics.Typeface
 import androidx.compose.animation.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -56,7 +57,12 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.noteapp.data.security.NoteCryptoManager
 import com.example.noteapp.media.FileStorageHelper
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.security.MessageDigest
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -169,6 +175,7 @@ data class EditorSnapshot(
 @Composable
 fun ImageEditScreen(
     imagePath: String,
+    cryptoManager: NoteCryptoManager,
     onSaveSuccess: (originalPath: String, newPath: String) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -189,6 +196,7 @@ fun ImageEditScreen(
     var contrast by remember { mutableFloatStateOf(1f) }
     var saturation by remember { mutableFloatStateOf(1f) }
     var selectedFilter by remember { mutableStateOf(FilterPreset.NONE) }
+    var historyRestored by remember(imagePath) { mutableStateOf(false) }
 
     // --- GERİ & İLERİ ALMA (UNDO / REDO) ---
     val undoStack = remember { mutableStateListOf<EditorSnapshot>() }
@@ -294,13 +302,68 @@ fun ImageEditScreen(
 
     // Kaydetme ve Çıkış
     var isSaving by remember { mutableStateOf(false) }
-    var showDiscardConfirmDialog by remember { mutableStateOf(false) }
+    var didSave by remember(imagePath) { mutableStateOf(false) }
 
     val hasChanges = undoStack.isNotEmpty() || drawingStrokes.isNotEmpty() || textOverlays.isNotEmpty() ||
             brightness != 0f || contrast != 1f || saturation != 1f || selectedFilter != FilterPreset.NONE
 
+    fun historyKey(path: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(path.toByteArray()).joinToString("") { "%02x".format(it) }
+    fun historyFile(path: String) = File(context.noBackupFilesDir, "image_edit_${historyKey(path)}.json")
+    fun bitmapFile(path: String) = File(context.cacheDir, "image_edit_${historyKey(path)}.png")
+
+    LaunchedEffect(imagePath) {
+        val file = historyFile(imagePath)
+        runCatching {
+            val encrypted = file.readText()
+            val raw = cryptoManager.decrypt(encrypted)
+            if (raw == encrypted || raw.startsWith("[Korumalı")) return@runCatching
+            val data = JSONObject(raw)
+            if (System.currentTimeMillis() - data.getLong("updated") > 60 * 60 * 1000L) {
+                file.delete(); bitmapFile(imagePath).delete(); return@runCatching
+            }
+            val savedBitmap = bitmapFile(imagePath)
+            if (savedBitmap.exists()) BitmapFactory.decodeFile(savedBitmap.absolutePath)?.let { currentBitmap = it }
+            brightness = data.optDouble("brightness", 0.0).toFloat()
+            contrast = data.optDouble("contrast", 1.0).toFloat()
+            saturation = data.optDouble("saturation", 1.0).toFloat()
+            selectedFilter = runCatching { FilterPreset.valueOf(data.optString("filter", FilterPreset.NONE.name)) }.getOrDefault(FilterPreset.NONE)
+            val strokes = data.optJSONArray("strokes") ?: JSONArray()
+            drawingStrokes.clear()
+            for (i in 0 until strokes.length()) {
+                val s = strokes.getJSONObject(i); val pts = s.getJSONArray("points")
+                drawingStrokes += DrawingStroke((0 until pts.length()).map { j -> val p = pts.getJSONObject(j); Offset(p.getDouble("x").toFloat(), p.getDouble("y").toFloat()) }, Color(s.getLong("color").toULong()), s.getDouble("width").toFloat(), s.optBoolean("highlighter"))
+            }
+            val texts = data.optJSONArray("texts") ?: JSONArray()
+            textOverlays.clear()
+            for (i in 0 until texts.length()) {
+                val t = texts.getJSONObject(i)
+                textOverlays += TextOverlayItem(t.optLong("id", System.nanoTime()), t.getString("text"), Offset(t.getDouble("x").toFloat(), t.getDouble("y").toFloat()), Color(t.getLong("color").toULong()), Color(t.getLong("bg").toULong()), t.getDouble("size").toFloat())
+            }
+        }.onFailure { /* A missing/invalid one-hour session simply starts from the image. */ }
+        historyRestored = true
+    }
+
+    LaunchedEffect(historyRestored, currentBitmap, brightness, contrast, saturation, selectedFilter, drawingStrokes.map { it.hashCode() }, textOverlays.map { listOf(it.id, it.text, it.positionFraction, it.color, it.bgColor, it.fontSizeSp) }) {
+        if (!historyRestored) return@LaunchedEffect
+        kotlinx.coroutines.delay(400)
+        runCatching {
+            currentBitmap?.let { bmp -> bitmapFile(imagePath).outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+            val strokes = JSONArray()
+            drawingStrokes.forEach { s ->
+                val points = JSONArray(); s.pointsFraction.forEach { points.put(JSONObject().put("x", it.x).put("y", it.y)) }
+                strokes.put(JSONObject().put("points", points).put("color", s.color.value.toLong()).put("width", s.strokeWidthDp).put("highlighter", s.isHighlighter))
+            }
+            val texts = JSONArray()
+            textOverlays.forEach { t -> texts.put(JSONObject().put("id", t.id).put("text", t.text).put("x", t.positionFraction.x).put("y", t.positionFraction.y).put("color", t.color.value.toLong()).put("bg", t.bgColor.value.toLong()).put("size", t.fontSizeSp)) }
+            val raw = JSONObject().put("updated", System.currentTimeMillis()).put("brightness", brightness).put("contrast", contrast).put("saturation", saturation).put("filter", selectedFilter.name).put("strokes", strokes).put("texts", texts).toString()
+            historyFile(imagePath).writeText(cryptoManager.encrypt(raw))
+        }
+    }
+
     // Nihai Kaydetme (Tüm Çizim, Metin ve Filtre Katmanlarını Bitmap'e İşler)
     fun performSave() {
+        if (isSaving || didSave) return
         val bmp = currentBitmap ?: return
         isSaving = true
 
@@ -395,11 +458,30 @@ fun ImageEditScreen(
         isSaving = false
 
         if (savedPath != null) {
+            runCatching {
+                currentBitmap?.let { base -> bitmapFile(savedPath).outputStream().use { base.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+                val strokes = JSONArray()
+                drawingStrokes.forEach { s ->
+                    val points = JSONArray(); s.pointsFraction.forEach { points.put(JSONObject().put("x", it.x).put("y", it.y)) }
+                    strokes.put(JSONObject().put("points", points).put("color", s.color.value.toLong()).put("width", s.strokeWidthDp).put("highlighter", s.isHighlighter))
+                }
+                val texts = JSONArray()
+                textOverlays.forEach { t -> texts.put(JSONObject().put("id", t.id).put("text", t.text).put("x", t.positionFraction.x).put("y", t.positionFraction.y).put("color", t.color.value.toLong()).put("bg", t.bgColor.value.toLong()).put("size", t.fontSizeSp)) }
+                val raw = JSONObject().put("updated", System.currentTimeMillis()).put("brightness", brightness).put("contrast", contrast).put("saturation", saturation).put("filter", selectedFilter.name).put("strokes", strokes).put("texts", texts).toString()
+                historyFile(savedPath).writeText(cryptoManager.encrypt(raw))
+            }
+            didSave = true
             onSaveSuccess(imagePath, savedPath)
         } else {
+            didSave = true
             onBackClick()
         }
     }
+
+    val exitEditor: () -> Unit = {
+        if (!isSaving && !didSave && hasChanges) performSave() else if (!isSaving) onBackClick()
+    }
+    BackHandler { exitEditor() }
 
     // --- METİN EKLEME VE DÜZENLEME DİALOGU ---
     if (showAddTextDialog) {
@@ -530,32 +612,6 @@ fun ImageEditScreen(
         )
     }
 
-    // Çıkış Onayı
-    if (showDiscardConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showDiscardConfirmDialog = false },
-            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("Değişiklikleri Kaydet") },
-            text = { Text("Yaptığınız düzenlemeleri kaydetmeden çıkmak istediğinize emin misiniz?") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showDiscardConfirmDialog = false
-                        onBackClick()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Değişiklikleri Sil ve Çık")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDiscardConfirmDialog = false }) {
-                    Text("Düzenlemeye Devam Et")
-                }
-            }
-        )
-    }
-
     val hasPreEditBackup = remember { com.example.noteapp.media.ImageBackupManager.hasPreviousVersion(context, imagePath) }
     var showRevertBackupConfirm by remember { mutableStateOf(false) }
 
@@ -606,13 +662,7 @@ fun ImageEditScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = {
-                            if (hasChanges) {
-                                showDiscardConfirmDialog = true
-                            } else {
-                                onBackClick()
-                            }
-                        },
+                        onClick = exitEditor,
                         modifier = Modifier.padding(start = 4.dp)
                     ) {
                         Surface(
@@ -709,25 +759,6 @@ fun ImageEditScreen(
                         }
                     }
 
-                    // Kaydet Butonu
-                    Button(
-                        onClick = { performSave() },
-                        enabled = !isSaving,
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        contentPadding = if (isCompactScreen) PaddingValues(horizontal = 10.dp, vertical = 6.dp) else PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                        modifier = Modifier.padding(end = 6.dp)
-                    ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                        } else {
-                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                            if (!isCompactScreen) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Kaydet", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            }
-                        }
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFF16161A)

@@ -14,6 +14,7 @@ import com.example.noteapp.media.AudioRecorder
 import com.example.noteapp.media.FileStorageHelper
 import com.example.noteapp.notification.AlarmScheduler
 import com.example.noteapp.data.settings.AppSettingsManager
+import com.example.noteapp.data.security.NoteCryptoManager
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -25,10 +26,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.UUID
 import androidx.compose.ui.text.TextRange
 import java.util.Locale
 import java.util.ArrayDeque
 import javax.inject.Inject
+
+private val emptyChecklistLineRegex = Regex("^(?:[-*+]\\s*)?\\[[ xX]?\\]\\s*$")
+
+private fun String.isEffectivelyBlankNoteContent(): Boolean =
+    lineSequence().all { line -> line.isBlank() || emptyChecklistLineRegex.matches(line.trim()) }
 
 data class NoteHistorySnapshot(
     val title: String,
@@ -41,6 +50,7 @@ data class NoteDetailState(
     val contentValue: TextFieldValue = TextFieldValue(""),
     val color: Int = 0,
     val isPinned: Boolean = false,
+    val isArchived: Boolean = false,
     val isLocked: Boolean = false,
     val categoryId: Long? = null,
     val reminderTime: Long? = null,
@@ -67,6 +77,7 @@ class NoteDetailViewModel @Inject constructor(
     private val audioRecorder: AudioRecorder,
     private val audioPlayer: AudioPlayer,
     private val settingsManager: AppSettingsManager,
+    private val cryptoManager: NoteCryptoManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -87,6 +98,8 @@ class NoteDetailViewModel @Inject constructor(
     private var historyDebounceJob: Job? = null
     private var autoSaveJob: Job? = null
     private var isInternalHistoryRestoring = false
+    private val draftHistoryId = savedStateHandle.get<String>(KEY_DRAFT_HISTORY_ID)
+        ?: UUID.randomUUID().toString().also { savedStateHandle[KEY_DRAFT_HISTORY_ID] = it }
 
     private var currentRecordingFile: File? = null
 
@@ -102,6 +115,7 @@ class NoteDetailViewModel @Inject constructor(
                         contentValue = initialContent,
                         color = note.color,
                         isPinned = note.isPinned,
+                        isArchived = note.isArchived,
                         isLocked = note.isLocked,
                         categoryId = note.categoryId,
                         reminderTime = note.reminderTime,
@@ -118,6 +132,7 @@ class NoteDetailViewModel @Inject constructor(
                     redoStack.clear()
                     _canUndo.value = false
                     _canRedo.value = false
+                    restoreEditHistory(note.id)
                 }
             }
         } else {
@@ -189,6 +204,7 @@ class NoteDetailViewModel @Inject constructor(
                 _canUndo.value = true
             }
             lastCommittedSnapshot = NoteHistorySnapshot(currentTitle, currentContent)
+            persistEditHistory()
         }
     }
 
@@ -221,6 +237,7 @@ class NoteDetailViewModel @Inject constructor(
         )
         isInternalHistoryRestoring = false
 
+        persistEditHistory()
         saveNoteQuietly()
     }
 
@@ -243,6 +260,7 @@ class NoteDetailViewModel @Inject constructor(
         )
         isInternalHistoryRestoring = false
 
+        persistEditHistory()
         saveNoteQuietly()
     }
 
@@ -254,6 +272,35 @@ class NoteDetailViewModel @Inject constructor(
     fun onTogglePin() {
         _state.value = _state.value.copy(isPinned = !_state.value.isPinned)
         saveNoteQuietly()
+    }
+
+    fun archiveCurrentNote(onDone: () -> Unit = {}) {
+        val current = _state.value
+        val id = current.currentNoteId ?: return
+        if (id <= 0L) return
+        viewModelScope.launch {
+            val existing = repository.getNoteById(id) ?: return@launch
+            val now = System.currentTimeMillis()
+            repository.updateNote(
+                existing.copy(
+                    title = current.title,
+                    content = current.contentValue.text,
+                    color = current.color,
+                    isPinned = current.isPinned,
+                    isLocked = current.isLocked,
+                    isArchived = !current.isArchived,
+                    categoryId = current.categoryId,
+                    reminderTime = current.reminderTime,
+                    attachments = current.attachments,
+                    backgroundImage = current.backgroundImage,
+                    updatedAt = now,
+                    timestamp = now
+                )
+            )
+            _state.value = _state.value.copy(isArchived = !current.isArchived)
+            persistEditHistory()
+            onDone()
+        }
     }
 
     fun onToggleLock() {
@@ -396,7 +443,18 @@ class NoteDetailViewModel @Inject constructor(
 
     fun onUpdateAttachment(oldPath: String, newPath: String) {
         com.example.noteapp.media.ImageBackupManager.recordEditBackup(app, oldPath, newPath)
-        val updated = _state.value.attachments.map { if (it == oldPath) newPath else it }
+        val currentAttachments = _state.value.attachments
+        val oldFilePath = runCatching { File(oldPath).canonicalPath }.getOrDefault(oldPath)
+        val updated = if (currentAttachments.any { path ->
+                path == oldPath || runCatching { File(path).canonicalPath }.getOrDefault(path) == oldFilePath
+            }) {
+            currentAttachments.map { path ->
+                if (path == oldPath || runCatching { File(path).canonicalPath }.getOrDefault(path) == oldFilePath) newPath else path
+            }
+        } else {
+            // State may have been refreshed while the editor was open; keep the saved edit visible.
+            currentAttachments + newPath
+        }
         _state.value = _state.value.copy(attachments = updated)
         saveNoteQuietly()
     }
@@ -415,6 +473,114 @@ class NoteDetailViewModel @Inject constructor(
 
     fun canRevertImage(path: String): Boolean {
         return com.example.noteapp.media.ImageBackupManager.hasPreviousVersion(app, path)
+    }
+
+    private fun editHistoryFile(key: String): File = File(
+        File(app.noBackupFilesDir, "edit_sessions"),
+        "$key.session"
+    )
+
+    private fun currentEditHistoryKey(): String =
+        _state.value.currentNoteId?.takeIf { it > 0L }?.let { "note_$it" }
+            ?: "draft_$draftHistoryId"
+
+    private fun appendSnapshot(array: JSONArray, snapshot: NoteHistorySnapshot) {
+        array.put(
+            JSONObject()
+                .put("title", snapshot.title)
+                .put("content", snapshot.contentValue.text)
+                .put("selectionStart", snapshot.contentValue.selection.start)
+                .put("selectionEnd", snapshot.contentValue.selection.end)
+        )
+    }
+
+    private fun readSnapshots(array: JSONArray): List<NoteHistorySnapshot> =
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val content = item.optString("content", "")
+                val max = content.length
+                val start = item.optInt("selectionStart", max).coerceIn(0, max)
+                val end = item.optInt("selectionEnd", start).coerceIn(0, max)
+                add(
+                    NoteHistorySnapshot(
+                        title = item.optString("title", ""),
+                        contentValue = TextFieldValue(content, TextRange(start, end))
+                    )
+                )
+            }
+        }
+
+    private fun persistEditHistory() {
+        val current = _state.value
+        val payload = JSONObject().apply {
+            put("updatedAt", System.currentTimeMillis())
+            put("current", JSONObject().apply {
+                put("title", current.title)
+                put("content", current.contentValue.text)
+                put("selectionStart", current.contentValue.selection.start)
+                put("selectionEnd", current.contentValue.selection.end)
+            })
+            put("undo", JSONArray().also { array -> undoStack.forEach { appendSnapshot(array, it) } })
+            put("redo", JSONArray().also { array -> redoStack.forEach { appendSnapshot(array, it) } })
+        }.toString()
+
+        // History can contain plaintext from a locked note, so never write an unencrypted fallback.
+        val encryptedPayload = cryptoManager.encrypt(payload)
+        if (!cryptoManager.isEncrypted(encryptedPayload)) return
+
+        runCatching {
+            val file = editHistoryFile(currentEditHistoryKey())
+            file.parentFile?.mkdirs()
+            val temp = File(file.parentFile, "${file.name}.tmp")
+            temp.writeText(encryptedPayload)
+            if (!temp.renameTo(file)) {
+                file.writeText(encryptedPayload)
+                temp.delete()
+            }
+        }
+    }
+
+    private fun restoreEditHistory(noteId: Long) {
+        val file = editHistoryFile("note_$noteId")
+        if (!file.exists()) return
+
+        runCatching {
+            val encoded = file.readText()
+            if (!cryptoManager.isEncrypted(encoded)) error("Unencrypted edit history")
+            val payload = JSONObject(cryptoManager.decrypt(encoded))
+            val updatedAt = payload.optLong("updatedAt", 0L)
+            if (updatedAt <= 0L || System.currentTimeMillis() - updatedAt > EDIT_HISTORY_TTL_MS) {
+                file.delete()
+                return
+            }
+
+            val current = payload.optJSONObject("current") ?: return
+            val content = current.optString("content", "")
+            val start = current.optInt("selectionStart", content.length).coerceIn(0, content.length)
+            val end = current.optInt("selectionEnd", start).coerceIn(0, content.length)
+            val recovered = NoteHistorySnapshot(
+                title = current.optString("title", ""),
+                contentValue = TextFieldValue(content, TextRange(start, end))
+            )
+
+            undoStack.clear()
+            readSnapshots(payload.optJSONArray("undo") ?: JSONArray()).takeLast(50).forEach(undoStack::addLast)
+            redoStack.clear()
+            readSnapshots(payload.optJSONArray("redo") ?: JSONArray()).takeLast(50).forEach(redoStack::addLast)
+            _canUndo.value = undoStack.isNotEmpty()
+            _canRedo.value = redoStack.isNotEmpty()
+            lastCommittedSnapshot = recovered
+            _state.value = _state.value.copy(
+                title = recovered.title,
+                contentValue = recovered.contentValue,
+                extractedWikilinks = extractWikilinks(content),
+                extractedTags = extractHashtags(content)
+            )
+            if (_state.value.isLocked) refreshBacklinks()
+        }.onFailure {
+            file.delete()
+        }
     }
 
     fun extractTextFromImage(imagePath: String, onResult: (String?) -> Unit) {
@@ -492,7 +658,7 @@ class NoteDetailViewModel @Inject constructor(
         autoSaveJob?.cancel()
         val currentState = _state.value
         val isBlankNote = currentState.title.isBlank() &&
-                currentState.contentValue.text.isBlank() &&
+                currentState.contentValue.text.isEffectivelyBlankNoteContent() &&
                 currentState.attachments.isEmpty() &&
                 currentState.backgroundImage == null
 
@@ -516,7 +682,7 @@ class NoteDetailViewModel @Inject constructor(
         val currentState = _state.value
         val noteId = currentState.currentNoteId ?: 0L
         val isBlankNote = currentState.title.isBlank() &&
-                currentState.contentValue.text.isBlank() &&
+                currentState.contentValue.text.isEffectivelyBlankNoteContent() &&
                 currentState.attachments.isEmpty() &&
                 currentState.backgroundImage == null
 
@@ -539,6 +705,7 @@ class NoteDetailViewModel @Inject constructor(
                 content = currentState.contentValue.text,
                 color = currentState.color,
                 isPinned = currentState.isPinned,
+                isArchived = currentState.isArchived,
                 isLocked = currentState.isLocked,
                 categoryId = currentState.categoryId,
                 reminderTime = currentState.reminderTime,
@@ -551,6 +718,10 @@ class NoteDetailViewModel @Inject constructor(
             val savedId = repository.insertNote(note)
             if (_state.value.currentNoteId == null || _state.value.currentNoteId == 0L) {
                 _state.value = _state.value.copy(currentNoteId = savedId)
+            }
+            if (noteId == 0L) {
+                editHistoryFile("draft_$draftHistoryId").delete()
+                persistEditHistory()
             }
 
             // Hatırlatıcı planlama
@@ -608,5 +779,10 @@ class NoteDetailViewModel @Inject constructor(
             audioRecorder.stop()
         }
         checkAndDiscardIfEmptyOrSave()
+    }
+
+    private companion object {
+        const val KEY_DRAFT_HISTORY_ID = "note_edit_history_draft_id"
+        const val EDIT_HISTORY_TTL_MS = 60 * 60 * 1000L
     }
 }

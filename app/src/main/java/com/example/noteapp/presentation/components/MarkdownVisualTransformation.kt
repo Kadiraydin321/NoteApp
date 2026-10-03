@@ -13,6 +13,19 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
 
+// Compiled once because filter() runs on every editor text update.
+private val fencedCodeBlockRegex = Regex("(?m)^```[^\\n]*\\n([\\s\\S]*?)^```\\s*$")
+private val headingRegex = Regex("(?m)^(#{1,3})\\s+(.*)$")
+private val boldAsteriskRegex = Regex("(?<!\\\\)\\*\\*(?!\\s)([^\\n]+?)(?<!\\s)\\*\\*")
+private val boldUnderscoreRegex = Regex("(?<!\\\\)__(?!\\s)([^\\n]+?)(?<!\\s)__")
+private val italicAsteriskRegex = Regex("(?<![\\*\\\\])\\*(?!\\s)([^\\n\\*]+?)(?<!\\s)\\*(?!\\*)")
+private val italicUnderscoreRegex = Regex("(?<![_\\\\])_(?!\\s)([^\\n_]+?)(?<!\\s)_(?!_)")
+private val strikeRegex = Regex("~~([^~\\n]+?)~~")
+private val highlightRegex = Regex("==([^=\\n]+?)==")
+private val inlineCodeRegex = Regex("`([^`\\n]+?)`")
+private val wikiLinkRegex = Regex("\\[\\[([^\\]\\n]+?)\\]\\]")
+private val quoteRegex = Regex("(?m)^>\\s+(.*)$")
+
 /**
  * Kullanıcı metin yazarken veya butonlarla formatlarken
  * **kalın**, *italik*, ~~üstü çizili~~, ==vurgu== ve # Başlıkları
@@ -40,13 +53,28 @@ class MarkdownVisualTransformation(
         val hiddenTokenStyle = SpanStyle(color = Color.Transparent, fontSize = 0.01.sp)
         val visibleTokenStyle = SpanStyle(color = syntaxColor)
         val tokenStyle = if (hideSyntaxTokens) hiddenTokenStyle else visibleTokenStyle
+        val fencedCodeMatches = fencedCodeBlockRegex.findAll(raw).toList()
+        fun isInFencedCode(range: IntRange): Boolean = fencedCodeMatches.any { range.first in it.range }
 
         val annotated = buildAnnotatedString {
             append(raw)
 
+            // Fenced code blocks use monospace styling; supported inline actions remain active inside them.
+            for (match in fencedCodeMatches) {
+                val codeRange = match.groups[1]?.range ?: continue
+                if (!codeRange.isEmpty()) {
+                    addStyle(
+                        SpanStyle(fontFamily = FontFamily.Monospace, background = codeBgColor),
+                        codeRange.first,
+                        codeRange.last + 1
+                    )
+                }
+                addStyle(tokenStyle, match.range.first, codeRange.first)
+                addStyle(tokenStyle, codeRange.last + 1, match.range.last + 1)
+            }
+
             // 1. Başlıklar: # Başlık 1, ## Başlık 2, ### Başlık 3
-            val headingRegex = Regex("(?m)^(#{1,3})\\s+(.*)$")
-            for (match in headingRegex.findAll(raw)) {
+            for (match in headingRegex.findAll(raw).filterNot { isInFencedCode(it.range) }) {
                 val range = match.range
                 val level = match.groupValues[1].length
                 val fontSize = when (level) {
@@ -68,7 +96,6 @@ class MarkdownVisualTransformation(
 
             // 2. KALIN (BOLD) VE İTALİK (ITALIC)
             // A. Çift Yıldız Kalın: **metin**
-            val boldAsteriskRegex = Regex("(?<!\\\\)\\*\\*(?!\\s)([^\n]+?)(?<!\\s)\\*\\*")
             for (match in boldAsteriskRegex.findAll(raw)) {
                 val range = match.range
                 if (range.last >= range.first + 3) {
@@ -79,7 +106,6 @@ class MarkdownVisualTransformation(
             }
 
             // B. Çift Altçizgi Kalın: __metin__
-            val boldUnderscoreRegex = Regex("(?<!\\\\)__(?!\\s)([^\n]+?)(?<!\\s)__")
             for (match in boldUnderscoreRegex.findAll(raw)) {
                 val range = match.range
                 if (range.last >= range.first + 3) {
@@ -90,7 +116,6 @@ class MarkdownVisualTransformation(
             }
 
             // C. Tek Yıldız İtalik: *metin*
-            val italicAsteriskRegex = Regex("(?<![\\*\\\\])\\*(?!\\s)([^\n\\*]+?)(?<!\\s)\\*(?!\\*)")
             for (match in italicAsteriskRegex.findAll(raw)) {
                 val range = match.range
                 if (range.last >= range.first + 2) {
@@ -101,7 +126,6 @@ class MarkdownVisualTransformation(
             }
 
             // D. Tek Altçizgi İtalik: _metin_
-            val italicUnderscoreRegex = Regex("(?<![_\\\\])_(?!\\s)([^\n_]+?)(?<!\\s)_(?!_)")
             for (match in italicUnderscoreRegex.findAll(raw)) {
                 val range = match.range
                 if (range.last >= range.first + 2) {
@@ -112,8 +136,7 @@ class MarkdownVisualTransformation(
             }
 
             // 3. Üstü Çizili (Strikethrough): ~~metin~~
-            val strikeRegex = Regex("~~([^~\\n]+?)~~")
-            for (match in strikeRegex.findAll(raw)) {
+            for (match in strikeRegex.findAll(raw).filterNot { isInFencedCode(it.range) }) {
                 val range = match.range
                 if (range.last >= range.first + 3) {
                     addStyle(
@@ -127,8 +150,7 @@ class MarkdownVisualTransformation(
             }
 
             // 4. Fosforlu Vurgu (Highlight): ==metin==
-            val highlightRegex = Regex("==([^=\\n]+?)==")
-            for (match in highlightRegex.findAll(raw)) {
+            for (match in highlightRegex.findAll(raw).filterNot { isInFencedCode(it.range) }) {
                 val range = match.range
                 if (range.last >= range.first + 3) {
                     addStyle(
@@ -142,8 +164,7 @@ class MarkdownVisualTransformation(
             }
 
             // 5. Kod Bloğu / Satır içi kod: `kod`
-            val codeRegex = Regex("`([^`\\n]+?)`")
-            for (match in codeRegex.findAll(raw)) {
+            for (match in inlineCodeRegex.findAll(raw).filterNot { isInFencedCode(it.range) }) {
                 val range = match.range
                 addStyle(
                     SpanStyle(
@@ -158,8 +179,7 @@ class MarkdownVisualTransformation(
             }
 
             // 6. Çift Yönlü Bağlantı (Backlink): [[Note Name]]
-            val linkRegex = Regex("\\[\\[([^\\]\\n]+?)\\]\\]")
-            for (match in linkRegex.findAll(raw)) {
+            for (match in wikiLinkRegex.findAll(raw)) {
                 val range = match.range
                 addStyle(
                     SpanStyle(
@@ -175,8 +195,7 @@ class MarkdownVisualTransformation(
             }
 
             // 7. Alıntı (Blockquote): > metin
-            val quoteRegex = Regex("(?m)^>\\s+(.*)$")
-            for (match in quoteRegex.findAll(raw)) {
+            for (match in quoteRegex.findAll(raw).filterNot { isInFencedCode(it.range) }) {
                 val range = match.range
                 addStyle(
                     SpanStyle(

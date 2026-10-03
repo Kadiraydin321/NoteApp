@@ -43,6 +43,7 @@ fun SettingsScreen(
     backupUiState: BackupUiState,
     onWidgetFilterChange: (WidgetFilterMode) -> Unit,
     onWidgetShowLockedChange: (Boolean) -> Unit,
+    onWidgetShowContentChange: (Boolean) -> Unit = {},
     onDefaultColorChange: (Int) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit = {},
@@ -54,7 +55,6 @@ fun SettingsScreen(
     onExportToUri: (Uri, String?) -> Unit,
     onExportAndShare: (Context, String?) -> Unit,
     onImportFromUri: (Uri, Boolean, String?) -> Unit,
-    onLoadSampleNotes: () -> Unit = {},
     onDismissBackupMessage: () -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -198,19 +198,6 @@ fun SettingsScreen(
                         Text("Yedekten Geri Yükle (İçe Aktar)")
                     }
 
-                    // Buton 4: 25 Adet Zengin Örnek Not Yükle
-                    FilledTonalButton(
-                        onClick = onLoadSampleNotes,
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("25 Adet Zengin Örnek Notu Yükle")
-                    }
                 }
             }
 
@@ -289,6 +276,33 @@ fun SettingsScreen(
                         Switch(
                             checked = settings.widgetShowLockedNotes,
                             onCheckedChange = onWidgetShowLockedChange
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Widget'ta içerik önizlemesi", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text(
+                                "Kapalıyken not başlıkları gösterilir, içerik gizlenir",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = settings.widgetShowContent,
+                            onCheckedChange = onWidgetShowContentChange
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            "Widget listesini kaydırarak tüm notlarına ulaşabilirsin.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -611,7 +625,7 @@ fun SettingsScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "Modern Note App v1.1.0",
+                        "Not Defterim · v1.1.0",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold
                     )

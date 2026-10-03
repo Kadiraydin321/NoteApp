@@ -3,9 +3,12 @@ package com.example.noteapp
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
+import java.io.File
+import org.json.JSONObject
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +43,7 @@ import androidx.navigation.navArgument
 import com.example.noteapp.biometric.BiometricPromptManager
 import com.example.noteapp.biometric.BiometricResult
 import com.example.noteapp.data.settings.AppSettingsManager
+import com.example.noteapp.data.security.NoteCryptoManager
 import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.presentation.detail.NoteDetailScreen
@@ -54,6 +58,7 @@ import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -66,6 +71,9 @@ class MainActivity : FragmentActivity() {
     @Inject
     lateinit var repository: NoteRepository
 
+    @Inject
+    lateinit var cryptoManager: NoteCryptoManager
+
     private val biometricPromptManager by lazy {
         BiometricPromptManager(this)
     }
@@ -74,6 +82,17 @@ class MainActivity : FragmentActivity() {
     private var navControllerRef: NavController? = null
     private var pendingWidgetIntent by mutableStateOf<Intent?>(null)
     private var wasAppInBackground = false
+    private var activeLockedNoteId: Long? = null
+
+    private fun hasRecentDrawingHistory(path: String): Boolean = runCatching {
+        val key = path.hashCode().toUInt().toString(16)
+        val historyFile = File(noBackupFilesDir, "drawing_$key.json")
+        if (!historyFile.exists()) return false
+        val history = JSONObject(historyFile.readText())
+        val updatedAt = history.optLong("updated", 0L)
+        val hasElements = (history.optJSONArray("elements")?.length() ?: 0) > 0
+        hasElements && updatedAt > 0L && System.currentTimeMillis() - updatedAt in 0..(60L * 60L * 1000L)
+    }.getOrDefault(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -95,6 +114,12 @@ class MainActivity : FragmentActivity() {
                 themeMode = appSettings.themeMode,
                 dynamicColor = appSettings.dynamicColor
             ) {
+                var showWelcomeScreen by remember { mutableStateOf(true) }
+                LaunchedEffect(Unit) {
+                    delay(100)
+                    showWelcomeScreen = false
+                }
+
                 val navController = rememberNavController()
                 LaunchedEffect(navController) {
                     navControllerRef = navController
@@ -333,6 +358,9 @@ class MainActivity : FragmentActivity() {
                     ) { backStackEntry ->
                         val viewModel = hiltViewModel<NoteDetailViewModel>()
                         val state by viewModel.state.collectAsState()
+                        SideEffect {
+                            activeLockedNoteId = state.currentNoteId?.takeIf { state.isLocked }
+                        }
                         val autoAction = backStackEntry.arguments?.getString("autoAction")
                         val sharedText = backStackEntry.arguments?.getString("sharedText")
                         val sharedTitle = backStackEntry.arguments?.getString("sharedTitle")
@@ -398,9 +426,13 @@ class MainActivity : FragmentActivity() {
                             onToggleAudioRecording = viewModel::toggleAudioRecording,
                             onToggleAudioPlayback = viewModel::toggleAudioPlayback,
                             onDeleteAttachment = viewModel::onDeleteAttachment,
-                            onImageClick = { imagePath ->
+                            onImageEditClick = { imagePath ->
                                 val encodedPath = java.net.URLEncoder.encode(imagePath, java.nio.charset.StandardCharsets.UTF_8.toString())
-                                navController.navigate("image_edit_screen?imagePath=$encodedPath")
+                                if (imagePath.substringAfterLast('/').startsWith("DRAW_") && hasRecentDrawingHistory(imagePath)) {
+                                    navController.navigate("drawing_screen?drawingPath=$encodedPath")
+                                } else {
+                                    navController.navigate("image_edit_screen?imagePath=$encodedPath")
+                                }
                             },
                             onRevertImageEdit = { path ->
                                 viewModel.revertImageEdit(path)
@@ -433,6 +465,11 @@ class MainActivity : FragmentActivity() {
                                     navController.popBackStack()
                                 }
                             },
+                            onArchiveNoteClick = {
+                                viewModel.archiveCurrentNote {
+                                    navController.popBackStack()
+                                }
+                            },
                             onDuplicateNote = {
                                 viewModel.duplicateCurrentNote {
                                     android.widget.Toast.makeText(this@MainActivity, "Notun bir kopyası oluşturuldu", android.widget.Toast.LENGTH_SHORT).show()
@@ -440,14 +477,6 @@ class MainActivity : FragmentActivity() {
                             },
                             onAddDrawingClick = {
                                 navController.navigate("drawing_screen")
-                            },
-                            onSaveClick = {
-                                viewModel.saveNote()
-                                if (!navController.popBackStack()) {
-                                    navController.navigate("notes_screen") {
-                                        popUpTo(0) { inclusive = true }
-                                    }
-                                }
                             },
                             onBackClick = {
                                 viewModel.saveNote()
@@ -482,6 +511,7 @@ class MainActivity : FragmentActivity() {
 
                         com.example.noteapp.presentation.imageedit.ImageEditScreen(
                             imagePath = decodedPath,
+                            cryptoManager = cryptoManager,
                             onSaveSuccess = { originalPath, newPath ->
                                 navController.previousBackStackEntry
                                     ?.savedStateHandle
@@ -502,12 +532,22 @@ class MainActivity : FragmentActivity() {
                         )
                     }
 
-                    composable("drawing_screen") {
+                    composable(
+                        route = "drawing_screen?drawingPath={drawingPath}",
+                        arguments = listOf(navArgument("drawingPath") { type = NavType.StringType; defaultValue = "" })
+                    ) { drawingBackStack ->
                         DrawingScreen(
                             onDrawingSaved = { drawingPath ->
-                                navController.previousBackStackEntry
-                                    ?.savedStateHandle
-                                    ?.set("drawing_path", drawingPath)
+                                val sourcePath = drawingBackStack.arguments?.getString("drawingPath")
+                                if (sourcePath.isNullOrBlank()) {
+                                    navController.previousBackStackEntry
+                                        ?.savedStateHandle
+                                        ?.set("drawing_path", drawingPath)
+                                } else {
+                                    navController.previousBackStackEntry
+                                        ?.savedStateHandle
+                                        ?.set("edited_image_pair", Pair(sourcePath, drawingPath))
+                                }
                                 if (!navController.popBackStack()) {
                                     navController.navigate("notes_screen") {
                                         popUpTo(0) { inclusive = true }
@@ -520,6 +560,9 @@ class MainActivity : FragmentActivity() {
                                         popUpTo(0) { inclusive = true }
                                     }
                                 }
+                            },
+                            drawingPath = drawingBackStack.arguments?.getString("drawingPath")?.takeIf { it.isNotBlank() }?.let {
+                                try { java.net.URLDecoder.decode(it, java.nio.charset.StandardCharsets.UTF_8.toString()) } catch (_: Exception) { it }
                             }
                         )
                     }
@@ -534,6 +577,7 @@ class MainActivity : FragmentActivity() {
                             backupUiState = backupUiState,
                             onWidgetFilterChange = viewModel::setWidgetFilterMode,
                             onWidgetShowLockedChange = viewModel::setWidgetShowLocked,
+                            onWidgetShowContentChange = viewModel::setWidgetShowContent,
                             onDefaultColorChange = viewModel::setDefaultNoteColor,
                             onDynamicColorChange = viewModel::setDynamicColor,
                             onThemeModeChange = viewModel::setThemeMode,
@@ -545,7 +589,6 @@ class MainActivity : FragmentActivity() {
                             onExportToUri = { uri, pass -> viewModel.exportBackupToUri(uri, pass) },
                             onExportAndShare = { ctx, pass -> viewModel.exportAndShare(ctx, pass) },
                             onImportFromUri = { uri, clear, pass -> viewModel.importBackupFromUri(uri, clear, pass) },
-                            onLoadSampleNotes = viewModel::loadSampleNotes,
                             onDismissBackupMessage = viewModel::dismissMessage,
                             onBackClick = {
                                 navController.popBackStack()
@@ -586,6 +629,37 @@ class MainActivity : FragmentActivity() {
                         }
                     }
                 }
+
+                if (showWelcomeScreen) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Not Defterim",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Hoş geldiniz",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
+                            )
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.5.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -593,30 +667,32 @@ class MainActivity : FragmentActivity() {
 
     override fun onPause() {
         super.onPause()
-        // Görev yöneticisi (task switcher / recents) anlık görüntüsü tam onPause anında çekilir!
-        // Task switcher önizlemesinde gizli bilgilerin sızmaması için onPause anında SECURE yapıyoruz:
+        // Kilitli not ekranı FLAG_SECURE'ı kendi yaşam döngüsünde yönetir.
+        // Normal notlar, ayarlar ve ana ekran Recents'te gereksiz yere sansürlenmemelidir.
         val currentRoute = navControllerRef?.currentBackStackEntry?.destination?.route
-        val isDetailRoute = currentRoute?.startsWith("note_detail_screen") == true
-        if (isDetailRoute || settingsManager.settings.value.autoLockOnExit) {
-            window.setFlags(
-                android.view.WindowManager.LayoutParams.FLAG_SECURE,
-                android.view.WindowManager.LayoutParams.FLAG_SECURE
-            )
+        val isLockedNoteRoute = currentRoute?.startsWith("note_detail_screen") == true &&
+                navControllerRef?.currentBackStackEntry?.arguments?.getLong("noteId")?.let { noteId ->
+                    noteId > 0L && activeLockedNoteId == noteId
+                } == true
+        if (isLockedNoteRoute) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
             isPrivacyShieldActive.value = true
+        } else {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            isPrivacyShieldActive.value = false
         }
     }
 
     override fun onStop() {
         super.onStop()
         wasAppInBackground = true
-        isPrivacyShieldActive.value = true
         // Kullanıcı uygulamadan ayrıldığında (arka plana geçtiğinde), eğer kilitli bir nottaysa
         // not ekranını kapatıp ana ekrana dönsün ki tekrar girildiğinde şifresiz açılmasın!
         navControllerRef?.let { nav ->
             val currentRoute = nav.currentBackStackEntry?.destination?.route
             if (currentRoute?.startsWith("note_detail_screen") == true) {
                 val noteId = nav.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
-                if (noteId != -1L) {
+                if (noteId != -1L && activeLockedNoteId == noteId) {
                     CoroutineScope(Dispatchers.Main).launch {
                         val note = repository.getNoteById(noteId)
                         if (note != null && note.isLocked) {
@@ -631,7 +707,6 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         isPrivacyShieldActive.value = false
-        NotesWidgetProvider.closeAllPopups(this)
         wasAppInBackground = false
 
         // Kullanıcı uygulamaya geri döndüğünde, kilitli bir notta değilsek FLAG_SECURE'ı temizle:

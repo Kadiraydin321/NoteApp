@@ -50,12 +50,29 @@
             <!-- Yenile Butonu -->
             <ImageButton
                 android:id="@+id/widget_btn_refresh"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:background="@android:color/transparent"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/widget_action_bg"
                 android:src="@drawable/ic_widget_refresh"
                 android:contentDescription="Yenile"
                 android:scaleType="centerInside" />
+
+            <FrameLayout
+                android:id="@+id/widget_fab_main"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/widget_fab_bg"
+                android:contentDescription="Yeni not oluştur">
+
+                <ImageView
+                    android:id="@+id/widget_fab_icon"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_widget_add_white"
+                    android:contentDescription="@null" />
+            </FrameLayout>
 
         </LinearLayout>
 
@@ -70,7 +87,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:divider="@android:color/transparent"
-                android:dividerHeight="4dp"
+                android:dividerHeight="6dp"
+                android:paddingBottom="6dp"
+                android:clipToPadding="false"
                 android:scrollbars="none" />
 
             <!-- Boş Liste Görünümü -->
@@ -79,20 +98,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:gravity="center"
-                android:text="Henüz not bulunmuyor.\n+ butonundan hemen ekleyebilirsiniz."
-                android:textSize="13sp"
+                android:text="Notların burada görünecek.\n+ ile hemen yeni not ekle."
+                android:textSize="14sp"
                 android:textColor="#79747E"
                 android:visibility="gone" />
-
-            <!-- Alt Gradyan Geçişi (Yumuşak sönümleme) -->
-            <ImageView
-                android:id="@+id/widget_bottom_gradient"
-                android:layout_width="match_parent"
-                android:layout_height="60dp"
-                android:layout_gravity="bottom"
-                android:src="@drawable/widget_bottom_gradient"
-                android:scaleType="fitXY"
-                android:contentDescription="@null" />
 
         </FrameLayout>
 
@@ -110,124 +119,20 @@
         android:id="@+id/widget_popup_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_marginBottom="54dp"
-        android:layout_marginEnd="4dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="50dp"
+        android:layout_marginEnd="8dp"
         android:background="@drawable/widget_popup_bg"
         android:orientation="vertical"
         android:paddingVertical="6dp"
         android:paddingHorizontal="4dp"
         android:visibility="gone">
 
-        <!-- 1. Görsel Notu -->
-        <LinearLayout
-            android:id="@+id/widget_popup_item_image"
-            android:layout_width="140dp"
-            android:layout_height="36dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@android:color/transparent"
-            android:paddingHorizontal="10dp">
-            <ImageView
-                android:id="@+id/widget_popup_icon_image"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_widget_image"
-                android:contentDescription="Fotoğraf" />
-            <TextView
-                android:id="@+id/widget_popup_text_image"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:text="Fotoğraf"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="#1C1B1F" />
-        </LinearLayout>
-
-        <!-- 2. Çizim Notu -->
-        <LinearLayout
-            android:id="@+id/widget_popup_item_draw"
-            android:layout_width="140dp"
-            android:layout_height="36dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@android:color/transparent"
-            android:paddingHorizontal="10dp">
-            <ImageView
-                android:id="@+id/widget_popup_icon_draw"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_widget_draw"
-                android:contentDescription="Çizim" />
-            <TextView
-                android:id="@+id/widget_popup_text_draw"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:text="Çizim"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="#1C1B1F" />
-        </LinearLayout>
-
-        <!-- 3. Ses Notu -->
-        <LinearLayout
-            android:id="@+id/widget_popup_item_voice"
-            android:layout_width="140dp"
-            android:layout_height="36dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@android:color/transparent"
-            android:paddingHorizontal="10dp">
-            <ImageView
-                android:id="@+id/widget_popup_icon_voice"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_widget_mic"
-                android:contentDescription="Ses" />
-            <TextView
-                android:id="@+id/widget_popup_text_voice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:text="Ses"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="#1C1B1F" />
-        </LinearLayout>
-
-        <!-- 4. Liste (To-Do) -->
-        <LinearLayout
-            android:id="@+id/widget_popup_item_todo"
-            android:layout_width="140dp"
-            android:layout_height="36dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@android:color/transparent"
-            android:paddingHorizontal="10dp">
-            <ImageView
-                android:id="@+id/widget_popup_icon_todo"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_widget_check"
-                android:contentDescription="Liste" />
-            <TextView
-                android:id="@+id/widget_popup_text_todo"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:text="Liste"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="#1C1B1F" />
-        </LinearLayout>
-
-        <!-- 5. Metin Notu -->
+        <!-- Metin her widget boyutunda ilk seçenek olarak sunulur. -->
         <LinearLayout
             android:id="@+id/widget_popup_item_text"
-            android:layout_width="140dp"
-            android:layout_height="36dp"
+            android:layout_width="156dp"
+            android:layout_height="40dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@android:color/transparent"
@@ -249,25 +154,109 @@
                 android:textColor="#1C1B1F" />
         </LinearLayout>
 
-    </LinearLayout>
+        <!-- Fotoğraf Notu -->
+        <LinearLayout
+            android:id="@+id/widget_popup_item_image"
+            android:layout_width="156dp"
+            android:layout_height="40dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@android:color/transparent"
+            android:paddingHorizontal="10dp">
+            <ImageView
+                android:id="@+id/widget_popup_icon_image"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_widget_image"
+                android:contentDescription="Fotoğraf" />
+            <TextView
+                android:id="@+id/widget_popup_text_image"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="Fotoğraf"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#1C1B1F" />
+        </LinearLayout>
 
-    <!-- Tek Yüzen Ekleme Butonu (FAB) -->
-    <LinearLayout
-        android:id="@+id/widget_fab_main"
-        android:layout_width="46dp"
-        android:layout_height="46dp"
-        android:layout_gravity="bottom|end"
-        android:layout_marginEnd="4dp"
-        android:layout_marginBottom="4dp"
-        android:background="@drawable/widget_fab_bg"
-        android:gravity="center">
+        <!-- Ses Notu -->
+        <LinearLayout
+            android:id="@+id/widget_popup_item_voice"
+            android:layout_width="156dp"
+            android:layout_height="40dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@android:color/transparent"
+            android:paddingHorizontal="10dp">
+            <ImageView
+                android:id="@+id/widget_popup_icon_voice"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_widget_mic"
+                android:contentDescription="Ses" />
+            <TextView
+                android:id="@+id/widget_popup_text_voice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="Ses"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#1C1B1F" />
+        </LinearLayout>
 
-        <ImageView
-            android:id="@+id/widget_fab_icon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_widget_add_white"
-            android:contentDescription="Yeni Not" />
+        <!-- Daha büyük widgetlarda aşağıda görünen ek seçenekler -->
+        <LinearLayout
+            android:id="@+id/widget_popup_item_draw"
+            android:layout_width="156dp"
+            android:layout_height="40dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@android:color/transparent"
+            android:paddingHorizontal="10dp">
+            <ImageView
+                android:id="@+id/widget_popup_icon_draw"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_widget_draw"
+                android:contentDescription="Çizim" />
+            <TextView
+                android:id="@+id/widget_popup_text_draw"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="Çizim"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#1C1B1F" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_popup_item_todo"
+            android:layout_width="156dp"
+            android:layout_height="40dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@android:color/transparent"
+            android:paddingHorizontal="10dp">
+            <ImageView
+                android:id="@+id/widget_popup_icon_todo"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_widget_check"
+                android:contentDescription="Liste" />
+            <TextView
+                android:id="@+id/widget_popup_text_todo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="Liste"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#1C1B1F" />
+        </LinearLayout>
+
     </LinearLayout>
 
 </FrameLayout>

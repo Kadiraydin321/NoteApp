@@ -1,96 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Not Kağıdı Gölgesi (Derinlik Hissi) -->
+    <!-- Lifted paper tile -->
     <path
-        android:pathData="M34,30 h40 c4.4,0 8,3.6 8,8 v42 c0,4.4 -3.6,8 -8,8 h-40 c-4.4,0 -8,-3.6 -8,-8 v-42 c0,-4.4 3.6,-8 8,-8 z"
-        android:fillColor="#33000000" />
-
-    <!-- Not Defteri Sayfası / Kartı -->
+        android:fillColor="#261E72"
+        android:pathData="M31,20 L65,20 L81,36 L81,78 C81,82.4 77.4,86 73,86 L31,86 C26.6,86 23,82.4 23,78 L23,28 C23,23.6 26.6,20 31,20 Z" />
     <path
-        android:pathData="M34,26 h40 c4.4,0 8,3.6 8,8 v42 c0,4.4 -3.6,8 -8,8 h-40 c-4.4,0 -8,-3.6 -8,-8 v-42 c0,-4.4 3.6,-8 8,-8 z"
-        android:fillColor="#FFFFFF" />
-
-    <!-- Sol Kenar Zarif Vurgu Çizgisi (Defter Cildi Efekti) -->
+        android:fillColor="#FFFFFF"
+        android:pathData="M31,16 L64,16 L80,32 L80,76 C80,80.4 76.4,84 72,84 L31,84 C26.6,84 23,80.4 23,76 L23,24 C23,19.6 26.6,16 31,16 Z" />
     <path
-        android:pathData="M34,26 h3 v58 h-3 c-4.4,0 -8,-3.6 -8,-8 v-42 c0,-4.4 3.6,-8 8,-8 z"
-        android:fillColor="#EEF2FF" />
+        android:fillColor="#DCE2FF"
+        android:pathData="M64,16 L64,28 C64,30.2 65.8,32 68,32 L80,32 Z" />
 
-    <!-- Sağ Üst Köşe Ayraç Kurdelesi (Bookmark Ribbon) -->
+    <!-- Note heading and task lines -->
     <path
-        android:pathData="M67,26 h10 c1.1,0 2,0.9 2,2 v14 l-7,-3.5 l-7,3.5 v-14 c0,-1.1 0.9,-2 2,-2 z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="65"
-                android:startY="26"
-                android:endX="79"
-                android:endY="42"
-                android:type="linear">
-                <item android:offset="0.0" android:color="#F59E0B" />
-                <item android:offset="1.0" android:color="#EA580C" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Not Başlık Çizgisi (Koyu Lacivert / Mor) -->
+        android:fillColor="#4F46E5"
+        android:pathData="M33,31 L60,31 C61.7,31 63,32.3 63,34 C63,35.7 61.7,37 60,37 L33,37 C31.3,37 30,35.7 30,34 C30,32.3 31.3,31 33,31 Z" />
     <path
-        android:pathData="M37,35 h24 c1.1,0 2,0.9 2,2 c0,1.1 -0.9,2 -2,2 h-24 c-1.1,0 -2,-0.9 -2,-2 c0,-1.1 0.9,-2 2,-2 z"
-        android:fillColor="#312E81" />
-
-    <!-- 1. Satır: Kontrol Kutusu (Zümrüt Yeşili) -->
+        android:fillColor="#14B8A6"
+        android:pathData="M36,45 C39.9,45 43,48.1 43,52 C43,55.9 39.9,59 36,59 C32.1,59 29,55.9 29,52 C29,48.1 32.1,45 36,45 Z" />
     <path
-        android:pathData="M37,45 c1.38,0 2.5,1.12 2.5,2.5 c0,1.38 -1.12,2.5 -2.5,2.5 c-1.38,0 -2.5,-1.12 -2.5,-2.5 c0,-1.38 1.12,-2.5 2.5,-2.5 z"
-        android:fillColor="#10B981" />
-
-    <!-- 1. Satır: Yapılacak Metin Çizgisi -->
+        android:fillColor="#FFFFFF"
+        android:pathData="M32.4,51.7 L34.6,49.7 L36.1,51.3 L39.5,47.6 L41.6,49.5 L36,55.6 Z" />
     <path
-        android:pathData="M43,46 h25 c0.83,0 1.5,0.67 1.5,1.5 c0,0.83 -0.67,1.5 -1.5,1.5 h-25 c-0.83,0 -1.5,-0.67 -1.5,-1.5 c0,-0.83 0.67,-1.5 1.5,-1.5 z"
-        android:fillColor="#64748B" />
-
-    <!-- 2. Satır Metin Çizgisi -->
+        android:fillColor="#A5B4FC"
+        android:pathData="M49,48 L68,48 C69.7,48 71,49.3 71,51 C71,52.7 69.7,54 68,54 L49,54 C47.3,54 46,52.7 46,51 C46,49.3 47.3,48 49,48 Z" />
     <path
-        android:pathData="M35.5,55 h35 c0.83,0 1.5,0.67 1.5,1.5 c0,0.83 -0.67,1.5 -1.5,1.5 h-35 c-0.83,0 -1.5,-0.67 -1.5,-1.5 c0,-0.83 0.67,-1.5 1.5,-1.5 z"
-        android:fillColor="#94A3B8" />
-
-    <!-- 3. Satır Metin Çizgisi -->
+        android:fillColor="#14B8A6"
+        android:pathData="M36,62 C39.9,62 43,65.1 43,69 C43,72.9 39.9,76 36,76 C32.1,76 29,72.9 29,69 C29,65.1 32.1,62 36,62 Z" />
     <path
-        android:pathData="M35.5,63 h23 c0.83,0 1.5,0.67 1.5,1.5 c0,0.83 -0.67,1.5 -1.5,1.5 h-23 c-0.83,0 -1.5,-0.67 -1.5,-1.5 c0,-0.83 0.67,-1.5 1.5,-1.5 z"
-        android:fillColor="#CBD5E1" />
-
-    <!-- Kalem Gölgesi -->
+        android:fillColor="#FFFFFF"
+        android:pathData="M32.4,68.7 L34.6,66.7 L36.1,68.3 L39.5,64.6 L41.6,66.5 L36,72.6 Z" />
     <path
-        android:pathData="M69,67 L81,55 c1,-1 2.6,-1 3.6,0 c1,1 1,2.6 0,3.6 L73,71 L65,73 Z"
-        android:fillColor="#26000000" />
+        android:fillColor="#A5B4FC"
+        android:pathData="M49,65 L66,65 C67.7,65 69,66.3 69,68 C69,69.7 67.7,71 66,71 L49,71 C47.3,71 46,69.7 46,68 C46,66.3 47.3,65 49,65 Z" />
 
-    <!-- Modern Yüzen Kalem Gövdesi (Canlı Mavi - Açık Turkuaz) -->
+    <!-- Coral pencil accent -->
     <path
-        android:pathData="M70,64 L80,54 c1.2,-1.2 3.1,-1.2 4.2,0 c1.2,1.2 1.2,3.1 0,4.2 L74,68 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="80"
-                android:startY="54"
-                android:endX="70"
-                android:endY="64"
-                android:type="linear">
-                <item android:offset="0.0" android:color="#38BDF8" />
-                <item android:offset="1.0" android:color="#2563EB" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Kalem Ucu (Koni ve Altın Uç) -->
+        android:fillColor="#F97360"
+        android:pathData="M68,77 L81,62 C82.7,60 85.6,59.8 87.5,61.6 C89.4,63.4 89.5,66.3 87.7,68.2 L74.8,82.2 L67,84 Z" />
     <path
-        android:pathData="M70,64 L74,68 L64,71 Z"
-        android:fillColor="#1E293B" />
-
-    <!-- Kalem Ucu Altın Detay -->
-    <path
-        android:pathData="M66,69.5 L67.5,70.5 L64,71 Z"
-        android:fillColor="#F59E0B" />
-
+        android:fillColor="#312E81"
+        android:pathData="M67,84 L69,76 L74.8,82.2 Z" />
 </vector>

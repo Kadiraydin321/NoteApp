@@ -254,6 +254,31 @@ internal fun applyMarkdownWrap(
     onFocusRequest()
 }
 
+/** Wraps complete lines in a fenced code block instead of formatting only the current word. */
+internal fun applyCodeBlock(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    onFocusRequest: () -> Unit
+) {
+    val text = value.text
+    val start = value.selection.min.coerceIn(0, text.length)
+    val end = value.selection.max.coerceIn(0, text.length)
+    val lineStart = text.lastIndexOf('\n', (start - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
+    val rangeEnd = if (end > start && end > 0 && text[end - 1] == '\n') end - 1 else end
+    val lineEnd = text.indexOf('\n', rangeEnd.coerceAtMost(text.length)).let { if (it < 0) text.length else it }
+    val selectedLines = text.substring(lineStart, lineEnd)
+    val before = text.substring(0, lineStart)
+    val after = text.substring(lineEnd)
+    val leadingBreak = if (before.isNotEmpty() && !before.endsWith('\n')) "\n" else ""
+    val opening = "${leadingBreak}```\n"
+    val closing = "\n```" + if (after.isNotEmpty() && !after.startsWith('\n')) "\n" else ""
+    val contentStart = before.length + opening.length
+    val newText = before + opening + selectedLines + closing + after
+
+    onValueChange(TextFieldValue(newText, TextRange(contentStart, contentStart + selectedLines.length)))
+    onFocusRequest()
+}
+
 private fun hasFormattingInside(text: String, prefix: String, suffix: String): Boolean {
     if (prefix == "**") {
         return (text.startsWith("***") && text.endsWith("***") && text.length >= 6) ||

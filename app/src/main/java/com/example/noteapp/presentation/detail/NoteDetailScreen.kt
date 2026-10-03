@@ -17,6 +17,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.*
@@ -45,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -55,6 +59,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -65,11 +70,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.presentation.components.AttachmentList
 import com.example.noteapp.presentation.components.KeepCheckboxIcon
 import com.example.noteapp.presentation.components.MarkdownPreview
 import com.example.noteapp.presentation.components.MarkdownVisualTransformation
+import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
 import com.example.noteapp.presentation.components.insertTextAtCursor
@@ -290,12 +299,12 @@ fun NoteDetailScreen(
     onToggleAudioRecording: () -> Unit,
     onToggleAudioPlayback: (String) -> Unit,
     onDeleteAttachment: (String) -> Unit,
-    onImageClick: (String) -> Unit,
+    onImageEditClick: (String) -> Unit,
     onRevertImageEdit: (String) -> Unit,
     canRevertImage: (String) -> Boolean,
     onDeleteNoteClick: () -> Unit,
+    onArchiveNoteClick: () -> Unit,
     onAddDrawingClick: () -> Unit,
-    onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
     autoAction: String? = null,
     justEditedImagePath: String? = null,
@@ -363,6 +372,23 @@ fun NoteDetailScreen(
             applyPrefixToLine(state.contentValue, prefix, onContentValueChange, requestActiveFocus)
         }
     }
+
+    val applyCodeBlockAction: () -> Unit = {
+        if (hasChecklistItems && activeChecklistLineIdx == null && !isTrailingActive) {
+            val firstChecklist = state.contentValue.text.lines().indexOfFirst { isChecklistLine(it) }.takeIf { it >= 0 } ?: 0
+            activeChecklistLineIdx = firstChecklist
+            val currentLine = state.contentValue.text.lines().getOrElse(firstChecklist) { "" }
+            val itemStart = getLineStartOffset(state.contentValue.text, firstChecklist) + getChecklistPrefixLength(currentLine)
+            val itemTextLength = extractItemText(currentLine).length
+            applyCodeBlock(
+                state.contentValue.copy(selection = TextRange(itemStart, itemStart + itemTextLength)),
+                onContentValueChange,
+                requestActiveFocus
+            )
+        } else {
+            applyCodeBlock(state.contentValue, onContentValueChange, requestActiveFocus)
+        }
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
@@ -379,10 +405,67 @@ fun NoteDetailScreen(
     var isBacklinksExpanded by rememberSaveable { mutableStateOf(true) }
     var moveCheckedToBottom by rememberSaveable { mutableStateOf(false) }
     var isCompletedSectionExpanded by rememberSaveable { mutableStateOf(true) }
+    var imageViewerPath by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Donanımsal veya jest ile geri tuşuna basıldığında
     BackHandler {
-        onBackClick()
+        if (imageViewerPath != null) imageViewerPath = null else onBackClick()
+    }
+
+    imageViewerPath?.let { path ->
+        var zoom by remember(path) { mutableFloatStateOf(1f) }
+        var panX by remember(path) { mutableFloatStateOf(0f) }
+        var panY by remember(path) { mutableFloatStateOf(0f) }
+        val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+            zoom = (zoom * zoomChange).coerceIn(1f, 5f)
+            panX += panChange.x
+            panY += panChange.y
+        }
+        Dialog(
+            onDismissRequest = { imageViewerPath = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+        ) {
+            val dialogView = LocalView.current
+            SideEffect {
+                (dialogView.parent as? DialogWindowProvider)?.window?.let { window ->
+                    window.statusBarColor = android.graphics.Color.BLACK
+                    window.navigationBarColor = android.graphics.Color.BLACK
+                }
+            }
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = File(path),
+                    contentDescription = "Tam ekran görsel",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().transformable(transformState).graphicsLayer {
+                        scaleX = zoom
+                        scaleY = zoom
+                        translationX = panX
+                        translationY = panY
+                    }
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).statusBarsPadding().padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilledTonalIconButton(onClick = { imageViewerPath = null }) {
+                        Icon(Icons.Default.Close, contentDescription = "Görseli kapat")
+                    }
+                    FilledTonalButton(onClick = {
+                        imageViewerPath = null
+                        onImageEditClick(path)
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Düzenle")
+                    }
+                }
+            }
+        }
     }
 
     // Görsel düzenlemeden yeni dönüldüyse geri alma için anında snackbar göster
@@ -873,8 +956,8 @@ fun NoteDetailScreen(
                         // 1. Sabitleme (Pin) Butonu
                         IconButton(onClick = onTogglePin) {
                             Icon(
-                                imageVector = if (state.isPinned) Icons.Default.PushPin else Icons.Default.OutlinedFlag,
-                                contentDescription = "Sabitle",
+                                imageVector = if (state.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                contentDescription = if (state.isPinned) "Sabitlemeyi kaldır" else "Sabitle",
                                 tint = pinButtonColor
                             )
                         }
@@ -890,17 +973,12 @@ fun NoteDetailScreen(
                             }
                         }
 
-                        // 3. Kaydet Butonu
-                        IconButton(onClick = onSaveClick) {
-                            Icon(Icons.Default.Done, contentDescription = "Kaydet", tint = topBarIconColor)
-                        }
-
-                        // 4. Not İçi Arama Butonu
+                        // Not İçi Arama Butonu
                         IconButton(onClick = { isSearchActive = true }) {
                             Icon(Icons.Default.Search, contentDescription = "Notta Ara", tint = topBarIconColor)
                         }
 
-                        // 5. Üç Nokta Menüsü
+                        // Üç Nokta Menüsü
                         Box {
                             IconButton(onClick = { showMoreMenu = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "Daha Fazla Seçenek", tint = topBarIconColor)
@@ -966,6 +1044,22 @@ fun NoteDetailScreen(
                                         showMoreMenu = false
                                     }
                                 )
+
+                                if ((state.currentNoteId ?: 0L) > 0L) {
+                                    DropdownMenuItem(
+                                        text = { Text(if (state.isArchived) "Arşivden Çıkar" else "Arşivle") },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = if (state.isArchived) Icons.Default.Unarchive else Icons.Default.Archive,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            onArchiveNoteClick()
+                                        }
+                                    )
+                                }
 
                                 HorizontalDivider()
 
@@ -1311,6 +1405,10 @@ fun NoteDetailScreen(
                                                     Icon(Icons.Default.BorderColor, contentDescription = "Vurgu", tint = Color(0xFFFBC02D))
                                                 }
                                                 VerticalDivider(modifier = Modifier.height(24.dp).padding(horizontal = 4.dp))
+                                                // Kod Bloku (```)
+                                                IconButton(onClick = applyCodeBlockAction) {
+                                                    Icon(Icons.Default.Code, contentDescription = "Kod Bloku")
+                                                }
                                                 // Başlık (H3)
                                                 IconButton(onClick = { applyPrefix("### ") }) {
                                                     Icon(Icons.Default.Title, contentDescription = "Başlık")
@@ -1335,10 +1433,6 @@ fun NoteDetailScreen(
                                                 // Bilgi Kutusu (> [!NOTE])
                                                 IconButton(onClick = { applyPrefix("> [!NOTE] ") }) {
                                                     Icon(Icons.Default.Lightbulb, contentDescription = "Bilgi Kutusu", tint = MaterialTheme.colorScheme.secondary)
-                                                }
-                                                // Kod Bloku (```)
-                                                IconButton(onClick = { applyWrap("```\n", "\n```") }) {
-                                                    Icon(Icons.Default.Code, contentDescription = "Kod Bloku")
                                                 }
                                             }
                                         }
@@ -1723,7 +1817,7 @@ fun NoteDetailScreen(
                         onPlayAudio = onToggleAudioPlayback,
                         isPlayingAudio = state.isPlayingAudio,
                         currentPlayingPath = state.currentPlayingPath,
-                        onImageClick = onImageClick,
+                        onImageClick = { imageViewerPath = it },
                         onRevertImage = { revertConfirmPath = it },
                         canRevertImage = canRevertImage,
                         onExtractText = onExtractText,
