@@ -1,0 +1,33 @@
+{
+  "name": "byterescue",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Cyber Data Recovery & Raw Sector Carver Desktop Application",
+  "main": "electron/main.js",
+  "scripts": {
+    "build": "vite build",
+    "start": "electron .",
+    "dev": "vite build && electron .",
+    "test-engine": "node tests/test-carver.js"
+  },
+  "keywords": [
+    "data-recovery",
+    "file-carving",
+    "disk-scanner",
+    "forensics",
+    "electron",
+    "svelte"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.1.1",
+    "autoprefixer": "^10.4.27",
+    "electron": "^33.4.11",
+    "lucide-svelte": "^1.0.1",
+    "postcss": "^8.5.8",
+    "svelte": "^5.53.8",
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.4.4"
+  }
+}
