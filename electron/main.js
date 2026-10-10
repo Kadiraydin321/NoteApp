@@ -13,14 +13,23 @@ const __dirname = path.dirname(__filename);
 let mainWindow = null;
 let activeEngine = null;
 
+// Windows görev çubuğu ve bildirimler için uygulama kimliği
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.kadir.byterescue');
+}
+
 function createWindow() {
+  const iconPath = path.join(__dirname, '../build/icon.png');
+
   mainWindow = new BrowserWindow({
-    width: 1300,
+    width: 1320,
     height: 880,
     minWidth: 1024,
     minHeight: 720,
-    title: 'ByteRescue // Ham Sektör & Bilgisayar Veri Kurtarma Laboratuvarı',
+    title: 'ByteRescue by Kadir // Ham Sektör & Bilgisayar Veri Kurtarma Laboratuvarı',
     backgroundColor: '#070a13',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,

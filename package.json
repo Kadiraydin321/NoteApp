@@ -1,14 +1,17 @@
 {
   "name": "byterescue",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "type": "module",
-  "description": "Cyber Data Recovery & Raw Sector Carver Desktop Application",
+  "description": "ByteRescue by Kadir - Ham Sektör ve Bilgisayar Veri Kurtarma Laboratuvarı",
   "main": "electron/main.js",
   "scripts": {
     "build": "vite build",
     "start": "electron .",
     "dev": "vite build && electron .",
-    "test-engine": "node tests/test-carver.js"
+    "test": "node tests/test-carver.js && node tests/test-computer-scan.js",
+    "test-engine": "node tests/test-carver.js",
+    "pack:win": "vite build && electron-builder --win --dir",
+    "dist:win": "vite build && electron-builder --win nsis portable --x64"
   },
   "keywords": [
     "data-recovery",
@@ -16,14 +19,57 @@
     "disk-scanner",
     "forensics",
     "electron",
-    "svelte"
+    "svelte",
+    "kadir-aydin"
   ],
-  "author": "Antigravity",
+  "author": "Kadir Aydın",
   "license": "MIT",
+  "build": {
+    "appId": "com.kadir.byterescue",
+    "productName": "ByteRescue",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "engine/**/*",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ByteRescue by Kadir",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    }
+  },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.1.1",
     "autoprefixer": "^10.4.27",
     "electron": "^33.4.11",
+    "electron-builder": "^24.13.3",
     "lucide-svelte": "^1.0.1",
     "postcss": "^8.5.8",
     "svelte": "^5.53.8",
