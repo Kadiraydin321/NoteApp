@@ -39,7 +39,7 @@
 
   // Konsol Logları (Siber Ticker)
   let consoleLogs = $state([
-    { time: new Date().toLocaleTimeString(), text: 'ByteRescue by Kadir hazır. Taranacak sürücü veya klasörü seçin.', type: 'info' }
+    { time: new Date().toLocaleTimeString(), text: 'ByteRescue Veri Kurtarıcı hazır. Taranacak sürücü veya klasörü seçin.', type: 'info' }
   ]);
 
   // Modal Durumları
@@ -310,12 +310,14 @@
           <h1 class="text-base font-extrabold tracking-wider font-mono bg-gradient-to-r from-cyan-400 via-teal-300 to-purple-400 bg-clip-text text-transparent">
             BYTERESCUE
           </h1>
-          <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono font-bold border border-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)]">
-            ⚡ KADİR AYDIN EDITION
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-bold border border-cyan-500/40 shadow-[0_0_8px_rgba(6,182,212,0.3)]">
+            ⚡ KURTARICI
           </span>
         </div>
         <p class="text-[11px] text-slate-400 font-mono tracking-tight flex items-center space-x-1.5">
-          <span>Ham Sektör & Dosya İmzası Veri Kurtarma Laboratuvarı</span>
+          <span>Veri Kurtarıcı</span>
+          <span class="text-cyan-500">•</span>
+          <span class="text-slate-300 font-medium">Kadir</span>
           <span class="text-cyan-500">•</span>
           <span class="text-slate-500">v1.2</span>
         </p>
@@ -403,10 +405,11 @@
       <!-- Hakkında Butonu -->
       <button
         type="button"
-        class="px-2.5 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold transition-all shadow-[0_0_8px_rgba(168,85,247,0.15)]"
+        class="px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-semibold transition-all shadow-[0_0_8px_rgba(6,182,212,0.15)] flex items-center space-x-1.5"
         onclick={() => (showAboutModal = true)}
       >
-        Kadir Aydın
+        <span>Kadir</span>
+        <span class="text-[10px] text-slate-400">• Bilgi</span>
       </button>
     </div>
   </header>

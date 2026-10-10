@@ -45,8 +45,8 @@
           <span>BYTERESCUE</span>
           <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">v1.2</span>
         </h3>
-        <p class="text-xs font-mono text-purple-400 font-semibold mt-1">
-          Geliştirici & Tasarım: <span class="text-slate-100 underline decoration-purple-500 font-bold">Kadir Aydın</span>
+        <p class="text-xs font-mono text-cyan-400 font-semibold mt-1">
+          Kurtarıcı: <span class="text-slate-100 font-bold">Kadir</span>
         </p>
       </div>
 
@@ -80,7 +80,7 @@
 
     <!-- Alt Kapat Butonu -->
     <div class="flex items-center justify-between px-6 py-3.5 border-t border-slate-800 bg-[#0d1426] text-xs font-mono">
-      <span class="text-slate-500">© 2026 Kadir Aydın. Tüm Hakları Saklıdır.</span>
+      <span class="text-slate-500">© 2026 Kadir. ByteRescue Veri Kurtarıcı.</span>
       <button
         type="button"
         class="px-5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-slate-950 font-bold transition-all shadow-md shadow-cyan-500/20"

@@ -26,7 +26,7 @@ function createWindow() {
     height: 880,
     minWidth: 1024,
     minHeight: 720,
-    title: 'ByteRescue by Kadir // Ham Sektör & Bilgisayar Veri Kurtarma Laboratuvarı',
+    title: 'ByteRescue // Veri Kurtarıcı',
     backgroundColor: '#070a13',
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     autoHideMenuBar: true,

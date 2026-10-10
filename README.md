@@ -1,7 +1,7 @@
-# ⚡ ByteRescue by Kadir // Ham Sektör ve Bilgisayar Veri Kurtarma Laboratuvarı
+# ⚡ ByteRescue // Veri Kurtarıcı
 
-**Geliştirici:** Kadir Aydın  
-**Sürüm:** 1.2.0 (Kadir Aydın Edition)  
+**Geliştirici:** Kadir  
+**Sürüm:** 1.2.0  
 **Platform:** Windows 10/11 & Linux  
 
 Modern, yüksek başarımlı ve siber temalı masaüstü veri kurtarma (Raw Sector Carver & Deep Computer Scanner) uygulaması.
