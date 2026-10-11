@@ -1,6 +1,6 @@
 {
   "name": "byterescue",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "description": "ByteRescue - Ham Sektör ve Bilgisayar Veri Kurtarıcısı",
   "main": "electron/main.js",

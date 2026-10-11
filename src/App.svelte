@@ -428,29 +428,31 @@
   </header>
 
   <!-- 2. ANA İÇERİK IZGARASI -->
-  <main class="flex-1 flex flex-col overflow-hidden p-5 gap-4">
-    <!-- A. KONTROL & HEDEF SEÇİM ŞERİDİ -->
-    <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-center bg-[#0d1322]/90 border border-cyan-500/20 rounded-2xl p-4 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-      <!-- Sürücü / Klasör Seçici -->
-      <DiskSelector
-        selectedSource={selectedSource}
-        isScanning={scanStatus === 'running'}
-        onSelect={(src) => {
-          selectedSource = src;
-          addLog(`Tarama hedefi seçildi: ${src.name} (${src.path})`, 'info');
-          checkSafety();
-        }}
-      />
+  <main class="flex-1 flex flex-col overflow-hidden p-3.5 gap-2.5">
+    <!-- A. KONTROL & HEDEF SEÇİM ŞERİDİ (YATAY, FERAH & ASLA ALTA SARKMAYAN TASARIM) -->
+    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-[#0d1322]/95 border border-cyan-500/25 rounded-2xl p-3 px-4 backdrop-blur-xl shadow-[0_8px_25px_rgba(0,0,0,0.5)]">
+      <!-- Sürücü / Hedef Seçici -->
+      <div class="flex-1 min-w-0">
+        <DiskSelector
+          selectedSource={selectedSource}
+          isScanning={scanStatus === 'running'}
+          onSelect={(src) => {
+            selectedSource = src;
+            addLog(`Tarama hedefi seçildi: ${src.name} (${src.path})`, 'info');
+            checkSafety();
+          }}
+        />
+      </div>
 
       <!-- Aksiyon Butonları -->
-      <div class="flex items-center space-x-2.5 flex-shrink-0">
+      <div class="flex items-center space-x-2 flex-shrink-0 self-end lg:self-center">
         {#if scanStatus === 'running'}
           <button
             type="button"
-            class="px-5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold font-mono transition-all flex items-center space-x-2 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+            class="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold font-mono transition-all flex items-center space-x-1.5 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
             onclick={handlePauseResume}
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span>DURAKLAT</span>
@@ -458,10 +460,10 @@
 
           <button
             type="button"
-            class="px-5 py-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold font-mono transition-all flex items-center space-x-2 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+            class="px-4 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold font-mono transition-all flex items-center space-x-1.5 shadow-[0_0_12px_rgba(239,68,68,0.2)]"
             onclick={handleStopScan}
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
             </svg>
@@ -470,10 +472,10 @@
         {:else if scanStatus === 'paused'}
           <button
             type="button"
-            class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold font-mono text-xs shadow-[0_0_20px_rgba(0,245,212,0.4)] transition-all flex items-center space-x-2"
+            class="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold font-mono text-xs shadow-[0_0_15px_rgba(0,245,212,0.4)] transition-all flex items-center space-x-1.5"
             onclick={handlePauseResume}
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -482,7 +484,7 @@
         {:else}
           <button
             type="button"
-            class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400 text-slate-950 font-extrabold font-mono text-xs shadow-[0_0_25px_rgba(0,245,212,0.35)] transition-all flex items-center space-x-2 disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
+            class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400 text-slate-950 font-extrabold font-mono text-xs shadow-[0_0_20px_rgba(0,245,212,0.35)] transition-all flex items-center space-x-2 disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
             disabled={!selectedSource}
             onclick={handleStartScan}
           >
@@ -495,73 +497,73 @@
       </div>
     </div>
 
-    <!-- B. FORMAT SEÇİM ŞERİDİ & SEKTÖR AYARI -->
-    <div class="flex flex-wrap items-center justify-between gap-3 px-1">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-mono text-slate-400 mr-1 font-bold">İMZALAR:</span>
+    <!-- B. FORMAT SEÇİM ŞERİDİ & SEKTÖR AYARI (KOMPAKT) -->
+    <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="text-[11px] font-mono text-slate-400 mr-1 font-bold">İMZALAR:</span>
 
         <button
           type="button"
-          class="px-3 py-1 rounded-xl text-xs font-mono font-semibold transition-all flex items-center space-x-1.5 {selectedCategories.includes('images') ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(0,245,212,0.2)]' : 'bg-slate-900/80 text-slate-400 border border-slate-800'}"
+          class="px-2.5 py-0.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center space-x-1 {selectedCategories.includes('images') ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-900/80 text-slate-400 border border-slate-800'}"
           onclick={() => toggleCategory('images')}
         >
           <span>📷 Görseller</span>
           {#if counts.images > 0}
-            <span class="px-1.5 py-0.2 rounded-full bg-cyan-400/30 text-[10px] text-cyan-200">{counts.images}</span>
+            <span class="px-1.5 py-0.2 rounded-full bg-cyan-400/30 text-[9px] text-cyan-200">{counts.images}</span>
           {/if}
         </button>
 
         <button
           type="button"
-          class="px-3 py-1 rounded-xl text-xs font-mono font-semibold transition-all flex items-center space-x-1.5 {selectedCategories.includes('documents') ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.2)]' : 'bg-slate-900/80 text-slate-400 border border-slate-800'}"
+          class="px-2.5 py-0.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center space-x-1 {selectedCategories.includes('documents') ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-slate-900/80 text-slate-400 border border-slate-800'}"
           onclick={() => toggleCategory('documents')}
         >
           <span>📄 Belgeler</span>
           {#if counts.documents > 0}
-            <span class="px-1.5 py-0.2 rounded-full bg-purple-400/30 text-[10px] text-purple-200">{counts.documents}</span>
+            <span class="px-1.5 py-0.2 rounded-full bg-purple-400/30 text-[9px] text-purple-200">{counts.documents}</span>
           {/if}
         </button>
 
         <button
           type="button"
-          class="px-3 py-1 rounded-xl text-xs font-mono font-semibold transition-all flex items-center space-x-1.5 {selectedCategories.includes('media') ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 'bg-slate-900/80 text-slate-400 border border-slate-800'}"
+          class="px-2.5 py-0.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center space-x-1 {selectedCategories.includes('media') ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-900/80 text-slate-400 border border-slate-800'}"
           onclick={() => toggleCategory('media')}
         >
           <span>🎬 Medya</span>
           {#if counts.media > 0}
-            <span class="px-1.5 py-0.2 rounded-full bg-emerald-400/30 text-[10px] text-emerald-200">{counts.media}</span>
+            <span class="px-1.5 py-0.2 rounded-full bg-emerald-400/30 text-[9px] text-emerald-200">{counts.media}</span>
           {/if}
         </button>
 
         <button
           type="button"
-          class="px-3 py-1 rounded-xl text-xs font-mono font-semibold transition-all flex items-center space-x-1.5 {selectedCategories.includes('archives') ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-slate-900/80 text-slate-400 border border-slate-800'}"
+          class="px-2.5 py-0.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center space-x-1 {selectedCategories.includes('archives') ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-900/80 text-slate-400 border border-slate-800'}"
           onclick={() => toggleCategory('archives')}
         >
           <span>📦 Arşivler</span>
           {#if counts.archives > 0}
-            <span class="px-1.5 py-0.2 rounded-full bg-amber-400/30 text-[10px] text-amber-200">{counts.archives}</span>
+            <span class="px-1.5 py-0.2 rounded-full bg-amber-400/30 text-[9px] text-amber-200">{counts.archives}</span>
           {/if}
         </button>
 
         <button
           type="button"
-          class="px-3 py-1 rounded-xl text-xs font-mono font-semibold transition-all border border-dashed border-purple-400/50 text-purple-300 hover:bg-purple-500/15 flex items-center space-x-1"
+          class="px-2 py-0.5 rounded-lg text-xs font-mono font-medium transition-all border border-dashed border-purple-400/40 text-purple-300 hover:bg-purple-500/15 flex items-center space-x-1"
           onclick={() => (showCustomModal = true)}
         >
-          <span>+ Özel İmza</span>
+          <span>+ Özel</span>
           {#if customSignatures.length > 0}
-            <span class="ml-1 px-1.5 py-0.2 rounded-full bg-purple-500/30 text-[10px] font-bold">{customSignatures.length}</span>
+            <span class="ml-1 px-1.5 py-0.2 rounded-full bg-purple-500/30 text-[9px] font-bold">{customSignatures.length}</span>
           {/if}
         </button>
       </div>
 
       <!-- Sektör Adımı -->
-      <div class="flex items-center space-x-2 text-xs font-mono text-slate-400">
-        <span>Sektör Adımı:</span>
+      <div class="flex items-center space-x-1.5 text-xs font-mono text-slate-400">
+        <span class="text-[11px]">Sektör Adımı:</span>
         <select
           bind:value={sectorAlignment}
-          class="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1 text-slate-200 text-xs focus:outline-none focus:border-cyan-500 font-mono"
+          class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-0.5 text-slate-200 text-xs focus:outline-none focus:border-cyan-500 font-mono"
         >
           <option value={512}>512 Bayt (Standart Hızlı)</option>
           <option value={4096}>4096 Bayt (4K Gelişmiş)</option>
@@ -570,12 +572,12 @@
       </div>
     </div>
 
-    <!-- C. GERÇEK ZAMANLI METRİK KARTLARI -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <!-- C. GERÇEK ZAMANLI METRİK KARTLARI (KOMPAKT & FERAH) -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
       <MetricCard
         title="Taranan Veri"
         value={`${formatBytes(stats.bytesScanned)}`}
-        subtitle={`${formatBytes(stats.totalBytes)} içinden (%${stats.percentage})`}
+        subtitle={`${formatBytes(stats.totalBytes)} (%${stats.percentage})`}
         accent="cyan"
         badge={`%${stats.percentage}`}
       />
@@ -583,7 +585,7 @@
       <MetricCard
         title="Tarama Hızı"
         value={`${stats.speedMBps} MB/s`}
-        subtitle="Ham Disk Çıkartma Hızı"
+        subtitle="Ham Okuma Hızı"
         accent="emerald"
         badge={stats.speedMBps > 200 ? 'Ultra Hızlı' : 'Aktif'}
       />
@@ -591,32 +593,32 @@
       <MetricCard
         title="Bulunan Dosyalar"
         value={`${stats.filesFound} Adet`}
-        subtitle="Ayrıştırılmış Sektör İmzaları"
+        subtitle="İmza Eşleşmesi"
         accent="purple"
         badge={stats.filesFound > 0 ? 'İmza Eşleşti' : 'Bekleniyor'}
       />
 
       <MetricCard
-        title="Tahmini Kalan Süre"
+        title="Kalan Süre"
         value={formatETA(stats.etaSeconds)}
-        subtitle="İş Parçacığı: Multi-Worker"
+        subtitle="Multi-Worker"
         accent="amber"
         badge="ETA"
       />
     </div>
 
-    <!-- D. İLERLEME ÇUBUĞU (Neon Siber Gradient) -->
-    <div class="w-full bg-[#0d1426] border border-cyan-500/30 rounded-xl p-1 relative overflow-hidden shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+    <!-- D. İLERLEME ÇUBUĞU (Kompakt Neon Çizgi) -->
+    <div class="w-full bg-[#0d1426] border border-cyan-500/25 rounded-full p-0.5 relative overflow-hidden shadow-sm">
       <div
-        class="h-3 rounded-lg bg-gradient-to-r from-cyan-400 via-teal-300 to-purple-500 transition-all duration-300 relative overflow-hidden shadow-[0_0_20px_rgba(0,245,212,0.4)]"
+        class="h-1.5 rounded-full bg-gradient-to-r from-cyan-400 via-teal-300 to-purple-500 transition-all duration-300 relative overflow-hidden shadow-[0_0_12px_rgba(0,245,212,0.4)]"
         style="width: {Math.max(stats.percentage, 0.5)}%"
       >
-        <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+        <div class="absolute inset-0 bg-white/25 animate-pulse"></div>
       </div>
     </div>
 
-    <!-- E. ALT BÖLÜM: BULUNAN DOSYALAR VE SİBER LOG PANELİ -->
-    <div class="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 min-h-0 overflow-hidden">
+    <!-- E. ALT BÖLÜM: BULUNAN DOSYALAR VE SİBER LOG PANELİ (GENİŞLETİLMİŞ ALAN) -->
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-3 min-h-0 overflow-hidden">
       <!-- SOL: BULUNAN DOSYALAR TABLOSU -->
       <div class="bg-[#0b1022]/95 border border-cyan-500/20 rounded-2xl flex flex-col overflow-hidden backdrop-blur-xl shadow-2xl">
         <!-- Tablo Filtre & Eylem Başlığı -->
