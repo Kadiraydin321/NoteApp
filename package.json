@@ -40,6 +40,7 @@
     ],
     "win": {
       "icon": "build/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator",
       "target": [
         {
           "target": "nsis",
@@ -56,6 +57,8 @@
       ]
     },
     "nsis": {
+      "perMachine": true,
+      "allowElevation": true,
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

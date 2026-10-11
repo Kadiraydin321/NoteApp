@@ -48,11 +48,23 @@
   let showCustomModal = $state(false);
   let showAboutModal = $state(false);
   let recoveryAlert = $state(null);
+  let adminStatus = $state(null);
 
   onMount(async () => {
     isSoundOn = cyberAudio.isEnabled();
 
     if (window.api) {
+      if (window.api.checkAdminStatus) {
+        try {
+          adminStatus = await window.api.checkAdminStatus();
+          if (adminStatus && adminStatus.isAdmin) {
+            addLog('🛡️ Sistem Yetkisi: YÖNETİCİ MODU AKTİF (Tüm disklere ve ham sektörlere tam yetki sağlandı)', 'success');
+          } else {
+            addLog('⚠️ Sistem Yetkisi: Standart kullanıcı modu. Ham sektör ve korumalı disk bölümleri için Yönetici izni önerilir.', 'warning');
+          }
+        } catch (_) {}
+      }
+
       if (window.api.getDefaultDestination) {
         try {
           const defaultDest = await window.api.getDefaultDestination();
@@ -113,12 +125,27 @@
 
   async function handleSelectDestFolder() {
     cyberAudio.playClick();
-    if (window.api && window.api.selectFolder) {
-      const folder = await window.api.selectFolder();
-      if (folder) {
-        destinationDir = folder;
-        checkSafety();
+    if (typeof window !== 'undefined' && window.api && window.api.selectFolder) {
+      try {
+        const folder = await window.api.selectFolder();
+        if (folder) {
+          destinationDir = folder;
+          addLog(`Kurtarma hedef klasörü güncellendi: ${folder}`, 'info');
+          checkSafety();
+        }
+      } catch (err) {
+        addLog(`Hedef klasör seçilemedi: ${err.message}`, 'error');
       }
+    } else {
+      alert('Hedef klasör seçimi için sistem arayüzü hazır değil (window.api bekleniyor).');
+    }
+  }
+
+  async function handleRequestAdmin() {
+    cyberAudio.playClick();
+    if (typeof window !== 'undefined' && window.api && window.api.requestAdminElevation) {
+      addLog('🛡️ Yönetici yetkisi isteniyor (Windows UAC ekranı açılıyor)...', 'info');
+      await window.api.requestAdminElevation();
     }
   }
 
@@ -139,6 +166,12 @@
     cyberAudio.playClick();
     if (!selectedSource?.path) {
       alert('Lütfen önce taranacak bir disk veya klasör seçin.');
+      return;
+    }
+
+    if (!window.api || !window.api.startScan) {
+      alert('Sistem köprüsü (window.api) hazır değil.');
+      addLog('Hata: Masaüstü iletişim köprüsü (window.api) başlatılamamış.', 'error');
       return;
     }
 
@@ -388,6 +421,26 @@
           </svg>
         {/if}
       </button>
+
+      <!-- Yönetici Yetki Rozeti / İzin Alma Butonu -->
+      {#if adminStatus}
+        {#if adminStatus.isAdmin}
+          <div class="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-mono border bg-cyan-500/15 text-cyan-300 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]" title="Yönetici (Administrator) yetkileri aktif. Ham sektör ve tüm dosya sistemine tam erişim izni var.">
+            <span class="text-xs">🛡️</span>
+            <span class="font-bold">YÖNETİCİ</span>
+          </div>
+        {:else}
+          <button
+            type="button"
+            class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-mono border bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/40 transition-colors cursor-pointer"
+            onclick={handleRequestAdmin}
+            title="Uygulama standart kullanıcı izniyle çalışıyor. Tam disk ve ham sektör erişimi için tıklayıp Yönetici olarak yeniden başlatabilirsiniz."
+          >
+            <span class="text-xs">🛡️</span>
+            <span class="font-bold">İzin Al (UAC)</span>
+          </button>
+        {/if}
+      {/if}
 
       <!-- Güvenli Koruma Rozeti -->
       {#if safetyStatus}

@@ -95,9 +95,9 @@
   async function handleBrowseScanFolder() {
     if (isScanning) return;
     try {
-      if (window.api && window.api.selectScanFolder) {
+      if (typeof window !== 'undefined' && window.api && window.api.selectScanFolder) {
         const folder = await window.api.selectScanFolder();
-        if (folder) {
+        if (folder && folder.path) {
           onSelect({
             id: 'custom_folder_' + Date.now(),
             type: 'user_folder',
@@ -108,9 +108,12 @@
             isAccessible: true
           });
         }
+      } else {
+        alert('Klasör seçimi için sistem arayüzü hazır değil (window.api bekleniyor).');
       }
     } catch (err) {
       console.error('Klasör seçimi hatası:', err);
+      alert('Klasör seçilirken bir hata oluştu: ' + err.message);
     }
   }
 
@@ -235,7 +238,7 @@
       </button>
     {/if}
 
-    <!-- Özel Klasör -->
+    <!-- Özel Klasör Butonu -->
     <button
       type="button"
       class="px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-mono font-semibold transition-all flex items-center space-x-1 flex-shrink-0 cursor-pointer"
@@ -248,6 +251,15 @@
       </svg>
       <span>Klasör Seç</span>
     </button>
+
+    {#if selectedSource && selectedSource.id && selectedSource.id.startsWith('custom_folder')}
+      <button
+        type="button"
+        class="px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all flex items-center space-x-1.5 flex-shrink-0 cursor-pointer bg-purple-500/25 text-purple-300 border-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.35)] scale-[1.02]"
+      >
+        <span>📂 {selectedSource.name}</span>
+      </button>
+    {/if}
 
     <!-- İmaj (.img) -->
     <button

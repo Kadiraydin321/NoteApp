@@ -2,6 +2,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
+import { execSync, exec } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CarverEngine } from '../engine/carver.js';
 import { DiskDetector } from '../engine/disk-detector.js';
@@ -12,6 +13,29 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow = null;
 let activeEngine = null;
+
+// Windows yönetici / UAC kontrolü
+function checkIsAdmin() {
+  if (process.platform === 'win32') {
+    try {
+      execSync('fsutil dirty query %systemdrive%', { stdio: 'ignore' });
+      return true;
+    } catch (_) {
+      try {
+        execSync('net session', { stdio: 'ignore' });
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+  } else {
+    return process.getuid ? process.getuid() === 0 : false;
+  }
+}
+
+function getWindow() {
+  return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+}
 
 // Windows görev çubuğu ve bildirimler için uygulama kimliği
 if (process.platform === 'win32') {
@@ -31,7 +55,7 @@ function createWindow() {
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     autoHideMenuBar: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true
     }
@@ -51,6 +75,26 @@ function createWindow() {
 }
 
 // IPC Handlers
+ipcMain.handle('check-admin-status', async () => {
+  return {
+    isAdmin: checkIsAdmin(),
+    platform: process.platform
+  };
+});
+
+ipcMain.handle('request-admin-elevation', async () => {
+  if (process.platform === 'win32') {
+    const exePath = process.execPath;
+    exec(`powershell.exe -Command "Start-Process '${exePath}' -Verb RunAs"`, (err) => {
+      if (!err) {
+        app.quit();
+      }
+    });
+    return { restarting: true };
+  }
+  return { restarting: false };
+});
+
 ipcMain.handle('list-drives', async () => {
   return DiskDetector.listDrives();
 });
@@ -60,14 +104,16 @@ ipcMain.handle('get-default-destination', async () => {
 });
 
 ipcMain.handle('select-file', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const win = getWindow();
+  const options = {
     title: 'Taranacak Disk İmajını Seçin',
-    properties: ['openFile'],
+    properties: ['openFile', 'dontAddToRecent'],
     filters: [
       { name: 'Disk İmajları', extensions: ['img', 'raw', 'dd', 'iso', 'bin', 'vhd'] },
       { name: 'Tüm Dosyalar', extensions: ['*'] }
     ]
-  });
+  };
+  const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
 
   if (result.canceled || result.filePaths.length === 0) return null;
   const filePath = result.filePaths[0];
@@ -81,10 +127,12 @@ ipcMain.handle('select-file', async () => {
 });
 
 ipcMain.handle('select-scan-folder', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const win = getWindow();
+  const options = {
     title: 'Bilgisayarınızda Taranacak Klasörü Seçin (Masaüstü, İndirilenler vb.)',
-    properties: ['openDirectory']
-  });
+    properties: ['openDirectory', 'dontAddToRecent']
+  };
+  const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
 
   if (result.canceled || result.filePaths.length === 0) return null;
   const folderPath = result.filePaths[0];
@@ -96,10 +144,12 @@ ipcMain.handle('select-scan-folder', async () => {
 });
 
 ipcMain.handle('select-folder', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const win = getWindow();
+  const options = {
     title: 'Kurtarılan Dosyaların Kaydedileceği Klasörü Seçin',
-    properties: ['openDirectory', 'createDirectory']
-  });
+    properties: ['openDirectory', 'createDirectory', 'dontAddToRecent']
+  };
+  const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
 
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths[0];

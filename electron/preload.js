@@ -1,14 +1,17 @@
 // electron/preload.js
-import { contextBridge, ipcRenderer } from 'electron';
+// ByteRescue - Preload Script
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
-  // Sistem Sürücüleri & Güvenlik
+  // Sistem Sürücüleri, Yetki & Güvenlik
   listDrives: () => ipcRenderer.invoke('list-drives'),
   selectFile: () => ipcRenderer.invoke('select-file'),
   selectScanFolder: () => ipcRenderer.invoke('select-scan-folder'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   getDefaultDestination: () => ipcRenderer.invoke('get-default-destination'),
   checkSafety: (source, dest) => ipcRenderer.invoke('check-safety', source, dest),
+  checkAdminStatus: () => ipcRenderer.invoke('check-admin-status'),
+  requestAdminElevation: () => ipcRenderer.invoke('request-admin-elevation'),
 
   // Tarama Kontrolleri
   startScan: (options) => ipcRenderer.invoke('start-scan', options),
