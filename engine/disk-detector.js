@@ -7,98 +7,201 @@ import path from 'node:path';
 import os from 'node:os';
 
 export class DiskDetector {
+  // Varsayılan güvenli kurtarma klasörünü belirle
+  static getDefaultDestination() {
+    try {
+      if (process.platform === 'win32') {
+        const home = os.homedir();
+        const desktopPath = path.join(home, 'Desktop', 'ByteRescue_Kurtarilan');
+        return desktopPath;
+      }
+      // WSL ortamı
+      if (fs.existsSync('/mnt/c/Users')) {
+        const userDirs = DiskDetector.detectUserLocations();
+        const desktop = userDirs.find(u => u.id === 'user_desktop');
+        if (desktop && desktop.path) {
+          return path.join(desktop.path, 'ByteRescue_Kurtarilan');
+        }
+      }
+      return path.join(os.homedir(), 'ByteRescue_Kurtarilan');
+    } catch (_) {
+      return process.platform === 'win32' ? 'C:\\ByteRescue_Kurtarilan' : '/tmp/byterescue_recovered';
+    }
+  }
+
   // Sistemdeki dahili bilgisayar sürücülerini, kullanıcı klasörlerini ve aygıtları listele
   static listDrives() {
     const items = [];
 
-    // 1. DAHİLİ BİLGİSAYAR SÜRÜCÜLERİ (Windows C:, D: ve Linux Kök)
-    // Windows C: sürücüsü
-    if (fs.existsSync('/mnt/c')) {
-      const sizeInfo = DiskDetector.getMountedPathSize('/mnt/c');
+    if (process.platform === 'win32') {
+      // --- WINDOWS DOĞAL ORTAMI ---
+      // 1. Sürücüler (C:\ - Z:\)
+      const letters = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+      for (const letter of letters) {
+        const rootPath = `${letter}:\\`;
+        try {
+          if (fs.existsSync(rootPath)) {
+            const sizeInfo = DiskDetector.getMountedPathSize(rootPath);
+            items.push({
+              id: `drive_${letter.toLowerCase()}`,
+              name: letter === 'C' ? 'C: Sürücüsü (Sistem)' : letter === 'D' ? 'D: Sürücüsü (Veri Deposu)' : `${letter}: Sürücüsü`,
+              path: rootPath,
+              sizeBytes: sizeInfo.sizeBytes,
+              sizeHuman: sizeInfo.sizeHuman,
+              type: 'computer_drive',
+              category: 'drives',
+              badge: 'Dahili Sürücü',
+              isAccessible: true,
+              description: letter === 'C' ? 'Windows ana yerel sürücüsü ve sistem' : `${letter}: yerel depolama sürücüsü`
+            });
+          }
+        } catch (_) {}
+      }
+
+      // 2. Kullanıcı Klasörleri (Masaüstü, İndirilenler, Belgeler vb.)
+      const userDirs = DiskDetector.detectWindowsUserLocations();
+      for (const u of userDirs) items.push(u);
+
+      // 3. Geri Dönüşüm Kutuları ($Recycle.Bin)
+      for (const letter of letters) {
+        const recyclePath = `${letter}:\\$Recycle.Bin`;
+        try {
+          if (fs.existsSync(recyclePath)) {
+            items.push({
+              id: `recycle_${letter.toLowerCase()}`,
+              name: `Geri Dönüşüm Kutusu (${letter}: $Recycle.Bin)`,
+              path: recyclePath,
+              sizeBytes: 0,
+              sizeHuman: 'Çöp Kutusu',
+              type: 'recycle_bin',
+              category: 'recycle',
+              badge: 'Silinenler',
+              isAccessible: true,
+              description: `${letter}: sürücüsünden silinmiş orijinal dosyalar ve metaveriler`
+            });
+          }
+        } catch (_) {}
+      }
+    } else {
+      // --- LINUX / WSL ORTAMI ---
+      // 1. Windows C: sürücüsü
+      if (fs.existsSync('/mnt/c')) {
+        const sizeInfo = DiskDetector.getMountedPathSize('/mnt/c');
+        items.push({
+          id: 'drive_c',
+          name: 'C: Sürücüsü (Windows)',
+          path: '/mnt/c',
+          sizeBytes: sizeInfo.sizeBytes,
+          sizeHuman: sizeInfo.sizeHuman,
+          type: 'computer_drive',
+          category: 'drives',
+          badge: 'Dahili Sürücü',
+          isAccessible: true,
+          description: 'Windows ana yerel sürücüsü ve programlar'
+        });
+      }
+
+      // Windows D: sürücüsü
+      if (fs.existsSync('/mnt/d')) {
+        const sizeInfo = DiskDetector.getMountedPathSize('/mnt/d');
+        items.push({
+          id: 'drive_d',
+          name: 'D: Sürücüsü (Veri Deposu)',
+          path: '/mnt/d',
+          sizeBytes: sizeInfo.sizeBytes,
+          sizeHuman: sizeInfo.sizeHuman,
+          type: 'computer_drive',
+          category: 'drives',
+          badge: 'Dahili Sürücü',
+          isAccessible: true,
+          description: 'İkincil veri ve depolama diski'
+        });
+      }
+
+      // Linux Kök / Sürücüsü
+      const rootSizeInfo = DiskDetector.getMountedPathSize('/');
       items.push({
-        id: 'drive_c',
-        name: 'C: Sürücüsü (Windows)',
-        path: '/mnt/c',
-        sizeBytes: sizeInfo.sizeBytes,
-        sizeHuman: sizeInfo.sizeHuman,
+        id: 'drive_root',
+        name: 'Linux Sistem Depolama (Kök /)',
+        path: '/',
+        sizeBytes: rootSizeInfo.sizeBytes,
+        sizeHuman: rootSizeInfo.sizeHuman,
         type: 'computer_drive',
         category: 'drives',
-        badge: 'Dahili Sürücü',
+        badge: 'Sistem',
         isAccessible: true,
-        description: 'Windows ana yerel sürücüsü ve programlar'
+        description: 'Linux kök dosya sistemi ve uygulamalar'
       });
-    }
 
-    // Windows D: sürücüsü
-    if (fs.existsSync('/mnt/d')) {
-      const sizeInfo = DiskDetector.getMountedPathSize('/mnt/d');
-      items.push({
-        id: 'drive_d',
-        name: 'D: Sürücüsü (Veri Deposu)',
-        path: '/mnt/d',
-        sizeBytes: sizeInfo.sizeBytes,
-        sizeHuman: sizeInfo.sizeHuman,
-        type: 'computer_drive',
-        category: 'drives',
-        badge: 'Dahili Sürücü',
-        isAccessible: true,
-        description: 'İkincil veri ve depolama diski'
-      });
-    }
+      // Kullanıcı klasörleri
+      const userDirs = DiskDetector.detectUserLocations();
+      for (const u of userDirs) items.push(u);
 
-    // Linux Kök / Sürücüsü
-    const rootSizeInfo = DiskDetector.getMountedPathSize('/');
-    items.push({
-      id: 'drive_root',
-      name: 'Linux Sistem Depolama (Kök /)',
-      path: '/',
-      sizeBytes: rootSizeInfo.sizeBytes,
-      sizeHuman: rootSizeInfo.sizeHuman,
-      type: 'computer_drive',
-      category: 'drives',
-      badge: 'Sistem',
-      isAccessible: true,
-      description: 'Linux kök dosya sistemi ve uygulamalar'
-    });
+      // Geri dönüşüm kutuları
+      const recycleBins = DiskDetector.detectRecycleBins();
+      for (const rb of recycleBins) items.push(rb);
 
-    // 2. HIZLI KULLANICI KLASÖRLERİ (Masaüstü, İndirilenler, Belgeler)
-    const userDirs = DiskDetector.detectUserLocations();
-    for (const u of userDirs) {
-      items.push(u);
-    }
+      // Fiziksel blok aygıtları
+      try {
+        const output = execSync('lsblk -J -b -o NAME,PATH,SIZE,TYPE,MOUNTPOINT,FSTYPE,MODEL,VENDOR,RO', {
+          encoding: 'utf8',
+          timeout: 3000
+        });
+        const data = JSON.parse(output);
 
-    // 3. GERİ DÖNÜŞÜM KUTULARI (Recycle Bin & Trash)
-    const recycleBins = DiskDetector.detectRecycleBins();
-    for (const rb of recycleBins) {
-      items.push(rb);
-    }
-
-    // 4. FİZİKSEL BLOK CİHAZLARI (/dev/sdX)
-    try {
-      const output = execSync('lsblk -J -b -o NAME,PATH,SIZE,TYPE,MOUNTPOINT,FSTYPE,MODEL,VENDOR,RO', {
-        encoding: 'utf8',
-        timeout: 3000
-      });
-      const data = JSON.parse(output);
-
-      if (data && data.blockdevices) {
-        for (const dev of data.blockdevices) {
-          const devItem = DiskDetector.formatDevice(dev);
-          items.push(devItem);
-
-          if (dev.children && Array.isArray(dev.children)) {
-            for (const child of dev.children) {
-              items.push(DiskDetector.formatDevice(child, dev.path));
+        if (data && data.blockdevices) {
+          for (const dev of data.blockdevices) {
+            items.push(DiskDetector.formatDevice(dev));
+            if (dev.children && Array.isArray(dev.children)) {
+              for (const child of dev.children) {
+                items.push(DiskDetector.formatDevice(child, dev.path));
+              }
             }
           }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     return items;
   }
 
-  // Windows ve Linux kullanıcı klasörlerini bul
+  // Windows doğal ortamı için kullanıcı klasörleri
+  static detectWindowsUserLocations() {
+    const locations = [];
+    try {
+      const home = os.homedir();
+      const userName = path.basename(home);
+
+      const dirs = [
+        { id: 'user_desktop', name: `Masaüstü (Desktop - ${userName})`, sub: 'Desktop', desc: 'Masaüstünden silinen dosyalar ve kısayollar' },
+        { id: 'user_downloads', name: `İndirilenler (Downloads - ${userName})`, sub: 'Downloads', desc: 'İndirilenler klasöründen silinen dosyalar' },
+        { id: 'user_docs', name: `Belgeler (Documents - ${userName})`, sub: 'Documents', desc: 'Kişisel ve ofis belgeleri' },
+        { id: 'user_pics', name: `Resimler (Pictures - ${userName})`, sub: 'Pictures', desc: 'Kayıtlı fotoğraflar ve resimler' },
+        { id: 'user_videos', name: `Videolar (Videos - ${userName})`, sub: 'Videos', desc: 'Kişisel videolar ve medya dosyaları' }
+      ];
+
+      for (const d of dirs) {
+        const fullP = path.join(home, d.sub);
+        if (fs.existsSync(fullP)) {
+          locations.push({
+            id: d.id,
+            name: d.name,
+            path: fullP,
+            sizeBytes: DiskDetector.getDirSizeFast(fullP),
+            sizeHuman: 'Klasör',
+            type: 'user_folder',
+            category: 'folders',
+            badge: 'Windows',
+            isAccessible: true,
+            description: d.desc
+          });
+        }
+      }
+    } catch (_) {}
+    return locations;
+  }
+
+  // WSL/Linux için Windows ve Linux kullanıcı klasörlerini bul
   static detectUserLocations() {
     const locations = [];
 
@@ -254,17 +357,32 @@ export class DiskDetector {
 
   static getMountedPathSize(mountPath) {
     try {
-      const out = execSync(`df -B1 -P "${mountPath}"`, { encoding: 'utf8' });
-      const lines = out.trim().split('\n');
-      if (lines.length >= 2) {
-        const parts = lines[1].split(/\s+/);
-        const total = parseInt(parts[1], 10);
-        return {
-          sizeBytes: total,
-          sizeHuman: DiskDetector.formatSize(total)
-        };
+      if (typeof fs.statfsSync === 'function') {
+        const stat = fs.statfsSync(mountPath);
+        const total = Number(stat.blocks) * Number(stat.bsize);
+        if (total > 0) {
+          return {
+            sizeBytes: total,
+            sizeHuman: DiskDetector.formatSize(total)
+          };
+        }
       }
     } catch (_) {}
+
+    if (process.platform !== 'win32') {
+      try {
+        const out = execSync(`df -B1 -P "${mountPath}"`, { encoding: 'utf8', timeout: 2000 });
+        const lines = out.trim().split('\n');
+        if (lines.length >= 2) {
+          const parts = lines[1].split(/\s+/);
+          const total = parseInt(parts[1], 10);
+          return {
+            sizeBytes: total,
+            sizeHuman: DiskDetector.formatSize(total)
+          };
+        }
+      } catch (_) {}
+    }
     return { sizeBytes: 0, sizeHuman: 'Bilinmeyen' };
   }
 
@@ -338,8 +456,8 @@ export class DiskDetector {
         }
       }
 
-      const sourceAbs = path.resolve(sourcePath);
-      const destAbs = path.resolve(destPath);
+      const sourceAbs = path.resolve(sourcePath).toLowerCase();
+      const destAbs = path.resolve(destPath).toLowerCase();
 
       // Hedef, taranan kaynak klasörün içinde mi?
       if (destAbs.startsWith(sourceAbs) || destAbs === sourceAbs) {

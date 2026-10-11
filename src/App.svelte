@@ -11,7 +11,7 @@
 
   // Durum Değişkenleri
   let selectedSource = $state(null);
-  let destinationDir = $state('/tmp/byterescue_recovered');
+  let destinationDir = $state('');
   let safetyStatus = $state(null);
   let isSoundOn = $state(false);
 
@@ -49,10 +49,19 @@
   let showAboutModal = $state(false);
   let recoveryAlert = $state(null);
 
-  onMount(() => {
+  onMount(async () => {
     isSoundOn = cyberAudio.isEnabled();
 
     if (window.api) {
+      if (window.api.getDefaultDestination) {
+        try {
+          const defaultDest = await window.api.getDefaultDestination();
+          if (defaultDest) {
+            destinationDir = defaultDest;
+          }
+        } catch (_) {}
+      }
+
       window.api.onScanProgress((data) => {
         stats = data;
         if (Math.random() < 0.2) {
@@ -85,7 +94,9 @@
       });
     }
 
-    checkSafety();
+    if (destinationDir && selectedSource?.path) {
+      checkSafety();
+    }
   });
 
   function addLog(text, type = 'info') {
@@ -399,7 +410,9 @@
         <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
-        <span class="max-w-[120px] truncate">{destinationDir}</span>
+        <span class="max-w-[140px] truncate" title={destinationDir}>
+          {destinationDir ? (destinationDir.split(/[/\\]/).filter(Boolean).pop() || destinationDir) : 'Hedef Klasör'}
+        </span>
       </button>
 
       <!-- Hakkında Butonu -->

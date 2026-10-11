@@ -1,5 +1,7 @@
 <!-- src/components/DiskSelector.svelte -->
 <script>
+  import { onMount } from 'svelte';
+
   let { selectedSource = null, onSelect = () => {}, isScanning = false } = $props();
 
   let drives = $state([]);
@@ -7,7 +9,7 @@
   let showDropdown = $state(false);
   let activeTab = $state('all'); // all | drives | folders | recycle | devices
 
-  $effect(() => {
+  onMount(() => {
     loadDrives();
   });
 

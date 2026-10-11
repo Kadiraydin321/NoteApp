@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   selectFile: () => ipcRenderer.invoke('select-file'),
   selectScanFolder: () => ipcRenderer.invoke('select-scan-folder'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  getDefaultDestination: () => ipcRenderer.invoke('get-default-destination'),
   checkSafety: (source, dest) => ipcRenderer.invoke('check-safety', source, dest),
 
   // Tarama Kontrolleri

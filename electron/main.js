@@ -55,6 +55,10 @@ ipcMain.handle('list-drives', async () => {
   return DiskDetector.listDrives();
 });
 
+ipcMain.handle('get-default-destination', async () => {
+  return DiskDetector.getDefaultDestination();
+});
+
 ipcMain.handle('select-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Taranacak Disk İmajını Seçin',
