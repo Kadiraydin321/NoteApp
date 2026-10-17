@@ -3,3 +3,7 @@ release/
 .DS_Store
 *.log
 /tmp/
+*.pdb
+*.lib
+*.obj
+*.o

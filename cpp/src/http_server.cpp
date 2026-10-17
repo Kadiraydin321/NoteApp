@@ -1,0 +1,395 @@
+// cpp/src/http_server.cpp
+#include "http_server.hpp"
+#include "embedded_web.hpp"
+
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <vector>
+#include <thread>
+#include <cstring>
+#include <algorithm>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#define closesocket close
+#define SOCKET int
+#define INVALID_SOCKET -1
+#define SOCKET_ERROR -1
+#endif
+
+namespace byterescue {
+
+HttpServer::HttpServer(int start_port) : start_port_(start_port) {}
+
+HttpServer::~HttpServer() {
+    stop();
+}
+
+std::string HttpServer::get_url() const {
+    return "http://127.0.0.1:" + std::to_string(bound_port_);
+}
+
+bool HttpServer::start() {
+#ifdef _WIN32
+    WSADATA wsa;
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
+        return false;
+    }
+#endif
+
+    SOCKET listen_sock = INVALID_SOCKET;
+    int port = start_port_;
+
+    for (int attempts = 0; attempts < 20; ++attempts, ++port) {
+        listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (listen_sock == INVALID_SOCKET) {
+            continue;
+        }
+
+        int opt = 1;
+#ifdef _WIN32
+        setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&opt), sizeof(opt));
+#else
+        setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+#endif
+
+        sockaddr_in server_addr{};
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1 only
+        server_addr.sin_port = htons(static_cast<uint16_t>(port));
+
+        if (bind(listen_sock, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) == 0) {
+            if (listen(listen_sock, 16) == 0) {
+                bound_port_ = port;
+                break;
+            }
+        }
+
+        closesocket(listen_sock);
+        listen_sock = INVALID_SOCKET;
+    }
+
+    if (listen_sock == INVALID_SOCKET) {
+#ifdef _WIN32
+        WSACleanup();
+#endif
+        return false;
+    }
+
+    listen_socket_ = static_cast<uintptr_t>(listen_sock);
+    is_running_.store(true);
+
+    std::thread([this]() {
+        this->listen_loop();
+    }).detach();
+
+    return true;
+}
+
+void HttpServer::stop() {
+    if (is_running_.load()) {
+        is_running_.store(false);
+        if (listen_socket_ != 0 && listen_socket_ != static_cast<uintptr_t>(INVALID_SOCKET)) {
+            closesocket(static_cast<SOCKET>(listen_socket_));
+            listen_socket_ = 0;
+        }
+#ifdef _WIN32
+        WSACleanup();
+#endif
+    }
+}
+
+void HttpServer::listen_loop() {
+    while (is_running_.load()) {
+        sockaddr_in client_addr{};
+        int client_len = sizeof(client_addr);
+        SOCKET client_sock = accept(static_cast<SOCKET>(listen_socket_), reinterpret_cast<sockaddr*>(&client_addr), &client_len);
+        if (client_sock == INVALID_SOCKET) {
+            if (!is_running_.load()) break;
+            continue;
+        }
+
+        std::thread([this, client_sock]() {
+            this->handle_client(static_cast<uintptr_t>(client_sock));
+        }).detach();
+    }
+}
+
+// Helpers for quick JSON string escaping
+static std::string json_escape(const std::string& s) {
+    std::ostringstream o;
+    for (char c : s) {
+        if (c == '"') o << "\\\"";
+        else if (c == '\\') o << "\\\\";
+        else if (c == '\b') o << "\\b";
+        else if (c == '\f') o << "\\f";
+        else if (c == '\n') o << "\\n";
+        else if (c == '\r') o << "\\r";
+        else if (c == '\t') o << "\\t";
+        else if (static_cast<unsigned char>(c) <= '\x1f') {
+            o << "\\u" << std::hex << std::setw(4) << std::setfill('0') << static_cast<int>(c);
+        } else {
+            o << c;
+        }
+    }
+    return o.str();
+}
+
+void HttpServer::handle_client(uintptr_t client_socket) {
+    SOCKET sock = static_cast<SOCKET>(client_socket);
+    std::vector<char> req_buf(16384, 0);
+    int received = recv(sock, req_buf.data(), static_cast<int>(req_buf.size()) - 1, 0);
+
+    if (received <= 0) {
+        closesocket(sock);
+        return;
+    }
+
+    std::string req(req_buf.data(), received);
+    std::istringstream req_stream(req);
+    std::string method, full_path, http_ver;
+    req_stream >> method >> full_path >> http_ver;
+
+    std::string path = full_path;
+    std::string query;
+    size_t q_pos = full_path.find('?');
+    if (q_pos != std::string::npos) {
+        path = full_path.substr(0, q_pos);
+        query = full_path.substr(q_pos + 1);
+    }
+
+    // Extract body if any
+    std::string body;
+    size_t body_pos = req.find("\r\n\r\n");
+    if (body_pos != std::string::npos) {
+        body = req.substr(body_pos + 4);
+    }
+
+    std::string content_type = "application/json; charset=utf-8";
+    std::string resp_body;
+    int status_code = 200;
+
+    if (path == "/" || path == "/index.html") {
+        content_type = "text/html; charset=utf-8";
+        resp_body = EMBEDDED_INDEX_HTML;
+    } else if (path == "/api/status") {
+        ScanStats st = engine_.get_stats();
+        bool is_admin = false;
+#ifdef _WIN32
+        HANDLE hToken = NULL;
+        if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+            TOKEN_ELEVATION elevation;
+            DWORD cbSize = sizeof(TOKEN_ELEVATION);
+            if (GetTokenInformation(hToken, TokenElevation, &elevation, sizeof(elevation), &cbSize)) {
+                is_admin = elevation.TokenIsElevated != 0;
+            }
+            CloseHandle(hToken);
+        }
+#endif
+        std::ostringstream ss;
+        ss << "{\n";
+        ss << "  \"status\": \"" << st.status << "\",\n";
+        ss << "  \"isAdmin\": " << (is_admin ? "true" : "false") << ",\n";
+        ss << "  \"bytesScanned\": " << st.bytes_scanned << ",\n";
+        ss << "  \"totalBytes\": " << st.total_bytes << ",\n";
+        ss << "  \"filesFound\": " << st.files_found << ",\n";
+        ss << "  \"speedMBps\": " << st.speed_mbps << ",\n";
+        ss << "  \"etaSeconds\": " << st.eta_seconds << ",\n";
+        ss << "  \"percentage\": " << st.percentage << ",\n";
+        ss << "  \"currentLocation\": \"" << json_escape(st.current_location) << "\",\n";
+        ss << "  \"errorMessage\": \"" << json_escape(st.error_message) << "\"\n";
+        ss << "}";
+        resp_body = ss.str();
+    } else if (path == "/api/scan/start" && method == "POST") {
+        // Parse sourcePath from body
+        std::string source_path = "C:\\";
+        size_t sp = body.find("\"sourcePath\"");
+        if (sp != std::string::npos) {
+            size_t colon = body.find(':', sp);
+            size_t q1 = body.find('"', colon);
+            size_t q2 = body.find('"', q1 + 1);
+            if (q1 != std::string::npos && q2 != std::string::npos) {
+                source_path = body.substr(q1 + 1, q2 - q1 - 1);
+                // unescape simple backslashes
+                std::string unesc;
+                for (size_t i = 0; i < source_path.size(); ++i) {
+                    if (source_path[i] == '\\' && i + 1 < source_path.size() && source_path[i + 1] == '\\') {
+                        unesc += '\\';
+                        i++;
+                    } else {
+                        unesc += source_path[i];
+                    }
+                }
+                source_path = unesc;
+            }
+        }
+
+        ScanOptions opt;
+        opt.source_path = source_path;
+        opt.categories = { "all" };
+        opt.deep_carve = true;
+
+        bool started = engine_.start_scan(opt);
+        resp_body = started ? "{\"success\":true}" : "{\"success\":false,\"error\":\"Tarama zaten çalışıyor\"}";
+    } else if (path == "/api/scan/pause" && method == "POST") {
+        engine_.pause_scan();
+        resp_body = "{\"success\":true}";
+    } else if (path == "/api/scan/resume" && method == "POST") {
+        engine_.resume_scan();
+        resp_body = "{\"success\":true}";
+    } else if (path == "/api/scan/stop" && method == "POST") {
+        engine_.stop_scan();
+        resp_body = "{\"success\":true}";
+    } else if (path == "/api/files") {
+        auto files = engine_.get_files(1000, 0);
+        std::ostringstream ss;
+        ss << "[\n";
+        for (size_t i = 0; i < files.size(); ++i) {
+            const auto& f = files[i];
+            ss << "  {\n";
+            ss << "    \"id\": \"" << f.id << "\",\n";
+            ss << "    \"name\": \"" << json_escape(f.name) << "\",\n";
+            ss << "    \"displayName\": \"" << json_escape(f.display_name) << "\",\n";
+            ss << "    \"type\": \"" << f.type << "\",\n";
+            ss << "    \"category\": \"" << f.category << "\",\n";
+            ss << "    \"sizeBytes\": " << f.size_bytes << ",\n";
+            ss << "    \"sizeHuman\": \"" << f.size_human << "\",\n";
+            ss << "    \"offset\": " << f.offset << ",\n";
+            ss << "    \"hexOffset\": \"" << f.hex_offset << "\",\n";
+            ss << "    \"confidence\": " << f.confidence << ",\n";
+            ss << "    \"sourcePath\": \"" << json_escape(f.source_path) << "\",\n";
+            ss << "    \"originalPath\": \"" << json_escape(f.original_path) << "\",\n";
+            ss << "    \"isRecycleBin\": " << (f.is_recycle_bin ? "true" : "false") << ",\n";
+            ss << "    \"previewSnippet\": \"" << json_escape(f.preview_snippet) << "\"\n";
+            ss << "  }" << (i + 1 < files.size() ? "," : "") << "\n";
+        }
+        ss << "]\n";
+        resp_body = ss.str();
+    } else if (path == "/api/preview") {
+        std::string file_id;
+        size_t id_pos = query.find("id=");
+        if (id_pos != std::string::npos) {
+            file_id = query.substr(id_pos + 3);
+            size_t amp = file_id.find('&');
+            if (amp != std::string::npos) file_id = file_id.substr(0, amp);
+        }
+        PreviewData prev = engine_.get_file_preview(file_id);
+        std::ostringstream ss;
+        ss << "{\n";
+        ss << "  \"type\": \"" << prev.type << "\",\n";
+        ss << "  \"mime\": \"" << prev.mime << "\",\n";
+        ss << "  \"data\": \"" << json_escape(prev.data) << "\",\n";
+        ss << "  \"hex\": \"" << json_escape(prev.hex) << "\"\n";
+        ss << "}";
+        resp_body = ss.str();
+    } else if (path == "/api/recover" && method == "POST") {
+        // Extract destination dir and fileIds
+        std::string dest_dir = DiskDetector::get_default_destination();
+        size_t dd = body.find("\"destDir\"");
+        if (dd != std::string::npos) {
+            size_t colon = body.find(':', dd);
+            size_t q1 = body.find('"', colon);
+            size_t q2 = body.find('"', q1 + 1);
+            if (q1 != std::string::npos && q2 != std::string::npos) {
+                dest_dir = body.substr(q1 + 1, q2 - q1 - 1);
+                // unescape
+                std::string unesc;
+                for (size_t i = 0; i < dest_dir.size(); ++i) {
+                    if (dest_dir[i] == '\\' && i + 1 < dest_dir.size() && dest_dir[i + 1] == '\\') {
+                        unesc += '\\';
+                        i++;
+                    } else {
+                        unesc += dest_dir[i];
+                    }
+                }
+                dest_dir = unesc;
+            }
+        }
+
+        std::vector<std::string> file_ids;
+        size_t fi = body.find("\"fileIds\"");
+        if (fi != std::string::npos) {
+            size_t b1 = body.find('[', fi);
+            size_t b2 = body.find(']', b1);
+            if (b1 != std::string::npos && b2 != std::string::npos) {
+                std::string list_str = body.substr(b1 + 1, b2 - b1 - 1);
+                size_t p = 0;
+                while ((p = list_str.find('"', p)) != std::string::npos) {
+                    size_t p2 = list_str.find('"', p + 1);
+                    if (p2 == std::string::npos) break;
+                    file_ids.push_back(list_str.substr(p + 1, p2 - p - 1));
+                    p = p2 + 1;
+                }
+            }
+        }
+
+        RecoveryResult res = engine_.recover_files(file_ids, dest_dir);
+        std::ostringstream ss;
+        ss << "{\n";
+        ss << "  \"success\": " << (res.success ? "true" : "false") << ",\n";
+        ss << "  \"recoveredCount\": " << res.recovered_count << ",\n";
+        ss << "  \"failedCount\": " << res.failed_count << ",\n";
+        ss << "  \"destinationDir\": \"" << json_escape(res.destination_dir) << "\",\n";
+        ss << "  \"reportPath\": \"" << json_escape(res.report_path) << "\",\n";
+        ss << "  \"error\": \"" << json_escape(res.error) << "\"\n";
+        ss << "}";
+        resp_body = ss.str();
+    } else if (path == "/api/drives") {
+        auto drives = DiskDetector::list_drives();
+        resp_body = DiskDetector::to_json(drives);
+    } else if (path == "/api/browse-folder") {
+        std::string folder = FolderDialog::open_folder_dialog("ByteRescue - Taranacak Klasörü Seçin");
+        resp_body = "{\"path\":\"" + json_escape(folder) + "\"}";
+    } else if (path == "/api/default-dest") {
+        std::string d = DiskDetector::get_default_destination();
+        resp_body = "{\"path\":\"" + json_escape(d) + "\"}";
+    } else if (path == "/api/create-test-disk") {
+        std::string test_path = DiskDetector::get_default_destination() + "_Test_Disk.img";
+        std::string gen = engine_.create_test_disk(test_path);
+        resp_body = "{\"path\":\"" + json_escape(gen) + "\"}";
+    } else if (path == "/api/shutdown-computer" && method == "POST") {
+        resp_body = "{\"success\":true,\"message\":\"Bilgisayar kapatılıyor...\"}";
+#ifdef _WIN32
+        system("shutdown /s /t 10 /c \"ByteRescue: Islemler tamamlandi. Bilgisayar 10 saniye icinde kapatiliyor.\"");
+#endif
+    } else if ((path == "/api/exit" || path == "/api/quit") && method == "POST") {
+        resp_body = "{\"success\":true}";
+        std::thread([this]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            this->stop();
+            exit(0);
+        }).detach();
+    } else if (path == "/api/shutdown" && method == "POST") {
+        resp_body = "{\"shuttingDown\":true}";
+        std::thread([this]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            this->stop();
+            exit(0);
+        }).detach();
+    } else {
+        status_code = 404;
+        resp_body = "{\"error\":\"Not Found\"}";
+    }
+
+    std::ostringstream resp;
+    resp << "HTTP/1.1 " << status_code << (status_code == 200 ? " OK\r\n" : " Not Found\r\n");
+    resp << "Content-Type: " << content_type << "\r\n";
+    resp << "Content-Length: " << resp_body.size() << "\r\n";
+    resp << "Access-Control-Allow-Origin: *\r\n";
+    resp << "Access-Control-Allow-Headers: *\r\n";
+    resp << "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
+    resp << "Connection: close\r\n\r\n";
+    resp << resp_body;
+
+    std::string resp_str = resp.str();
+    send(sock, resp_str.data(), static_cast<int>(resp_str.size()), 0);
+    closesocket(sock);
+}
+
+} // namespace byterescue
