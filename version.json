@@ -1,7 +1,7 @@
 {
-  "versionCode": 8,
-  "versionName": "1.0.7",
-  "buildTime": 1792341200000,
+  "versionCode": 9,
+  "versionName": "1.0.8",
+  "buildTime": 1792342000000,
   "releaseDate": "18.10.2026",
-  "changeLog": "Yan menü (drawer) donması ve nota girip çıkıldığında oluşan gri ekran sorunu tamamen giderildi. Geri tuşu (BackHandler) ve menü geçiş kararlılığı optimize edildi."
+  "changeLog": "Uygulama logosu kırmızı, siyah ve beyaz renkleriyle baştan aşağı sade ve modern olarak yeniden tasarlandı. Yükleme ekranındaki karakter kaldırılarak yeni şık logo ve modern ambiyans animasyonu yerleştirildi."
 }
