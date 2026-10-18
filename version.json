@@ -1,7 +1,7 @@
 {
-  "versionCode": 4,
-  "versionName": "1.0.3",
-  "buildTime": 1792333431963,
+  "versionCode": 5,
+  "versionName": "1.0.4",
+  "buildTime": 1792334189423,
   "releaseDate": "18.10.2026",
-  "changeLog": "Sevimli 3D Memoji karşılama ekranı, regex ve arama performansı optimizasyonları"
+  "changeLog": "Ayarlar çarkı ve Hızlı Wi-Fi senkronizasyon butonu yan menü başlığına (Not Defterim yanına) taşındı, menü ve ana ekran sadeleştirildi."
 }
