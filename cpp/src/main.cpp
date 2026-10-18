@@ -23,20 +23,20 @@ BOOL WINAPI ConsoleHandler(DWORD signal) {
 }
 #endif
 
-int main() {
+int run_byterescue() {
 #ifdef _WIN32
+    // 1. Single-Instance Guard: prevent duplicate processes & port clashes
+    HANDLE hMutex = CreateMutexA(NULL, TRUE, "Global\\ByteRescue_SingleInstance_App");
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        // Application is already active! Just pop open the browser and exit cleanly.
+        ShellExecuteA(NULL, "open", "http://127.0.0.1:45678", NULL, NULL, SW_SHOWNORMAL);
+        return 0;
+    }
+
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
     SetConsoleCtrlHandler(ConsoleHandler, TRUE);
 #endif
-
-    std::cout << "========================================================\n";
-    std::cout << "  ⚡ BYTERESCUE // VERİ KURTARICI\n";
-    std::cout << "  Geliştirici : Kadir\n";
-    std::cout << "  Altyapı     : Native C++ x64 Yüksek Başarımlı Motor\n";
-    std::cout << "========================================================\n\n";
-
-    std::cout << "[*] Yerel web arayüz sunucusu başlatılıyor...\n";
 
     byterescue::HttpServer server(45678);
     if (!server.start()) {
@@ -45,26 +45,34 @@ int main() {
     }
 
     std::string url = server.get_url();
-    std::cout << "[+] Sunucu başarıyla çalışıyor: " << url << "\n";
-    std::cout << "[*] Varsayılan internet tarayıcınız açılıyor...\n\n";
 
 #ifdef _WIN32
     // Automatically launch user default web browser
     ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 #endif
 
-    std::cout << "--------------------------------------------------------\n";
-    std::cout << "  Tarayıcınızda arayüz açıldı. Tüm işlemleri oradan\n";
-    std::cout << "  yönetebilirsiniz. Çıkmak için Ctrl+C tuşlayabilir\n";
-    std::cout << "  veya bu pencereyi kapatabilirsiniz.\n";
-    std::cout << "--------------------------------------------------------\n";
-
     while (g_app_running.load() && server.is_running()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
-    std::cout << "\n[*] ByteRescue kapatılıyor...\n";
     server.stop();
-    std::cout << "[+] Güvenle sonlandırıldı.\n";
+
+#ifdef _WIN32
+    if (hMutex) {
+        ReleaseMutex(hMutex);
+        CloseHandle(hMutex);
+    }
+#endif
+
     return 0;
+}
+
+#ifdef _WIN32
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    return run_byterescue();
+}
+#endif
+
+int main() {
+    return run_byterescue();
 }

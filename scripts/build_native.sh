@@ -44,9 +44,14 @@ echo "[2/4] C++ kaynak kodları derleniyor (ByteRescue.exe)..."
     cpp/src/ntfs_scanner.cpp \
     cpp/src/disk_detector.cpp \
     cpp/src/folder_dialog.cpp \
+    cpp/src/repair_engine.cpp \
+    cpp/src/image_engine.cpp \
+    cpp/src/shredder_engine.cpp \
+    cpp/src/vss_scanner.cpp \
     cpp/src/app.rc \
     -o ByteRescue.exe \
-    -lws2_32 -lshell32 -lole32 -lcomctl32 \
+    -lws2_32 -lshell32 -lole32 -lcomctl32 -lcomdlg32 \
+    -Wl,/subsystem:windows \
     -static
 
 rm -f ByteRescue.pdb ByteRescue.lib main.lib

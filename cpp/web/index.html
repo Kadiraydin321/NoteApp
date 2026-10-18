@@ -1080,6 +1080,80 @@
       font-size: 12px;
       flex-shrink: 0;
     }
+
+    /* Dropdown Menu for Tools */
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      min-width: 250px;
+      z-index: 1000;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .dropdown-item {
+      padding: 10px 14px;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 12px;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.15s ease, color 0.15s ease;
+      width: 100%;
+    }
+    .dropdown-item:hover {
+      background: var(--btn-sec-hover);
+      color: var(--accent);
+    }
+    .dropdown-divider {
+      height: 1px;
+      background: var(--border-color);
+      margin: 4px 0;
+    }
+
+    /* Modal Form Controls */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .form-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-control {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      width: 100%;
+    }
+    .form-control:focus {
+      border-color: var(--accent);
+    }
+
   </style>
 </head>
 <body>
@@ -1176,6 +1250,20 @@
         <span id="themeToggleIcon">☀️</span>
         <span id="themeToggleText">Aydınlık</span>
       </button>
+
+      <!-- Advanced Tools Dropdown -->
+      <div class="dropdown" id="toolsDropdownContainer">
+        <button class="btn btn-secondary btn-sm" id="btnToolsMenu" onclick="toggleToolsMenu()" title="Gelişmiş Kurtarma & Onarım Araçları">
+          <span>🛠️ Araçlar ▾</span>
+        </button>
+        <div class="dropdown-menu" id="toolsDropdownMenu" style="display: none;">
+          <button class="dropdown-item" onclick="openImageModal()">💾 Disk İmajı Al (RAW Klon)</button>
+          <button class="dropdown-item" onclick="openRepairModal()">🔧 Bozuk Dosya Başlığı Onar</button>
+          <button class="dropdown-item" onclick="openVssModal()">🕒 Windows Gölge Kopyaları (VSS)</button>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item" style="color: var(--danger);" onclick="openShredModal()">🛡️ Güvenli Dosya İmha (Shredder)</button>
+        </div>
+      </div>
       <button class="btn btn-secondary btn-sm" id="btnDestDir" title="Kurtarılan Dosyaların Kaydedileceği Dizin">
         <span>Hedef:</span>
         <strong id="destDirName">Masaüstü</strong>
@@ -1335,6 +1423,11 @@
             <input type="checkbox" id="chkOnlyHealthy">
             <span>Sadece Sağlam (%100)</span>
           </label>
+
+          <label class="filter-toggle" title="Format atılmış USB veya disklerdeki eski MFT ve FAT kayıtlarını derinlemesine ara">
+            <input type="checkbox" id="chkDeepFormat">
+            <span>Format Sonrası Kurtarma</span>
+          </label>
         </div>
 
         <div class="filter-group">
@@ -1395,8 +1488,12 @@
       </div>
 
       <div class="selection-bar" id="selectionBar" style="display: none;">
-        <div>
-          <strong id="selectedCountText">0</strong> dosya seçildi
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div><strong id="selectedCountText">0</strong> dosya seçildi</div>
+          <label class="filter-toggle" title="Kurtarma sırasında bozuk veya kesik dosya başlıklarını otomatik onar">
+            <input type="checkbox" id="chkAutoRepair" checked>
+            <span>Bozuk Başlıkları Otomatik Onar</span>
+          </label>
         </div>
         <button class="btn btn-primary btn-sm" id="btnRecoverSelected">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -1515,6 +1612,164 @@
     </div>
   </div>
 
+  <!-- 1. Disk Imaging Modal (RAW Klon) -->
+  <div class="modal-backdrop" id="imageModal">
+    <div class="modal-dialog" style="max-width: 650px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
+          <span>💾 Hasarlı Disk & USB İmaj Klonlama (RAW/IMG)</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeImageModal()">Kapat</button>
+      </div>
+      <div class="modal-body" style="background: var(--bg-card); color: var(--text-main); font-family: var(--font-sans); white-space: normal; padding: 22px;">
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.6;">
+          Bozulmak üzere olan veya yavaş okunan USB bellek ve diskleri doğrudan taramak cihazı yakabilir. 1:1 sektör kopyasını <strong>.img</strong> dosyasına çıkarıp kurtarma işlemini güvenle bu dosya üzerinden yapabilirsiniz.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Kaynak Sürücü veya USB:</label>
+          <select class="form-control" id="imgSourceSelect">
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Hedef .IMG İmaj Dosyası Konumu:</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" class="form-control" id="imgTargetPath" placeholder="C:\Users\...\Disk_Yedek.img">
+            <button class="btn btn-secondary btn-sm" onclick="browseImageTarget()">Gözat</button>
+          </div>
+        </div>
+
+        <!-- Live Imaging Progress Box -->
+        <div id="imgProgressBox" style="display: none; margin-top: 18px; padding: 14px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px;">
+            <span id="imgStatusLabel">Klonlama başlatılıyor...</span>
+            <strong id="imgPctLabel">0%</strong>
+          </div>
+          <div style="height: 6px; background: var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
+            <div id="imgProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #10b981, #06b6d4); border-radius: 4px; transition: width 0.2s;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); font-family: var(--font-mono);">
+            <span id="imgBytesLabel">0 MB / 0 MB</span>
+            <span id="imgBadSectorsLabel" style="color: var(--danger);">Bozuk Sektör: 0</span>
+            <span id="imgSpeedLabel">0 MB/s</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btnStopImage" style="display: none;" onclick="stopImageCloning()">Durdur</button>
+        <button class="btn btn-primary btn-sm" id="btnStartImage" onclick="startImageCloning()">Klonlamayı Başlat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Header & File Repair Modal -->
+  <div class="modal-backdrop" id="repairModal">
+    <div class="modal-dialog" style="max-width: 650px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
+          <span>🔧 Bozuk Dosya Başlığı & Konteyner Onarıcı</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeRepairModal()">Kapat</button>
+      </div>
+      <div class="modal-body" style="background: var(--bg-card); color: var(--text-main); font-family: var(--font-sans); white-space: normal; padding: 22px;">
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.6;">
+          Kurtarılan fakat açılmayan resim (JPG, PNG), video (MP4), belge (PDF) veya arşivlerin (ZIP, DOCX) eksik veya hasarlı başlık bloklarını yeniden yapılandırır.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Onarılacak Dosyayı Seçin:</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" class="form-control" id="repairFilePath" placeholder="Dosya yolu...">
+            <button class="btn btn-secondary btn-sm" onclick="browseRepairFile()">Dosya Seç</button>
+          </div>
+        </div>
+
+        <!-- Repair Result Box -->
+        <div id="repairResultBox" style="display: none; margin-top: 16px; padding: 14px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; font-size: 13px;">
+          <div style="font-weight: 700; color: var(--accent); margin-bottom: 6px;" id="repairResultTitle">Onarım Tamamlandı</div>
+          <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;" id="repairResultDetails"></div>
+          <div style="font-size: 11px; font-family: var(--font-mono); color: var(--accent-blue);" id="repairResultPath"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeRepairModal()">Kapat</button>
+        <button class="btn btn-primary btn-sm" onclick="executeFileRepair()">Başlığı Onar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Windows VSS Shadow Copies Modal -->
+  <div class="modal-backdrop" id="vssModal">
+    <div class="modal-dialog" style="max-width: 720px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
+          <span>🕒 Windows Sistem Gölge Kopyaları (VSS) Gezgini</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeVssModal()">Kapat</button>
+      </div>
+      <div class="modal-body" style="background: var(--bg-card); color: var(--text-main); font-family: var(--font-sans); white-space: normal; padding: 22px;">
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.6;">
+          Windows Sistem Geri Yükleme ve Gölge Kopya (Volume Shadow Copy) anlık görüntüleri, dosyalarınızın silinmeden önceki geçmiş sürümlerini barındırır.
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 16px;">
+          <select class="form-control" id="vssDriveSelect" style="max-width: 140px;">
+            <option value="C:">C: Sürücüsü</option>
+            <option value="D:">D: Sürücüsü</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="loadVssSnapshots()">Gölge Kopyaları Tara</button>
+        </div>
+
+        <div id="vssListContainer" style="max-height: 320px; overflow-y: auto;">
+          <div style="text-align: center; color: var(--text-dim); padding: 30px;">Yukarıdan sürücü seçip "Gölge Kopyaları Tara" butonuna tıklayınız.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeVssModal()">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. DoD 5220.22-M Secure Shredder Modal -->
+  <div class="modal-backdrop" id="shredModal">
+    <div class="modal-dialog" style="max-width: 650px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display:flex; align-items:center; gap:8px; color: var(--danger);">
+          <span>🛡️ Güvenli Dosya İmha (DoD 5220.22-M Shredder)</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeShredModal()">Kapat</button>
+      </div>
+      <div class="modal-body" style="background: var(--bg-card); color: var(--text-main); font-family: var(--font-sans); white-space: normal; padding: 22px;">
+        <div style="padding: 12px 16px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; color: #fca5a5; font-size: 13px; line-height: 1.6; margin-bottom: 16px;">
+          ⚠️ <strong>GERİ ALINAMAZ İMHA UYARISI:</strong> Seçilen dosya disk üzerinde askeri standartta (0x00, 0xFF ve rastgele baytlarla) ezilerek tamamen yok edilir. Bu dosya <strong>ByteRescue dahil hiçbir veri kurtarma yazılımı veya laboratuvarı</strong> tarafından geri getirilemez!
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">İmha Edilecek Dosya:</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" class="form-control" id="shredFilePath" placeholder="İmha edilecek dosya yolu...">
+            <button class="btn btn-secondary btn-sm" onclick="browseShredFile()">Gözat</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">İmha Standardı:</label>
+          <select class="form-control" id="shredPassesSelect">
+            <option value="3">DoD 5220.22-M Standardı (3 Aşama: 00 -> FF -> Rastgele) [Önerilen]</option>
+            <option value="1">Hızlı Sıfırlama (1 Aşama: Tüm sektörleri sıfırla)</option>
+            <option value="7">DoD 5220.22-M ECE (7 Aşama - Paronayak Seviye)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeShredModal()">Vazgeç</button>
+        <button class="btn btn-danger btn-sm" onclick="executeFileShred()">Kalıcı Olarak İmha Et</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Live Visual & Document Preview Modal -->
   <div class="modal-backdrop" id="previewModal">
     <div class="modal-dialog" style="max-width: 860px; max-height: 88vh;">
@@ -1553,6 +1808,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary btn-sm" id="btnDetailsHex" onclick="switchDetailsToHex()">Hex İncele</button>
+        <button class="btn btn-warning btn-sm" id="btnDetailsRepairRecover" onclick="recoverSingleWithRepair(activeHexFile)" title="Başlığı onararak kurtar">🔧 Onar & Kurtar</button>
         <button class="btn btn-primary btn-sm" id="btnDetailsRecover">Bu Dosyayı Kurtar</button>
       </div>
     </div>
@@ -1598,6 +1854,302 @@
     let activeDetailsFile = null;
     let rawDrives = [];
     let currentDriveCat = "all";
+
+    
+    // --- Tools Menu Dropdown ---
+    function toggleToolsMenu() {
+      const menu = document.getElementById('toolsDropdownMenu');
+      if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      const container = document.getElementById('toolsDropdownContainer');
+      const menu = document.getElementById('toolsDropdownMenu');
+      if (container && menu && !container.contains(e.target)) {
+        menu.style.display = 'none';
+      }
+    });
+
+    // --- 1. Disk Imaging (RAW Klon) ---
+    let imagePollTimer = null;
+
+    function openImageModal() {
+      document.getElementById('toolsDropdownMenu').style.display = 'none';
+      const sel = document.getElementById('imgSourceSelect');
+      sel.innerHTML = '';
+      (rawDrives || []).forEach(d => {
+        if (d.type !== 'recycle_bin') {
+          const opt = document.createElement('option');
+          opt.value = d.path;
+          opt.textContent = `${d.name} (${d.sizeHuman || d.badge})`;
+          sel.appendChild(opt);
+        }
+      });
+      document.getElementById('imgTargetPath').value = destDir + '\Disk_Yedek.img';
+      document.getElementById('imgProgressBox').style.display = 'none';
+      document.getElementById('btnStartImage').style.display = 'inline-flex';
+      document.getElementById('btnStopImage').style.display = 'none';
+      document.getElementById('imageModal').classList.add('open');
+    }
+
+    function closeImageModal() {
+      if (imagePollTimer) clearInterval(imagePollTimer);
+      document.getElementById('imageModal').classList.remove('open');
+    }
+
+    async function browseImageTarget() {
+      try {
+        const res = await fetch('/api/browse-folder', { method: 'POST' });
+        const data = await res.json();
+        if (data && data.path) {
+          document.getElementById('imgTargetPath').value = data.path + '\Disk_Yedek.img';
+        }
+      } catch (_) {}
+    }
+
+    async function startImageCloning() {
+      const source = document.getElementById('imgSourceSelect').value;
+      const target = document.getElementById('imgTargetPath').value;
+      if (!source || !target) {
+        showToast('Kaynak ve hedef dosya yolu belirtilmelidir', 'warning');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/create-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source, target })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('imgProgressBox').style.display = 'block';
+          document.getElementById('btnStartImage').style.display = 'none';
+          document.getElementById('btnStopImage').style.display = 'inline-flex';
+          showToast('Disk klonlama başlatıldı...', 'info');
+          pollImageStatus();
+        } else {
+          showToast('Hata: ' + data.error, 'error');
+        }
+      } catch (err) {
+        showToast('Hata: ' + err.message, 'error');
+      }
+    }
+
+    function pollImageStatus() {
+      if (imagePollTimer) clearInterval(imagePollTimer);
+      imagePollTimer = setInterval(async () => {
+        try {
+          const res = await fetch('/api/image-status');
+          const data = await res.json();
+          document.getElementById('imgProgressBar').style.width = data.percentage + '%';
+          document.getElementById('imgPctLabel').textContent = data.percentage + '%';
+          document.getElementById('imgBytesLabel').textContent = formatBytes(data.bytesWritten) + ' / ' + formatBytes(data.totalBytes);
+          document.getElementById('imgBadSectorsLabel').textContent = 'Bozuk Sektör: ' + data.badSectors;
+          document.getElementById('imgSpeedLabel').textContent = data.speedMbps.toFixed(1) + ' MB/s';
+
+          if (!data.isActive) {
+            clearInterval(imagePollTimer);
+            document.getElementById('btnStartImage').style.display = 'inline-flex';
+            document.getElementById('btnStopImage').style.display = 'none';
+            if (data.isComplete) {
+              document.getElementById('imgStatusLabel').textContent = '✅ İmaj alma tamamlandı!';
+              showToast('Disk imajı başarıyla oluşturuldu: ' + data.targetPath, 'success');
+            } else {
+              document.getElementById('imgStatusLabel').textContent = 'Durduruldu';
+            }
+          }
+        } catch (_) {}
+      }, 1000);
+    }
+
+    async function stopImageCloning() {
+      await fetch('/api/stop-image', { method: 'POST' });
+      showToast('Klonlama durduruldu.', 'info');
+    }
+
+    // --- 2. File Header & Corruption Repair ---
+    function openRepairModal() {
+      document.getElementById('toolsDropdownMenu').style.display = 'none';
+      document.getElementById('repairFilePath').value = '';
+      document.getElementById('repairResultBox').style.display = 'none';
+      document.getElementById('repairModal').classList.add('open');
+    }
+
+    function closeRepairModal() {
+      document.getElementById('repairModal').classList.remove('open');
+    }
+
+    async function browseRepairFile() {
+      try {
+        const res = await fetch('/api/browse-file');
+        const data = await res.json();
+        if (data && data.path) {
+          document.getElementById('repairFilePath').value = data.path;
+        }
+      } catch (_) {}
+    }
+
+    async function executeFileRepair() {
+      const filePath = document.getElementById('repairFilePath').value.trim();
+      if (!filePath) {
+        showToast('Onarılacak dosya seçilmedi', 'warning');
+        return;
+      }
+
+      showToast('Dosya başlığı analiz ediliyor ve onarılıyor...', 'info');
+      try {
+        const res = await fetch('/api/repair-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filePath })
+        });
+        const data = await res.json();
+        const box = document.getElementById('repairResultBox');
+        box.style.display = 'block';
+        if (data.success) {
+          document.getElementById('repairResultTitle').textContent = data.wasModified ? '✅ Başlık Başarıyla Onarıldı!' : 'ℹ️ Dosya Zaten Sağlam';
+          document.getElementById('repairResultDetails').textContent = data.details + ` (${formatBytes(data.originalSize)} -> ${formatBytes(data.repairedSize)})`;
+          document.getElementById('repairResultPath').textContent = 'Onarılmış Dosya: ' + data.repairedFile;
+          showToast('Dosya onarımı tamamlandı!', 'success');
+        } else {
+          document.getElementById('repairResultTitle').textContent = '❌ Onarım Başarısız';
+          document.getElementById('repairResultDetails').textContent = data.details || 'Hata oluştu.';
+        }
+      } catch (err) {
+        showToast('Hata: ' + err.message, 'error');
+      }
+    }
+
+    window.recoverSingleWithRepair = async function(fileId) {
+      if (!fileId) return;
+      closeDetailsModal();
+      showToast('Dosya kurtarılıyor ve başlığı onarılıyor...', 'info');
+      try {
+        const res = await fetch('/api/recover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileIds: [fileId], destDir, repair: true })
+        });
+        const data = await res.json();
+        if (data.success && data.recoveredCount > 0) {
+          showToast(`✅ Dosya kurtarıldı ve başlığı onarıldı! (${destDir})`, 'success');
+        } else {
+          showToast('Kurtarılamadı: ' + (data.error || 'Bilinmeyen hata'), 'error');
+        }
+      } catch (err) {
+        showToast('Hata: ' + err.message, 'error');
+      }
+    };
+
+    // --- 3. Windows VSS Shadow Copies ---
+    function openVssModal() {
+      document.getElementById('toolsDropdownMenu').style.display = 'none';
+      document.getElementById('vssModal').classList.add('open');
+      loadVssSnapshots();
+    }
+
+    function closeVssModal() {
+      document.getElementById('vssModal').classList.remove('open');
+    }
+
+    async function loadVssSnapshots() {
+      const drive = document.getElementById('vssDriveSelect').value;
+      const container = document.getElementById('vssListContainer');
+      container.innerHTML = '<div style="text-align: center; color: var(--text-dim); padding: 30px;">Gölge kopyalar taranıyor...</div>';
+
+      try {
+        const res = await fetch('/api/vss-snapshots?drive=' + encodeURIComponent(drive));
+        const list = await res.json();
+        if (!Array.isArray(list) || list.length === 0 || !list[0].isAccessible) {
+          container.innerHTML = `<div style="text-align:center; padding: 30px; color: var(--text-dim);">
+            ${list[0] ? list[0].description : (drive + ' üzerinde etkin sistem geri yükleme gölge kopyası bulunamadı.')}
+          </div>`;
+          return;
+        }
+
+        let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+        list.forEach(item => {
+          html += `
+            <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <div>
+                <div style="font-weight: 700; color: var(--text-main); font-size: 13px;">🕒 ${escapeHtml(item.creationTime || 'Geri Yükleme Noktası')}</div>
+                <div style="font-size: 11px; color: var(--accent-blue); font-family: var(--font-mono); margin-top: 2px;">${escapeHtml(item.shadowVolume || item.shadowCopyId)}</div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="selectVssTarget('${escapeHtml(item.shadowVolume)}')">Bu Noktayı Tara</button>
+            </div>
+          `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      } catch (err) {
+        container.innerHTML = `<div style="color: var(--danger); padding: 20px;">Hata: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function selectVssTarget(path) {
+      closeVssModal();
+      selectTarget(path, null);
+      showToast('Gölge kopya tarama hedefi olarak belirlendi!', 'success');
+    }
+
+    // --- 4. DoD 5220.22-M Secure Shredder ---
+    function openShredModal() {
+      document.getElementById('toolsDropdownMenu').style.display = 'none';
+      document.getElementById('shredFilePath').value = '';
+      document.getElementById('shredModal').classList.add('open');
+    }
+
+    function closeShredModal() {
+      document.getElementById('shredModal').classList.remove('open');
+    }
+
+    async function browseShredFile() {
+      try {
+        const res = await fetch('/api/browse-file');
+        const data = await res.json();
+        if (data && data.path) {
+          document.getElementById('shredFilePath').value = data.path;
+        }
+      } catch (_) {}
+    }
+
+    async function executeFileShred() {
+      const filePath = document.getElementById('shredFilePath').value.trim();
+      const passes = parseInt(document.getElementById('shredPassesSelect').value) || 3;
+      if (!filePath) {
+        showToast('İmha edilecek dosya seçilmedi', 'warning');
+        return;
+      }
+
+      if (!confirm(`⚠️ KRİTİK ONAY:
+
+"${filePath}" dosyası ${passes} aşamalı DoD 5220.22-M yöntemiyle kalıcı olarak imha edilecek ve asla geri getirilemeyecektir.
+
+Emin misiniz?`)) {
+        return;
+      }
+
+      showToast('Güvenli dosya imhası uygulanıyor...', 'warning');
+      try {
+        const res = await fetch('/api/shred-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filePath, passes })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeShredModal();
+          showToast('✅ ' + data.message, 'success');
+        } else {
+          showToast('İmha başarısız: ' + data.message, 'error');
+        }
+      } catch (err) {
+        showToast('Hata: ' + err.message, 'error');
+      }
+    }
 
     // Theme Management (Dark & Light)
     function initTheme() {

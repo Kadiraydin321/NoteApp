@@ -4,6 +4,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shlobj.h>
+#include <commdlg.h>
 #endif
 
 namespace byterescue {
@@ -62,6 +63,29 @@ std::string FolderDialog::open_folder_dialog(const std::string& title) {
     return "";
 #else
     return "/home/birin";
+#endif
+}
+
+std::string FolderDialog::open_file_dialog(const std::string& title, const std::string& filter_desc) {
+#ifdef _WIN32
+    OPENFILENAMEA ofn = { 0 };
+    char szFile[MAX_PATH] = { 0 };
+
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = NULL;
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile);
+    ofn.lpstrFilter = "Tüm Desteklenen Dosyalar (*.img;*.raw;*.*)\0*.img;*.raw;*.*\0Tüm Dosyalar (*.*)\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrTitle = title.c_str();
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+    if (GetOpenFileNameA(&ofn) == TRUE) {
+        return std::string(ofn.lpstrFile);
+    }
+    return "";
+#else
+    return "";
 #endif
 }
 

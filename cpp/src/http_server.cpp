@@ -1,6 +1,10 @@
 // cpp/src/http_server.cpp
 #include "http_server.hpp"
 #include "embedded_web.hpp"
+#include "repair_engine.hpp"
+#include "image_engine.hpp"
+#include "shredder_engine.hpp"
+#include "vss_scanner.hpp"
 
 #include <iostream>
 #include <sstream>
@@ -398,6 +402,13 @@ void HttpServer::handle_client(uintptr_t client_socket) {
         RecoveryResult res = engine_.recover_files(file_ids, dest_dir);
         std::cout << "[+] Kurtarma sonucu: " << res.recovered_count << " basarili, " << res.failed_count << " basarisiz.\n";
 
+        bool do_repair = (body.find("\"repair\":true") != std::string::npos || body.find("\"repair\": true") != std::string::npos);
+        if (do_repair && res.success) {
+            for (const auto& saved : res.saved_files) {
+                RepairEngine::repair_file(saved, saved);
+            }
+        }
+
         std::ostringstream ss;
         ss << "{\n";
         ss << "  \"success\": " << (res.success ? "true" : "false") << ",\n";
@@ -421,6 +432,98 @@ void HttpServer::handle_client(uintptr_t client_socket) {
         std::string test_path = DiskDetector::get_default_destination() + "_Test_Disk.img";
         std::string gen = engine_.create_test_disk(test_path);
         resp_body = "{\"path\":\"" + json_escape(gen) + "\"}";
+    } else if (path == "/api/browse-file") {
+        std::string file = FolderDialog::open_file_dialog("ByteRescue - Dosya veya Disk İmajı Seçin");
+        resp_body = "{\"path\":\"" + json_escape(file) + "\"}";
+    } else if (path == "/api/repair-file" && method == "POST") {
+        std::string file_path;
+        size_t fp = body.find("\"filePath\"");
+        if (fp != std::string::npos) {
+            size_t q1 = body.find('"', body.find(':', fp));
+            size_t q2 = body.find('"', q1 + 1);
+            if (q1 != std::string::npos && q2 != std::string::npos) file_path = body.substr(q1 + 1, q2 - q1 - 1);
+        }
+        RepairResult rep = RepairEngine::repair_file(file_path);
+        std::ostringstream ss;
+        ss << "{\n";
+        ss << "  \"success\": " << (rep.success ? "true" : "false") << ",\n";
+        ss << "  \"wasModified\": " << (rep.was_modified ? "true" : "false") << ",\n";
+        ss << "  \"repairedFile\": \"" << json_escape(rep.repaired_file) << "\",\n";
+        ss << "  \"fileType\": \"" << rep.file_type << "\",\n";
+        ss << "  \"details\": \"" << json_escape(rep.details) << "\",\n";
+        ss << "  \"originalSize\": " << rep.original_size << ",\n";
+        ss << "  \"repairedSize\": " << rep.repaired_size << "\n";
+        ss << "}";
+        resp_body = ss.str();
+    } else if (path == "/api/create-image" && method == "POST") {
+        std::string src = "C:\\";
+        std::string target = DiskDetector::get_default_destination() + "\\Disk_Backup.img";
+        size_t sp = body.find("\"source\"");
+        if (sp != std::string::npos) {
+            size_t q1 = body.find('"', body.find(':', sp));
+            size_t q2 = body.find('"', q1 + 1);
+            if (q1 != std::string::npos && q2 != std::string::npos) src = body.substr(q1 + 1, q2 - q1 - 1);
+        }
+        size_t tp = body.find("\"target\"");
+        if (tp != std::string::npos) {
+            size_t q1 = body.find('"', body.find(':', tp));
+            size_t q2 = body.find('"', q1 + 1);
+            if (q1 != std::string::npos && q2 != std::string::npos) target = body.substr(q1 + 1, q2 - q1 - 1);
+        }
+        bool started = ImageEngine::instance().start_cloning(src, target);
+        resp_body = started ? "{\"success\":true,\"message\":\"Klonlama başlatıldı.\"}" : "{\"success\":false,\"error\":\"Klonlama zaten aktif veya başlatılamadı.\"}";
+    } else if (path == "/api/image-status") {
+        auto st = ImageEngine::instance().get_status();
+        std::ostringstream ss;
+        ss << "{\n";
+        ss << "  \"isActive\": " << (st.is_active ? "true" : "false") << ",\n";
+        ss << "  \"isComplete\": " << (st.is_complete ? "true" : "false") << ",\n";
+        ss << "  \"bytesWritten\": " << st.bytes_written << ",\n";
+        ss << "  \"totalBytes\": " << st.total_bytes << ",\n";
+        ss << "  \"badSectors\": " << st.bad_sectors << ",\n";
+        ss << "  \"speedMbps\": " << st.speed_mbps << ",\n";
+        ss << "  \"percentage\": " << st.percentage << ",\n";
+        ss << "  \"sourcePath\": \"" << json_escape(st.source_path) << "\",\n";
+        ss << "  \"targetPath\": \"" << json_escape(st.target_path) << "\",\n";
+        ss << "  \"error\": \"" << json_escape(st.error_message) << "\"\n";
+        ss << "}";
+        resp_body = ss.str();
+    } else if (path == "/api/stop-image" && method == "POST") {
+        ImageEngine::instance().stop_cloning();
+        resp_body = "{\"success\":true}";
+    } else if (path == "/api/shred-file" && method == "POST") {
+        std::string file_path;
+        int passes = 3;
+        size_t fp = body.find("\"filePath\"");
+        if (fp != std::string::npos) {
+            size_t q1 = body.find('"', body.find(':', fp));
+            size_t q2 = body.find('"', q1 + 1);
+            if (q1 != std::string::npos && q2 != std::string::npos) file_path = body.substr(q1 + 1, q2 - q1 - 1);
+        }
+        size_t pp = body.find("\"passes\"");
+        if (pp != std::string::npos) {
+            size_t colon = body.find(':', pp);
+            if (colon != std::string::npos) passes = std::atoi(body.c_str() + colon + 1);
+        }
+        ShredResult sh = ShredderEngine::shred_file(file_path, passes);
+        std::ostringstream ss;
+        ss << "{\n";
+        ss << "  \"success\": " << (sh.success ? "true" : "false") << ",\n";
+        ss << "  \"bytesShredded\": " << sh.bytes_shredded << ",\n";
+        ss << "  \"passesCompleted\": " << sh.passes_completed << ",\n";
+        ss << "  \"message\": \"" << json_escape(sh.message) << "\"\n";
+        ss << "}";
+        resp_body = ss.str();
+    } else if (path == "/api/vss-snapshots") {
+        std::string drive = "C:";
+        size_t dp = query.find("drive=");
+        if (dp != std::string::npos) {
+            drive = query.substr(dp + 6);
+            size_t amp = drive.find('&');
+            if (amp != std::string::npos) drive = drive.substr(0, amp);
+        }
+        auto snapshots = VssScanner::list_snapshots(drive);
+        resp_body = VssScanner::to_json(snapshots);
     } else if (path == "/api/shutdown-computer" && method == "POST") {
         resp_body = "{\"success\":true,\"message\":\"Bilgisayar kapatılıyor...\"}";
 #ifdef _WIN32
