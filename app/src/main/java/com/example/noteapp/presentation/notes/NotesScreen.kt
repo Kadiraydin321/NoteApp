@@ -102,6 +102,11 @@ fun NotesScreen(
     onFilterTypeChange: (NoteTypeFilter) -> Unit = {},
     onSortOrderChange: (NoteSortOrder) -> Unit = {},
     onSelectTag: (String?) -> Unit = {},
+    quickSyncState: QuickSyncState = QuickSyncState(),
+    syncHost: String = "",
+    onQuickSyncSend: () -> Unit = {},
+    onQuickSyncPull: () -> Unit = {},
+    onDismissQuickSyncMessage: () -> Unit = {},
     onSettingsClick: () -> Unit
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -153,6 +158,14 @@ fun NotesScreen(
     var noteToDeletePermanently by remember { mutableStateOf<Note?>(null) }
     var showSortMenu by remember { mutableStateOf(false) }
     var isFabExpanded by remember { mutableStateOf(false) }
+    var showQuickSyncDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(quickSyncState.message) {
+        quickSyncState.message?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            onDismissQuickSyncMessage()
+        }
+    }
 
     BackHandler(enabled = isFabExpanded) {
         isFabExpanded = false
@@ -182,13 +195,45 @@ fun NotesScreen(
             ModalDrawerSheet(
                 modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    "Not Defterim",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
-                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 24.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Not Defterim",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = {
+                            scope.launch { drawerState.close() }
+                            showQuickSyncDialog = true
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Sync,
+                                contentDescription = "Masaüstü ile Eşitle",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(onClick = {
+                            scope.launch { drawerState.close() }
+                            onSettingsClick()
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Ayarlar",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
                 HorizontalDivider()
 
                 NavigationDrawerItem(
@@ -342,20 +387,6 @@ fun NotesScreen(
                         )
                     }
                 }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                    label = { Text("Ayarlar") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onSettingsClick()
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                )
-
                 Spacer(Modifier.height(32.dp))
             }
         }
@@ -521,9 +552,6 @@ fun NotesScreen(
                                         contentDescription = "Görünüm Düzenini Değiştir"
                                     )
                                 }
-                            }
-                            IconButton(onClick = onSettingsClick) {
-                                Icon(Icons.Default.Settings, contentDescription = "Ayarlar")
                             }
                         }
                     )
@@ -1195,6 +1223,92 @@ fun NotesScreen(
             }
         )
     }
+
+    // 8. Hızlı Wi-Fi Senkronizasyonu Dialogu
+    if (showQuickSyncDialog) {
+        if (syncHost.isBlank()) {
+            AlertDialog(
+                onDismissRequest = { showQuickSyncDialog = false },
+                icon = { Icon(Icons.Default.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                title = { Text("Masaüstü ile Eşitle") },
+                text = {
+                    Text("Henüz bir masaüstü bilgisayar eşleştirilmedi. Ayarlar ekranına gidip tek tıkla ağdaki bilgisayarınızı bulabilir veya IP adresi girebilirsiniz.")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showQuickSyncDialog = false
+                        onSettingsClick()
+                    }) {
+                        Text("Ayarlara Git")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showQuickSyncDialog = false }) {
+                        Text("Kapat")
+                    }
+                }
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!quickSyncState.isOperating) showQuickSyncDialog = false
+                },
+                icon = { Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                title = { Text("Hızlı Wi-Fi Senkronizasyonu") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            "Hedef Bilgisayar: $syncHost",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Notlarınızı bilgisayarınızdaki 'Not Defterim Masaüstü' ile kablosuz eşitleyin:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (quickSyncState.isOperating) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
+                                Spacer(Modifier.width(12.dp))
+                                Text("Eşitleniyor...", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { onQuickSyncSend() },
+                            enabled = !quickSyncState.isOperating
+                        ) {
+                            Text("Gönder 📤")
+                        }
+                        FilledTonalButton(
+                            onClick = { onQuickSyncPull() },
+                            enabled = !quickSyncState.isOperating
+                        ) {
+                            Text("Çek 📥")
+                        }
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showQuickSyncDialog = false },
+                        enabled = !quickSyncState.isOperating
+                    ) {
+                        Text("Kapat")
+                    }
+                }
+            )
+        }
+    }
 }
 
 @Composable
@@ -1224,10 +1338,10 @@ private fun noteEntranceModifier(noteId: Long): Modifier {
     var hasEntered by rememberSaveable(noteId) { mutableStateOf(false) }
     val progress by animateFloatAsState(
         targetValue = if (hasEntered) 1f else 0f,
-        animationSpec = tween(durationMillis = 360),
+        animationSpec = tween(durationMillis = 280),
         label = "note_entry_$noteId"
     )
-    val entranceDistance = with(androidx.compose.ui.platform.LocalDensity.current) { 26.dp.toPx() }
+    val entranceDistance = with(androidx.compose.ui.platform.LocalDensity.current) { 20.dp.toPx() }
     LaunchedEffect(noteId) { hasEntered = true }
     return Modifier.graphicsLayer {
         alpha = progress
