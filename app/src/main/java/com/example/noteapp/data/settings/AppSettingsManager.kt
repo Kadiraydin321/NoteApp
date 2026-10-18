@@ -27,6 +27,13 @@ enum class NotesLayoutMode {
     COMPACT_LIST    // Kompakt tek satırlı hızlı liste
 }
 
+enum class DrawerCollapseMode(val title: String, val description: String) {
+    AUTO_ACCORDION("Otomatik Akordiyon (5+ ise)", "5'ten fazla öge olduğunda başlık akordiyon şeklinde katlanır"),
+    INLINE_EXPAND("Kompakt (İlk 5 + Fazlası)", "İlk 5 öge listelenir, fazlası 'Daha Fazla' butonuyla açılır"),
+    ALWAYS_ACCORDION("Her Zaman Akordiyon", "Tüm kategori ve etiket başlıkları katlanabilir akordiyon olur"),
+    EXPANDED_ALL("Tümünü Göster (Klasik)", "Hiçbir daraltma olmadan tüm liste doğrudan açık durur")
+}
+
 data class AppSettings(
     val widgetFilterMode: WidgetFilterMode = WidgetFilterMode.ALL,
     val widgetShowLockedNotes: Boolean = false,
@@ -39,7 +46,11 @@ data class AppSettings(
     val autoLockOnExit: Boolean = true,
     val highContrastNegative: Boolean = true,
     val lastBackupTimestamp: Long? = null,
-    val noteFontSize: Float = 16f
+    val noteFontSize: Float = 16f,
+    val lastSyncHost: String = "",
+    val lastSyncPin: String = "",
+    val colorPalette: AppColorPalette = AppColorPalette.WARM_AMBER,
+    val drawerCollapseMode: DrawerCollapseMode = DrawerCollapseMode.AUTO_ACCORDION
 )
 
 @Singleton
@@ -95,6 +106,22 @@ class AppSettingsManager @Inject constructor(
         val lastBackup = if (prefs.contains(KEY_LAST_BACKUP)) prefs.getLong(KEY_LAST_BACKUP, 0L) else null
 
         val noteFontSize = prefs.getFloat(KEY_NOTE_FONT_SIZE, 16f).coerceIn(12f, 24f)
+        val syncHost = prefs.getString(KEY_LAST_SYNC_HOST, "") ?: ""
+        val syncPin = prefs.getString(KEY_LAST_SYNC_PIN, "") ?: ""
+
+        val paletteStr = prefs.getString(KEY_COLOR_PALETTE, AppColorPalette.WARM_AMBER.name) ?: AppColorPalette.WARM_AMBER.name
+        val colorPalette = try {
+            AppColorPalette.valueOf(paletteStr)
+        } catch (_: Exception) {
+            AppColorPalette.WARM_AMBER
+        }
+
+        val drawerCollapseStr = prefs.getString(KEY_DRAWER_COLLAPSE_MODE, DrawerCollapseMode.AUTO_ACCORDION.name) ?: DrawerCollapseMode.AUTO_ACCORDION.name
+        val drawerCollapseMode = try {
+            DrawerCollapseMode.valueOf(drawerCollapseStr)
+        } catch (_: Exception) {
+            DrawerCollapseMode.AUTO_ACCORDION
+        }
 
         return AppSettings(
             widgetFilterMode = filterMode,
@@ -108,8 +135,32 @@ class AppSettingsManager @Inject constructor(
             autoLockOnExit = autoLock,
             highContrastNegative = highContrast,
             lastBackupTimestamp = lastBackup,
-            noteFontSize = noteFontSize
+            noteFontSize = noteFontSize,
+            lastSyncHost = syncHost,
+            lastSyncPin = syncPin,
+            colorPalette = colorPalette,
+            drawerCollapseMode = drawerCollapseMode
         )
+    }
+
+    fun setDrawerCollapseMode(mode: DrawerCollapseMode) {
+        prefs.edit().putString(KEY_DRAWER_COLLAPSE_MODE, mode.name).apply()
+        _settings.value = _settings.value.copy(drawerCollapseMode = mode)
+    }
+
+    fun setColorPalette(palette: AppColorPalette) {
+        prefs.edit().putString(KEY_COLOR_PALETTE, palette.name).apply()
+        _settings.value = _settings.value.copy(colorPalette = palette)
+    }
+
+    fun setLastSyncHost(host: String) {
+        prefs.edit().putString(KEY_LAST_SYNC_HOST, host).apply()
+        _settings.value = _settings.value.copy(lastSyncHost = host)
+    }
+
+    fun setLastSyncPin(pin: String) {
+        prefs.edit().putString(KEY_LAST_SYNC_PIN, pin).apply()
+        _settings.value = _settings.value.copy(lastSyncPin = pin)
     }
 
     fun setNoteFontSize(size: Float) {
@@ -191,6 +242,10 @@ class AppSettingsManager @Inject constructor(
         private const val KEY_HIGH_CONTRAST = "high_contrast_negative"
         private const val KEY_LAST_BACKUP = "last_backup_timestamp"
         private const val KEY_NOTE_FONT_SIZE = "key_note_font_size"
+        private const val KEY_LAST_SYNC_HOST = "last_sync_host"
+        private const val KEY_LAST_SYNC_PIN = "last_sync_pin"
+        private const val KEY_COLOR_PALETTE = "app_color_palette"
+        private const val KEY_DRAWER_COLLAPSE_MODE = "drawer_collapse_mode"
 
         // Helper for Widget Service to access synchronously without injection
         fun getWidgetFilterMode(context: Context): WidgetFilterMode {

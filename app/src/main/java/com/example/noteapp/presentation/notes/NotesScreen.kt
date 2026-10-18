@@ -39,6 +39,7 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.ui.res.painterResource
 import com.example.noteapp.R
+import com.example.noteapp.data.settings.DrawerCollapseMode
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -107,6 +108,7 @@ fun NotesScreen(
     onQuickSyncSend: () -> Unit = {},
     onQuickSyncPull: () -> Unit = {},
     onDismissQuickSyncMessage: () -> Unit = {},
+    drawerCollapseMode: DrawerCollapseMode = DrawerCollapseMode.AUTO_ACCORDION,
     onSettingsClick: () -> Unit
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -159,6 +161,50 @@ fun NotesScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     var isFabExpanded by remember { mutableStateOf(false) }
     var showQuickSyncDialog by remember { mutableStateOf(false) }
+
+    var isCategoriesAccordionExpanded by rememberSaveable(drawerCollapseMode) {
+        mutableStateOf(
+            when (drawerCollapseMode) {
+                DrawerCollapseMode.EXPANDED_ALL, DrawerCollapseMode.INLINE_EXPAND -> true
+                DrawerCollapseMode.ALWAYS_ACCORDION -> state.selectedCategory != null
+                DrawerCollapseMode.AUTO_ACCORDION -> state.selectedCategory != null || state.categories.size <= 5
+            }
+        )
+    }
+    var isCategoriesInlineExpanded by rememberSaveable(drawerCollapseMode) {
+        mutableStateOf(
+            state.selectedCategory != null && state.categories.indexOfFirst { it.id == state.selectedCategory?.id } >= 5
+        )
+    }
+
+    var isTagsAccordionExpanded by rememberSaveable(drawerCollapseMode) {
+        mutableStateOf(
+            when (drawerCollapseMode) {
+                DrawerCollapseMode.EXPANDED_ALL, DrawerCollapseMode.INLINE_EXPAND -> true
+                DrawerCollapseMode.ALWAYS_ACCORDION -> state.selectedTag != null
+                DrawerCollapseMode.AUTO_ACCORDION -> state.selectedTag != null || state.allHashtags.size <= 5
+            }
+        )
+    }
+    var isTagsInlineExpanded by rememberSaveable(drawerCollapseMode) {
+        mutableStateOf(
+            state.selectedTag != null && state.allHashtags.indexOf(state.selectedTag) >= 5
+        )
+    }
+
+    LaunchedEffect(state.selectedCategory) {
+        if (state.selectedCategory != null) {
+            isCategoriesAccordionExpanded = true
+            isCategoriesInlineExpanded = true
+        }
+    }
+
+    LaunchedEffect(state.selectedTag) {
+        if (state.selectedTag != null) {
+            isTagsAccordionExpanded = true
+            isTagsInlineExpanded = true
+        }
+    }
 
     LaunchedEffect(quickSyncState.message) {
         quickSyncState.message?.let { msg ->
@@ -330,61 +376,231 @@ fun NotesScreen(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-                // Kategoriler Başlığı ve Aksiyonları (+ Ekle ve - / Yönet)
+                // ==========================================
+                // KATEGORİLER BÖLÜMÜ
+                // ==========================================
+                val isCatAccordion = when (drawerCollapseMode) {
+                    DrawerCollapseMode.ALWAYS_ACCORDION -> true
+                    DrawerCollapseMode.AUTO_ACCORDION -> state.categories.size > 5
+                    DrawerCollapseMode.INLINE_EXPAND, DrawerCollapseMode.EXPANDED_ALL -> false
+                }
+                val isCatInline = drawerCollapseMode == DrawerCollapseMode.INLINE_EXPAND && state.categories.size > 5
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 2.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(enabled = isCatAccordion) {
+                            isCategoriesAccordionExpanded = !isCategoriesAccordionExpanded
+                        }
+                        .padding(start = 8.dp, end = 0.dp, top = 2.dp, bottom = 2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Kategoriler", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Row {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Kategoriler", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        if (isCatAccordion && state.categories.isNotEmpty()) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                            ) {
+                                Text(
+                                    text = "${state.categories.size}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { showAddCategoryDialog = true }) {
                             Icon(Icons.Default.Add, contentDescription = "Kategori Ekle")
                         }
                         IconButton(onClick = { showManageCategoriesDialog = true }) {
                             Icon(Icons.Default.Tune, contentDescription = "Kategorileri Düzenle")
                         }
+                        if (isCatAccordion) {
+                            val catRotation by animateFloatAsState(
+                                targetValue = if (isCategoriesAccordionExpanded) 180f else 0f,
+                                label = "cat_arrow_rotation"
+                            )
+                            IconButton(onClick = { isCategoriesAccordionExpanded = !isCategoriesAccordionExpanded }) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = if (isCategoriesAccordionExpanded) "Daralt" else "Genişlet",
+                                    modifier = Modifier.rotate(catRotation)
+                                )
+                            }
+                        }
                     }
                 }
 
-                state.categories.forEach { category ->
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
-                        label = { Text(category.name) },
-                        selected = state.viewMode == NotesViewMode.ALL &&
-                                state.filterType == NoteTypeFilter.ALL &&
-                                state.selectedTag == null && state.selectedCategory?.id == category.id,
-                        onClick = {
-                            onCategorySelect(category)
-                            scope.launch { drawerState.close() }
-                        },
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
-                    )
+                val categoriesToShow = when {
+                    isCatAccordion -> if (isCategoriesAccordionExpanded) state.categories else emptyList()
+                    isCatInline -> if (isCategoriesInlineExpanded) state.categories else state.categories.take(5)
+                    else -> state.categories
                 }
 
+                AnimatedVisibility(
+                    visible = !isCatAccordion || isCategoriesAccordionExpanded,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column {
+                        categoriesToShow.forEach { category ->
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
+                                label = { Text(category.name) },
+                                selected = state.viewMode == NotesViewMode.ALL &&
+                                        state.filterType == NoteTypeFilter.ALL &&
+                                        state.selectedTag == null && state.selectedCategory?.id == category.id,
+                                onClick = {
+                                    onCategorySelect(category)
+                                    scope.launch { drawerState.close() }
+                                },
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        if (isCatInline) {
+                            TextButton(
+                                onClick = { isCategoriesInlineExpanded = !isCategoriesInlineExpanded },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isCategoriesInlineExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = if (isCategoriesInlineExpanded) "Daha Az Göster" else "Daha Fazla Göster (+${state.categories.size - 5})",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // ==========================================
+                // METİN ETİKETLERİ BÖLÜMÜ
+                // ==========================================
                 if (allHashtags.isNotEmpty()) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    Text(
-                        "Metin Etiketleri",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-                    )
-                    allHashtags.forEach { tag ->
-                        NavigationDrawerItem(
-                            icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
-                            label = { Text("#$tag") },
-                            selected = state.viewMode == NotesViewMode.ALL &&
-                                    state.filterType == NoteTypeFilter.ALL &&
-                                    state.selectedCategory == null && state.selectedTag == tag,
-                            onClick = {
-                                onSelectTag(if (state.selectedTag == tag) null else tag)
-                                scope.launch { drawerState.close() }
-                            },
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
-                        )
+
+                    val isTagAccordion = when (drawerCollapseMode) {
+                        DrawerCollapseMode.ALWAYS_ACCORDION -> true
+                        DrawerCollapseMode.AUTO_ACCORDION -> allHashtags.size > 5
+                        DrawerCollapseMode.INLINE_EXPAND, DrawerCollapseMode.EXPANDED_ALL -> false
+                    }
+                    val isTagInline = drawerCollapseMode == DrawerCollapseMode.INLINE_EXPAND && allHashtags.size > 5
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(enabled = isTagAccordion) {
+                                isTagsAccordionExpanded = !isTagsAccordionExpanded
+                            }
+                            .padding(start = 8.dp, end = 0.dp, top = 2.dp, bottom = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                "Metin Etiketleri",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (isTagAccordion) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
+                                ) {
+                                    Text(
+                                        text = "${allHashtags.size}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (isTagAccordion) {
+                            val tagRotation by animateFloatAsState(
+                                targetValue = if (isTagsAccordionExpanded) 180f else 0f,
+                                label = "tag_arrow_rotation"
+                            )
+                            IconButton(onClick = { isTagsAccordionExpanded = !isTagsAccordionExpanded }) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = if (isTagsAccordionExpanded) "Daralt" else "Genişlet",
+                                    modifier = Modifier.rotate(tagRotation)
+                                )
+                            }
+                        }
+                    }
+
+                    val tagsToShow = when {
+                        isTagAccordion -> if (isTagsAccordionExpanded) allHashtags else emptyList()
+                        isTagInline -> if (isTagsInlineExpanded) allHashtags else allHashtags.take(5)
+                        else -> allHashtags
+                    }
+
+                    AnimatedVisibility(
+                        visible = !isTagAccordion || isTagsAccordionExpanded,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        Column {
+                            tagsToShow.forEach { tag ->
+                                NavigationDrawerItem(
+                                    icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
+                                    label = { Text("#$tag") },
+                                    selected = state.viewMode == NotesViewMode.ALL &&
+                                            state.filterType == NoteTypeFilter.ALL &&
+                                            state.selectedCategory == null && state.selectedTag == tag,
+                                    onClick = {
+                                        onSelectTag(if (state.selectedTag == tag) null else tag)
+                                        scope.launch { drawerState.close() }
+                                    },
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                                )
+                            }
+
+                            if (isTagInline) {
+                                TextButton(
+                                    onClick = { isTagsInlineExpanded = !isTagsInlineExpanded },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isTagsInlineExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isTagsInlineExpanded) "Daha Az Göster" else "Daha Fazla Göster (+${allHashtags.size - 5})",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.height(32.dp))

@@ -110,6 +110,10 @@ class SettingsViewModel @Inject constructor(
         settingsManager.setLayoutMode(mode)
     }
 
+    fun setDrawerCollapseMode(mode: com.example.noteapp.data.settings.DrawerCollapseMode) {
+        settingsManager.setDrawerCollapseMode(mode)
+    }
+
     fun setMasterPin(pin: String?) {
         settingsManager.setMasterPin(pin)
     }

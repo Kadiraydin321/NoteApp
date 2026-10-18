@@ -28,8 +28,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.BorderStroke
 import com.example.noteapp.data.settings.AppColorPalette
 import com.example.noteapp.data.settings.AppSettings
+import com.example.noteapp.data.settings.DrawerCollapseMode
 import com.example.noteapp.data.settings.NotesLayoutMode
 import com.example.noteapp.data.settings.ThemeMode
 import com.example.noteapp.data.settings.WidgetFilterMode
@@ -57,6 +59,7 @@ fun SettingsScreen(
     onColorPaletteChange: (AppColorPalette) -> Unit = {},
     onThemeModeChange: (ThemeMode) -> Unit = {},
     onLayoutModeChange: (NotesLayoutMode) -> Unit = {},
+    onDrawerCollapseModeChange: (DrawerCollapseMode) -> Unit = {},
     onMasterPinChange: (String?) -> Unit = {},
     onAutoLockChange: (Boolean) -> Unit = {},
     onHighContrastChange: (Boolean) -> Unit = {},
@@ -973,6 +976,57 @@ fun SettingsScreen(
                             } else null,
                             modifier = Modifier.weight(1f)
                         )
+                    }
+
+                    // Sol Menü Kategori ve Etiket Düzeni
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Sol Menü Kategori & Etiket Görünümü:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            "Sol menüdeki kategori ve etiketlerin listelenme ve katlanma biçimini seçin:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        DrawerCollapseMode.values().forEach { mode ->
+                            val isSelected = settings.drawerCollapseMode == mode
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onDrawerCollapseModeChange(mode) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = { onDrawerCollapseModeChange(mode) }
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = mode.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = mode.description,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Negatif / Yüksek Kontrastlı Metinler
