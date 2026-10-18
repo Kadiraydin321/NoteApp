@@ -48,6 +48,32 @@ class NotificationHelper(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Aksiyon 1: Tamamlandı Olarak İşaretle
+        val doneIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+            action = ReminderActionReceiver.ACTION_MARK_DONE
+            putExtra(ReminderActionReceiver.EXTRA_NOTE_ID, noteId)
+        }
+        val donePendingIntent = PendingIntent.getBroadcast(
+            context,
+            (noteId * 10 + 1).toInt(),
+            doneIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Aksiyon 2: 15 Dakika Ertele
+        val snoozeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+            action = ReminderActionReceiver.ACTION_SNOOZE
+            putExtra(ReminderActionReceiver.EXTRA_NOTE_ID, noteId)
+            putExtra(ReminderActionReceiver.EXTRA_NOTE_TITLE, title)
+            putExtra(ReminderActionReceiver.EXTRA_NOTE_CONTENT, content)
+        }
+        val snoozePendingIntent = PendingIntent.getBroadcast(
+            context,
+            (noteId * 10 + 2).toInt(),
+            snoozeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle(if (title.isNotBlank()) title else "Not Hatırlatıcısı")
@@ -56,6 +82,8 @@ class NotificationHelper(private val context: Context) {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .addAction(android.R.drawable.checkbox_on_background, "✓ Tamamlandı", donePendingIntent)
+            .addAction(android.R.drawable.ic_popup_sync, "⏱ 15 Dk Ertele", snoozePendingIntent)
             .build()
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

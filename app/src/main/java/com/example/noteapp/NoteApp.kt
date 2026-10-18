@@ -3,6 +3,10 @@ package com.example.noteapp
 import android.app.Application
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.widget.NotesWidgetProvider
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,12 +17,30 @@ import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 
 @HiltAndroidApp
-class NoteApp : Application() {
+class NoteApp : Application(), ImageLoaderFactory {
 
     @Inject
     lateinit var repository: NoteRepository
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(0.25)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(64L * 1024 * 1024) // 64 MB
+                    .build()
+            }
+            .crossfade(true)
+            .respectCacheHeaders(false)
+            .build()
+    }
 
     override fun onCreate() {
         super.onCreate()

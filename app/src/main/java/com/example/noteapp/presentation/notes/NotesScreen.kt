@@ -120,12 +120,37 @@ fun NotesScreen(
     searchBarShape: SearchBarShape = SearchBarShape.PILL,
     onSettingsClick: () -> Unit
 ) {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val screenDensity = LocalDensity.current
     val homeGlowColor = MaterialTheme.colorScheme.primary
+
+    // Ekran açıldığında veya nota girip geri dönüldüğünde menünün donup gri ekran yapmasını önle
+    LaunchedEffect(Unit) {
+        if (drawerState.isOpen || drawerState.targetValue != DrawerValue.Closed) {
+            drawerState.snapTo(DrawerValue.Closed)
+        }
+    }
+
+    val handleOpenNote: (Note) -> Unit = remember(onNoteClick, drawerState, scope) {
+        { note ->
+            if (drawerState.isOpen) {
+                scope.launch { drawerState.snapTo(DrawerValue.Closed) }
+            }
+            onNoteClick(note)
+        }
+    }
+
+    val handleAddNote: (String?) -> Unit = remember(onAddNoteClick, drawerState, scope) {
+        { action ->
+            if (drawerState.isOpen) {
+                scope.launch { drawerState.snapTo(DrawerValue.Closed) }
+            }
+            onAddNoteClick(action)
+        }
+    }
 
     val onShareNote: (Note) -> Unit = remember(context) {
         { note ->
@@ -222,11 +247,18 @@ fun NotesScreen(
         }
     }
 
-    BackHandler(enabled = isFabExpanded) {
-        isFabExpanded = false
+    val isSelectionMode = state.selectedNoteIds.isNotEmpty()
+
+    BackHandler(enabled = drawerState.isOpen || isSelectionMode || isFabExpanded) {
+        if (drawerState.isOpen) {
+            scope.launch { drawerState.close() }
+        } else if (isSelectionMode) {
+            onClearSelection()
+        } else if (isFabExpanded) {
+            isFabExpanded = false
+        }
     }
 
-    val isSelectionMode = state.selectedNoteIds.isNotEmpty()
     val reserveFabSpace = !isSelectionMode &&
             (state.viewMode == NotesViewMode.ALL || state.viewMode == NotesViewMode.REMINDERS)
 
@@ -246,9 +278,12 @@ fun NotesScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = !isSelectionMode,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.verticalScroll(rememberScrollState())
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
                 Spacer(Modifier.height(12.dp))
                 Row(
@@ -722,7 +757,11 @@ fun NotesScreen(
                             )
                         },
                         navigationIcon = {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            IconButton(onClick = {
+                                scope.launch {
+                                    if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                                }
+                            }) {
                                 Icon(Icons.Default.Menu, contentDescription = "Menü")
                             }
                         },
@@ -824,7 +863,7 @@ fun NotesScreen(
                                     icon = Icons.Default.Image,
                                     onClick = {
                                         isFabExpanded = false
-                                        onAddNoteClick("image")
+                                        handleAddNote("image")
                                     }
                                 )
                                 QuickFabOption(
@@ -832,7 +871,7 @@ fun NotesScreen(
                                     icon = Icons.Default.Draw,
                                     onClick = {
                                         isFabExpanded = false
-                                        onAddNoteClick("draw")
+                                        handleAddNote("draw")
                                     }
                                 )
                                 QuickFabOption(
@@ -840,7 +879,7 @@ fun NotesScreen(
                                     icon = Icons.Default.Mic,
                                     onClick = {
                                         isFabExpanded = false
-                                        onAddNoteClick("voice")
+                                        handleAddNote("voice")
                                     }
                                 )
                                 QuickFabOption(
@@ -848,7 +887,7 @@ fun NotesScreen(
                                     icon = Icons.Default.CheckBox,
                                     onClick = {
                                         isFabExpanded = false
-                                        onAddNoteClick("checklist")
+                                        handleAddNote("checklist")
                                     }
                                 )
                                 QuickFabOption(
@@ -856,7 +895,7 @@ fun NotesScreen(
                                     icon = Icons.Default.EditNote,
                                     onClick = {
                                         isFabExpanded = false
-                                        onAddNoteClick(null)
+                                        handleAddNote(null)
                                     }
                                 )
                             }
@@ -1035,7 +1074,7 @@ fun NotesScreen(
                                             elevationStyle = cardElevationStyle,
                                             onClick = {
                                                 if (isSelectionMode) onToggleNoteSelection(note.id)
-                                                else onNoteClick(note)
+                                                else handleOpenNote(note)
                                             },
                                             onLongClick = { onToggleNoteSelection(note.id) },
                                             onPinClick = { onPinNote(note) },
@@ -1072,7 +1111,7 @@ fun NotesScreen(
                                             elevationStyle = cardElevationStyle,
                                             onClick = {
                                                 if (isSelectionMode) onToggleNoteSelection(note.id)
-                                                else onNoteClick(note)
+                                                else handleOpenNote(note)
                                             },
                                             onLongClick = { onToggleNoteSelection(note.id) },
                                             onPinClick = { onPinNote(note) },
@@ -1111,7 +1150,7 @@ fun NotesScreen(
                                             elevationStyle = cardElevationStyle,
                                             onClick = {
                                                 if (isSelectionMode) onToggleNoteSelection(note.id)
-                                                else onNoteClick(note)
+                                                else handleOpenNote(note)
                                             },
                                             onLongClick = { onToggleNoteSelection(note.id) },
                                             onPinClick = { onPinNote(note) },

@@ -4,8 +4,18 @@ import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+import androidx.room.Index
+
 @Immutable
-@Entity(tableName = "notes")
+@Entity(
+    tableName = "notes",
+    indices = [
+        Index(value = ["isDeleted", "isArchived", "isPinned", "timestamp"]),
+        Index(value = ["categoryId"]),
+        Index(value = ["reminderTime"]),
+        Index(value = ["title"])
+    ]
+)
 data class Note(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

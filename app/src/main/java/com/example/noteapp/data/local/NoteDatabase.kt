@@ -12,7 +12,7 @@ import com.example.noteapp.domain.model.Note
 
 @Database(
     entities = [Note::class, Category::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -38,6 +38,15 @@ abstract class NoteDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_isDeleted_isArchived_isPinned_timestamp ON notes (isDeleted, isArchived, isPinned, timestamp)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_categoryId ON notes (categoryId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_reminderTime ON notes (reminderTime)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_title ON notes (title)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: NoteDatabase? = null
 
@@ -48,7 +57,7 @@ abstract class NoteDatabase : RoomDatabase() {
                     NoteDatabase::class.java,
                     DATABASE_NAME
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build().also { INSTANCE = it }
             }

@@ -84,6 +84,7 @@ import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
 import com.example.noteapp.presentation.components.insertTextAtCursor
+import com.example.noteapp.util.NoteExporter
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -92,19 +93,25 @@ import kotlin.math.roundToInt
 
 val NoteColors = listOf(
     Color.Transparent,  // 0: Standart / Varsayılan Tema Rengi
-    Color(0xFFFFF9C4), // Açık Sarı (Klasik Not Rengi)
-    Color(0xFFFFE0B2), // Açık Şeftali
-    Color(0xFFFFCDD2), // Açık Mercan / Gül
-    Color(0xFFF8BBD0), // Açık Pembe
-    Color(0xFFE1BEE7), // Açık Mor / Lavanta
-    Color(0xFFC5CAE9), // Açık İndigo
-    Color(0xFFBBDEFB), // Açık Gökyüzü Mavisi
-    Color(0xFFB2DFDB), // Açık Teal
-    Color(0xFFC8E6C9), // Açık Nane / Yeşil
-    Color(0xFFD7CCC8), // Sıcak Bej
-    Color(0xFFCFD8DC), // Soğuk Kayrak Gri
-    Color(0xFF37474F), // Koyu Mavi Gri
-    Color(0xFF1E1E1E)  // Gece Siyahı
+    // Sıcak & İç Isıtan Tonlar
+    Color(0xFF3E2723), // Sıcak Espresso / Koyu Çikolata
+    Color(0xFF4E342E), // Sıcak Kavruk Karamel
+    Color(0xFF4A148C), // Derin Gece Mürdümü
+    Color(0xFF880E4F), // Sıcak Nar & Bordo
+    Color(0xFFBF360C), // Sıcak Yanık Kiremit / Terracotta
+    Color(0xFF1B5E20), // Derin Zümrüt & Orman Yeşili
+    Color(0xFF004D40), // Derin Petrol Yeşili
+    Color(0xFF0D47A1), // Gece Mavisi / Safir
+    Color(0xFF263238), // Koyu Antrasit Grafit
+    // Sıcak ve Yumuşak Pastel Not Renkleri
+    Color(0xFFFFE0B2), // Sıcak Şeftali & Bal
+    Color(0xFFFFF9C4), // Sıcak Kehribar Sarısı
+    Color(0xFFFFCDD2), // Sıcak Mercan & Gül Kurusu
+    Color(0xFFE1BEE7), // Yumuşak Lavanta
+    Color(0xFFC8E6C9), // Adaçayı & Nane Yeşili
+    Color(0xFFBBDEFB), // Durgun Gökyüzü Mavisi
+    Color(0xFFD7CCC8), // Sıcak Kaşmir & Bej
+    Color(0xFF181512)  // Gece Koyu Espresso
 )
 
 enum class NoteToolCategory {
@@ -1072,6 +1079,53 @@ fun NoteDetailScreen(
                                 }
 
                                 HorizontalDivider()
+
+                                // PDF Olarak Paylaş / Dışa Aktar
+                                DropdownMenuItem(
+                                    text = { Text("PDF Olarak Paylaş / Dışa Aktar") },
+                                    leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        try {
+                                            val categoryName = categories.find { it.id == state.categoryId }?.name
+                                            val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
+                                            val pdfFile = NoteExporter.exportToPdf(
+                                                context = context,
+                                                title = state.title,
+                                                content = state.contentValue.text,
+                                                categoryName = categoryName,
+                                                dateFormatted = dateStr,
+                                                tags = state.extractedTags
+                                            )
+                                            NoteExporter.shareFile(context, pdfFile, "application/pdf", "PDF Belgesini Paylaş")
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "PDF oluşturulamadı: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                )
+
+                                // Düz Metin (.txt) Olarak Paylaş
+                                DropdownMenuItem(
+                                    text = { Text("Düz Metin (.txt) Olarak Paylaş") },
+                                    leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        try {
+                                            val categoryName = categories.find { it.id == state.categoryId }?.name
+                                            val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
+                                            val txtFile = NoteExporter.exportToTxt(
+                                                context = context,
+                                                title = state.title,
+                                                content = state.contentValue.text,
+                                                categoryName = categoryName,
+                                                dateFormatted = dateStr
+                                            )
+                                            NoteExporter.shareFile(context, txtFile, "text/plain", "Metin Dosyasını Paylaş")
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Dosya oluşturulamadı: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                )
 
                                 // Markdown Olarak Paylaş
                                 DropdownMenuItem(

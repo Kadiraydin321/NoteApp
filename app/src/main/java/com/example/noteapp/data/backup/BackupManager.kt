@@ -68,7 +68,7 @@ class BackupManager @Inject constructor(
     /**
      * Tüm notları, kategorileri ve medya dosyalarını bellek içi ZIP arşivi olarak oluşturur.
      */
-    private suspend fun buildZipArchiveBytes(): Triple<ByteArray, Int, Int> {
+    suspend fun buildZipArchiveBytes(): Triple<ByteArray, Int, Int> {
         val notes = repository.getAllNotes()
         val categories = repository.getAllCategoriesList()
         var attachmentsCount = 0
