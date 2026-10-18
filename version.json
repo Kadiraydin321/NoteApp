@@ -1,7 +1,7 @@
 {
-  "versionCode": 7,
-  "versionName": "1.0.6",
-  "buildTime": 1792340305227,
+  "versionCode": 8,
+  "versionName": "1.0.7",
+  "buildTime": 1792341200000,
   "releaseDate": "18.10.2026",
-  "changeLog": "Tasarım Stüdyosu sayfası eklendi: Canlı mini ekran simülasyonu, 5 hazır tasarım şablonu, kart köşe & derinlik stilleri ve buton konumu görsel özelleştirmeleri."
+  "changeLog": "Yan menü (drawer) donması ve nota girip çıkıldığında oluşan gri ekran sorunu tamamen giderildi. Geri tuşu (BackHandler) ve menü geçiş kararlılığı optimize edildi."
 }
