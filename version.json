@@ -1,7 +1,7 @@
 {
   "versionCode": 3,
   "versionName": "1.0.2",
-  "buildTime": 1792326718931,
+  "buildTime": 1792329171891,
   "releaseDate": "18.10.2026",
-  "changeLog": "Sadeleştirilmiş '🚀 Denetle ve yükle' butonu ve akıllı sürüm denetleyicisi"
+  "changeLog": "Otomatik güncelleme denetimi, Detay popup penceresi ve internet bağlantısı uyarısı"
 }
