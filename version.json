@@ -1,7 +1,7 @@
 {
-  "versionCode": 10,
-  "versionName": "1.0.9",
-  "buildTime": 1792344000000,
+  "versionCode": 11,
+  "versionName": "1.1.0",
+  "buildTime": 1792348000000,
   "releaseDate": "18.10.2026",
-  "changeLog": "Kapsamlı performans ve bellek optimizasyonu yapıldı: Liste kaydırma donmaları giderildi (donanım katmanı yükü kaldırıldı), Enum.entries ile gereksiz bellek tahsisleri sıfırlandı, güncelleme indirme ilerleme yayını sınırlandırılarak UI kasmaları önlendi ve önbellek temizleme mekanizması eklendi."
+  "changeLog": "Sol menü (çekmece) tüm ekran yüksekliğini kaplayacak şekilde sabitlendi. Başlık alanı yukarıda sabit tutularak kategori ve etiket açılıp kapandığında menü çerçevesinin aşağı yukarı zıplaması önlendi; tüm içerik sabit menü içerisinde akıcı şekilde kayacak hale getirildi."
 }
