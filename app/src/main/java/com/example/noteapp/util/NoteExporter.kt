@@ -127,6 +127,7 @@ object NoteExporter {
 
         // Dosyaya yaz
         val exportDir = File(context.cacheDir, "exports").apply { mkdirs() }
+        cleanOldExports(exportDir)
         val sanitizedTitle = displayTitle.replace("[^a-zA-Z0-9çÇğĞıİöÖşŞüÜ_\\-]".toRegex(), "_").take(30)
         val file = File(exportDir, "${sanitizedTitle}_${System.currentTimeMillis()}.pdf")
 
@@ -227,5 +228,16 @@ object NoteExporter {
         }
 
         return lines
+    }
+
+    private fun cleanOldExports(exportDir: File) {
+        try {
+            val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            exportDir.listFiles()?.forEach { file ->
+                if (file.isFile && file.lastModified() < oneDayAgo) {
+                    file.delete()
+                }
+            }
+        } catch (_: Exception) {}
     }
 }

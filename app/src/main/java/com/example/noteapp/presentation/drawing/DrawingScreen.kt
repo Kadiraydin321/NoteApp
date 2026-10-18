@@ -612,7 +612,7 @@ fun DrawingScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        DrawingTool.values().forEach { tool ->
+                        DrawingTool.entries.forEach { tool ->
                             val isSelected = activeTool == tool
                             val icon = when (tool) {
                                 DrawingTool.PEN -> Icons.Default.Edit
@@ -1163,7 +1163,7 @@ private fun ShapesStudioRow(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ShapeType.values().forEach { shape ->
+                ShapeType.entries.forEach { shape ->
                     val isSelected = selectedShape == shape
                     val icon = when (shape) {
                         ShapeType.LINE -> Icons.Default.HorizontalRule

@@ -34,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -2263,7 +2264,7 @@ fun NoteDetailScreen(
                                                 modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp)
                                             ) {
                                                 Icon(
-                                                    imageVector = if (isCompletedSectionExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                                                    imageVector = if (isCompletedSectionExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                                     contentDescription = null,
                                                     tint = contentColor.copy(alpha = 0.6f),
                                                     modifier = Modifier.size(20.dp)

@@ -103,7 +103,7 @@ fun DesignStudioScreen(
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                DesignPreset.values().filter { it != DesignPreset.CUSTOM }.forEach { preset ->
+                DesignPreset.entries.filter { it != DesignPreset.CUSTOM }.forEach { preset ->
                     val isSelected = settings.designPreset == preset
                     Surface(
                         shape = RoundedCornerShape(14.dp),
@@ -217,7 +217,7 @@ fun DesignStudioScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CardCornerStyle.values().forEach { corner ->
+                CardCornerStyle.entries.forEach { corner ->
                     val isSelected = settings.cardCornerStyle == corner
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -280,7 +280,7 @@ fun DesignStudioScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CardElevationStyle.values().forEach { elevation ->
+                CardElevationStyle.entries.forEach { elevation ->
                     val isSelected = settings.cardElevationStyle == elevation
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -354,7 +354,7 @@ fun DesignStudioScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                SearchBarShape.values().forEach { shape ->
+                SearchBarShape.entries.forEach { shape ->
                     val isSelected = settings.searchBarShape == shape
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -421,7 +421,7 @@ fun DesignStudioScreen(
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                AppColorPalette.values().forEach { palette ->
+                AppColorPalette.entries.forEach { palette ->
                     val isSelected = settings.colorPalette == palette
                     val swatchColors = when (palette) {
                         AppColorPalette.WARM_AMBER -> listOf(Color(0xFFFFB74D), Color(0xFFFFAB91), Color(0xFF2E241E))

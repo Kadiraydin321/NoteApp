@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.LabelOff
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
@@ -785,7 +786,7 @@ fun NotesScreen(
                                         expanded = showSortMenu,
                                         onDismissRequest = { showSortMenu = false }
                                     ) {
-                                        NoteSortOrder.values().forEach { order ->
+                                        NoteSortOrder.entries.forEach { order ->
                                             DropdownMenuItem(
                                                 text = { Text(order.title) },
                                                 onClick = {
@@ -1385,7 +1386,7 @@ fun NotesScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(Icons.Default.LabelOff, contentDescription = null)
+                                    Icon(Icons.AutoMirrored.Filled.LabelOff, contentDescription = null)
                                     Text("Kategorisiz")
                                 }
                             }
@@ -1624,14 +1625,16 @@ private fun noteActionErrorColor(cardColor: Color): Color =
 @Composable
 private fun noteEntranceModifier(noteId: Long): Modifier {
     var hasEntered by rememberSaveable(noteId) { mutableStateOf(false) }
+
     val progress by animateFloatAsState(
         targetValue = if (hasEntered) 1f else 0f,
-        animationSpec = tween(durationMillis = 280),
+        animationSpec = tween(durationMillis = 240),
         label = "note_entry_$noteId"
     )
-    val entranceDistance = with(androidx.compose.ui.platform.LocalDensity.current) { 20.dp.toPx() }
+    val density = LocalDensity.current
+    val entranceDistance = remember(density) { with(density) { 16.dp.toPx() } }
     LaunchedEffect(noteId) { hasEntered = true }
-    return Modifier.graphicsLayer {
+    return if (progress >= 0.99f) Modifier else Modifier.graphicsLayer {
         alpha = progress
         translationY = entranceDistance * (1f - progress)
     }
@@ -1673,20 +1676,24 @@ fun NoteCard(
         parseMarkdownCardPreview(note.content)
     }
 
-    val cardShape = RoundedCornerShape(cornerStyle.radiusDp.dp)
-    val cardBorder = when {
-        isSelected -> BorderStroke(2.5.dp, MaterialTheme.colorScheme.primary)
-        elevationStyle == CardElevationStyle.BORDERED -> BorderStroke(1.2.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
-        elevationStyle == CardElevationStyle.GLASS -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
-        else -> null
+    val cardShape = remember(cornerStyle) { RoundedCornerShape(cornerStyle.radiusDp.dp) }
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val outlineVariantColor = MaterialTheme.colorScheme.outlineVariant
+    val cardBorder = remember(isSelected, elevationStyle, primaryColor, outlineVariantColor) {
+        when {
+            isSelected -> BorderStroke(2.5.dp, primaryColor)
+            elevationStyle == CardElevationStyle.BORDERED -> BorderStroke(1.2.dp, outlineVariantColor.copy(alpha = 0.55f))
+            elevationStyle == CardElevationStyle.GLASS -> BorderStroke(1.dp, primaryColor.copy(alpha = 0.35f))
+            else -> null
+        }
     }
     val cardElevation = when (elevationStyle) {
         CardElevationStyle.ELEVATED -> CardDefaults.cardElevation(defaultElevation = 3.dp)
         else -> CardDefaults.cardElevation(defaultElevation = 0.dp)
     }
-    val cardBg = when (elevationStyle) {
-        CardElevationStyle.GLASS -> colorSpec.backgroundColor.copy(alpha = 0.65f)
-        else -> colorSpec.backgroundColor
+    val cardBg = remember(elevationStyle, colorSpec.backgroundColor) {
+        if (elevationStyle == CardElevationStyle.GLASS) colorSpec.backgroundColor.copy(alpha = 0.65f)
+        else colorSpec.backgroundColor
     }
 
     Card(
@@ -1923,13 +1930,19 @@ fun CompactNoteCard(
         SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(note.timestamp))
     }
 
-    val compactRadius = (cornerStyle.radiusDp * 0.75f).coerceAtLeast(4f).dp
-    val compactShape = RoundedCornerShape(compactRadius)
-    val cardBorder = when {
-        isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        elevationStyle == CardElevationStyle.BORDERED -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-        elevationStyle == CardElevationStyle.GLASS -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-        else -> null
+    val compactShape = remember(cornerStyle) {
+        val compactRadius = (cornerStyle.radiusDp * 0.75f).coerceAtLeast(4f).dp
+        RoundedCornerShape(compactRadius)
+    }
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val outlineVariantColor = MaterialTheme.colorScheme.outlineVariant
+    val cardBorder = remember(isSelected, elevationStyle, primaryColor, outlineVariantColor) {
+        when {
+            isSelected -> BorderStroke(2.dp, primaryColor)
+            elevationStyle == CardElevationStyle.BORDERED -> BorderStroke(1.dp, outlineVariantColor.copy(alpha = 0.5f))
+            elevationStyle == CardElevationStyle.GLASS -> BorderStroke(1.dp, primaryColor.copy(alpha = 0.3f))
+            else -> null
+        }
     }
 
     Surface(

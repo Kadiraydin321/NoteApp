@@ -934,7 +934,7 @@ fun ImageEditScreen(
                         horizontalArrangement = Arrangement.SpaceAround,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        for (tab in ImageEditorTab.values()) {
+                        for (tab in ImageEditorTab.entries) {
                             val isSelected = activeTab == tab
                             val activeTint = MaterialTheme.colorScheme.primary
                             val inactiveTint = Color(0xFF9EABB8)
@@ -1384,7 +1384,7 @@ private fun CropControlPanel(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(CropAspectRatio.values()) { ratio ->
+            items(CropAspectRatio.entries) { ratio ->
                 val isSelected = selectedRatio == ratio
                 Surface(
                     onClick = { onRatioSelect(ratio) },
@@ -1507,7 +1507,7 @@ private fun DrawControlPanel(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Row(modifier = Modifier.padding(3.dp)) {
-                    DrawingMode.values().forEach { mode ->
+                    DrawingMode.entries.forEach { mode ->
                         val isSelected = currentMode == mode
                         Surface(
                             onClick = { onModeSelect(mode) },
@@ -1754,7 +1754,7 @@ private fun AdjustControlPanel(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(FilterPreset.values()) { filter ->
+            items(FilterPreset.entries) { filter ->
                 val isSelected = selectedFilter == filter
                 Surface(
                     onClick = { onFilterSelect(filter) },

@@ -1057,7 +1057,7 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        DrawerCollapseMode.values().forEach { mode ->
+                        DrawerCollapseMode.entries.forEach { mode ->
                             val isSelected = settings.drawerCollapseMode == mode
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
@@ -1140,7 +1140,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        AppColorPalette.values().forEach { palette ->
+                        AppColorPalette.entries.forEach { palette ->
                             val isSelected = (!settings.dynamicColor && settings.colorPalette == palette) ||
                                     (settings.dynamicColor && settings.colorPalette == palette)
                             val previewColors = when (palette) {

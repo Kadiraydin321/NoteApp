@@ -178,16 +178,20 @@ class AppUpdateManager @Inject constructor(
 
         connection.inputStream.use { input ->
             FileOutputStream(apkFile).use { output ->
-                val buffer = ByteArray(16 * 1024)
+                val buffer = ByteArray(32 * 1024)
                 var bytesRead: Int
                 var totalRead = 0L
+                var lastEmittedProgress = -1
 
                 while (input.read(buffer).also { bytesRead = it } != -1) {
                     output.write(buffer, 0, bytesRead)
                     totalRead += bytesRead
                     if (totalLength > 0) {
                         val progress = ((totalRead * 100) / totalLength).toInt()
-                        onProgress(progress, totalRead, totalLength)
+                        if (progress != lastEmittedProgress || totalRead == totalLength) {
+                            lastEmittedProgress = progress
+                            onProgress(progress, totalRead, totalLength)
+                        }
                     } else {
                         onProgress(-1, totalRead, -1)
                     }
