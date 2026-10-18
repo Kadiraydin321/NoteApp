@@ -11,12 +11,16 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ByteRescue // Veri Kurtarıcı - Kadir</title>
-  <style>
+    <style>
     :root {
+      /* Dark Theme (Varsayılan) */
       --bg-base: #090d16;
       --bg-card: #111827;
       --bg-card-hover: #162032;
+      --bg-surface: #151f30;
+      --bg-input: #0b111e;
       --border-color: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(255, 255, 255, 0.2);
       --border-focus: rgba(16, 185, 129, 0.5);
       --accent: #10b981;
       --accent-hover: #059669;
@@ -25,10 +29,45 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       --text-main: #f9fafb;
       --text-muted: #9ca3af;
       --text-dim: #6b7280;
+      --header-bg: rgba(17, 24, 39, 0.88);
+      --btn-sec-bg: rgba(255, 255, 255, 0.05);
+      --btn-sec-hover: rgba(255, 255, 255, 0.1);
+      --table-th-bg: #141f32;
+      --table-row-hover: rgba(255, 255, 255, 0.025);
+      --table-border: rgba(255, 255, 255, 0.04);
+      --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
       --danger: #ef4444;
       --warning: #f59e0b;
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", Helvetica, Arial, sans-serif;
       --font-mono: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
+    }
+
+    [data-theme="light"] {
+      /* Aydınlık Modern Minimalist Tema */
+      --bg-base: #f4f6fa;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f8fafc;
+      --bg-surface: #eef2f6;
+      --bg-input: #ffffff;
+      --border-color: #e2e8f0;
+      --border-hover: #cbd5e1;
+      --border-focus: rgba(16, 185, 129, 0.6);
+      --accent: #059669;
+      --accent-hover: #047857;
+      --accent-glow: rgba(5, 150, 105, 0.2);
+      --accent-blue: #0284c7;
+      --text-main: #0f172a;
+      --text-muted: #334155;
+      --text-dim: #64748b;
+      --header-bg: rgba(255, 255, 255, 0.94);
+      --btn-sec-bg: #f1f5f9;
+      --btn-sec-hover: #e2e8f0;
+      --table-th-bg: #f8fafc;
+      --table-row-hover: rgba(241, 245, 249, 0.8);
+      --table-border: #edf2f7;
+      --card-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+      --danger: #dc2626;
+      --warning: #d97706;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,18 +79,19 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       display: flex;
       flex-direction: column;
       overflow-x: hidden;
+      transition: background-color 0.25s ease, color 0.25s ease;
     }
 
     /* Scrollbar */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: var(--bg-base); }
-    ::-webkit-scrollbar-thumb { background: #1f293d; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #374151; }
+    ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
     /* Layout */
     header {
       height: 64px;
-      background: rgba(17, 24, 39, 0.85);
+      background: var(--header-bg);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border-color);
       display: flex;
@@ -61,24 +101,28 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       position: sticky;
       top: 0;
       z-index: 50;
+      transition: background 0.25s ease, border-color 0.25s ease;
     }
 
     .brand {
       display: flex;
       align-items: center;
       gap: 12px;
+      cursor: pointer;
+      user-select: none;
     }
     .brand-icon {
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
       background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
       border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
       box-shadow: 0 0 15px var(--accent-glow);
+      flex-shrink: 0;
     }
-    .brand-icon svg { width: 20px; height: 20px; fill: #ffffff; }
+    .brand-icon svg { width: 22px; height: 22px; }
     .brand-title {
       font-size: 17px;
       font-weight: 700;
@@ -86,6 +130,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       display: flex;
       align-items: center;
       gap: 8px;
+      color: var(--text-main);
     }
     .brand-badge {
       font-size: 10px;
@@ -113,11 +158,12 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       gap: 8px;
       padding: 6px 14px;
       border-radius: 20px;
-      background: rgba(0, 0, 0, 0.3);
+      background: var(--bg-surface);
       border: 1px solid var(--border-color);
       font-size: 12px;
       font-family: var(--font-mono);
       font-weight: 600;
+      color: var(--text-main);
     }
     .dot {
       width: 8px;
@@ -142,7 +188,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     .header-right {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .btn {
@@ -158,6 +204,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       transition: all 0.15s ease;
       border: 1px solid transparent;
       outline: none;
+      user-select: none;
     }
     .btn-primary {
       background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -169,18 +216,18 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       box-shadow: 0 4px 15px var(--accent-glow);
     }
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
+      background: var(--btn-sec-bg);
       border-color: var(--border-color);
       color: var(--text-main);
     }
     .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.2);
+      background: var(--btn-sec-hover);
+      border-color: var(--border-hover);
     }
     .btn-danger {
       background: rgba(239, 68, 68, 0.15);
       border-color: rgba(239, 68, 68, 0.3);
-      color: #fca5a5;
+      color: #f87171;
     }
     .btn-danger:hover {
       background: rgba(239, 68, 68, 0.25);
@@ -188,13 +235,22 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     .btn-warning {
       background: rgba(245, 158, 11, 0.15);
       border-color: rgba(245, 158, 11, 0.3);
-      color: #fde68a;
+      color: #fbbf24;
     }
     .btn-warning:hover {
       background: rgba(245, 158, 11, 0.25);
     }
-    .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 6px; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Theme Toggle Button Specific */
+    .btn-theme {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 6px 11px;
+    }
 
     /* Main Container */
     main {
@@ -214,7 +270,8 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       border: 1px solid var(--border-color);
       border-radius: 12px;
       padding: 18px 20px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+      box-shadow: var(--card-shadow);
+      transition: background-color 0.25s ease, border-color 0.25s ease;
     }
 
     .section-label {
@@ -229,6 +286,34 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       gap: 6px;
     }
 
+    /* Target Category Filter Tabs */
+    .target-cat-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .target-cat-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--text-dim);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .target-cat-btn:hover {
+      color: var(--text-main);
+      border-color: var(--border-hover);
+    }
+    .target-cat-btn.active {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+
     .targets-row {
       display: flex;
       flex-wrap: wrap;
@@ -237,7 +322,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     }
 
     .target-pill {
-      background: rgba(255, 255, 255, 0.03);
+      background: var(--bg-surface);
       border: 1px solid var(--border-color);
       color: var(--text-muted);
       padding: 8px 14px;
@@ -253,13 +338,18 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     .target-pill:hover {
       background: var(--bg-card-hover);
       color: var(--text-main);
-      border-color: rgba(255, 255, 255, 0.2);
+      border-color: var(--border-hover);
     }
     .target-pill.active {
       background: rgba(16, 185, 129, 0.12);
       border-color: var(--accent);
       color: var(--accent);
       box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+    }
+    .target-pill.mobile-target {
+      border-color: rgba(6, 182, 212, 0.4);
+      background: rgba(6, 182, 212, 0.08);
+      color: var(--accent-blue);
     }
     .target-pill .sub {
       font-size: 10px;
@@ -283,11 +373,12 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       align-items: center;
       gap: 10px;
       font-size: 13px;
+      color: var(--text-main);
     }
     .current-path-tag {
       font-family: var(--font-mono);
       font-size: 12px;
-      background: rgba(0, 0, 0, 0.35);
+      background: var(--bg-input);
       border: 1px solid var(--border-color);
       padding: 4px 10px;
       border-radius: 6px;
@@ -316,10 +407,11 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       display: flex;
       flex-direction: column;
       gap: 6px;
-      transition: border-color 0.15s ease;
+      box-shadow: var(--card-shadow);
+      transition: all 0.15s ease;
     }
     .metric-card:hover {
-      border-color: rgba(255, 255, 255, 0.15);
+      border-color: var(--border-hover);
     }
     .metric-title {
       font-size: 11px;
@@ -350,6 +442,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      box-shadow: var(--card-shadow);
     }
 
     .content-header {
@@ -365,9 +458,10 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     .filter-tabs {
       display: flex;
       gap: 4px;
-      background: rgba(0, 0, 0, 0.25);
+      background: var(--bg-surface);
       padding: 4px;
       border-radius: 8px;
+      border: 1px solid var(--border-color);
     }
     .tab-btn {
       background: transparent;
@@ -385,19 +479,21 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     }
     .tab-btn:hover { color: var(--text-main); }
     .tab-btn.active {
-      background: rgba(255, 255, 255, 0.08);
+      background: var(--bg-card);
       color: var(--accent);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     .tab-badge {
       font-size: 10px;
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--btn-sec-bg);
+      border: 1px solid var(--border-color);
       padding: 1px 6px;
       border-radius: 10px;
       color: var(--text-muted);
     }
 
     .search-input {
-      background: rgba(0, 0, 0, 0.3);
+      background: var(--bg-input);
       border: 1px solid var(--border-color);
       color: var(--text-main);
       padding: 7px 12px;
@@ -425,7 +521,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     th {
       position: sticky;
       top: 0;
-      background: #131c2e;
+      background: var(--table-th-bg);
       padding: 10px 16px;
       font-size: 11px;
       font-weight: 700;
@@ -437,12 +533,12 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     }
     td {
       padding: 11px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid var(--table-border);
       color: var(--text-muted);
       vertical-align: middle;
     }
     tr:hover td {
-      background: rgba(255, 255, 255, 0.02);
+      background: var(--table-row-hover);
     }
 
     .type-pill {
@@ -454,10 +550,14 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       display: inline-block;
       text-transform: uppercase;
     }
-    .type-png, .type-jpg, .type-jpeg, .type-webp, .type-gif { background: rgba(6, 182, 212, 0.15); color: #22d3ee; }
-    .type-pdf, .type-doc, .type-docx, .type-txt { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    .type-zip, .type-rar, .type-7z { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .type-mp4, .type-mp3, .type-wav { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+    .type-png, .type-jpg, .type-jpeg, .type-webp, .type-gif { background: rgba(6, 182, 212, 0.15); color: #0284c7; }
+    [data-theme="dark"] .type-png, [data-theme="dark"] .type-jpg, [data-theme="dark"] .type-jpeg { color: #22d3ee; }
+    .type-pdf, .type-doc, .type-docx, .type-txt { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+    [data-theme="dark"] .type-pdf, [data-theme="dark"] .type-doc, [data-theme="dark"] .type-docx { color: #f87171; }
+    .type-zip, .type-rar, .type-7z { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+    [data-theme="dark"] .type-zip, [data-theme="dark"] .type-rar { color: #fbbf24; }
+    .type-mp4, .type-mp3, .type-wav { background: rgba(168, 85, 247, 0.15); color: #9333ea; }
+    [data-theme="dark"] .type-mp4, [data-theme="dark"] .type-mp3 { color: #c084fc; }
 
     .file-name-cell {
       display: flex;
@@ -481,13 +581,14 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       display: flex;
       align-items: center;
       justify-content: space-between;
+      color: var(--text-main);
     }
 
     /* Modal */
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.65);
       backdrop-filter: blur(6px);
       display: flex;
       align-items: center;
@@ -510,9 +611,10 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       max-height: 85vh;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
       transform: translateY(20px);
       transition: transform 0.2s ease;
+      color: var(--text-main);
     }
     .modal-backdrop.open .modal-dialog {
       transform: translateY(0);
@@ -527,6 +629,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     .modal-title {
       font-size: 15px;
       font-weight: 700;
+      color: var(--text-main);
     }
     .modal-body {
       padding: 20px;
@@ -534,8 +637,8 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       font-family: var(--font-mono);
       font-size: 12px;
       line-height: 1.6;
-      background: #090e18;
-      color: #38bdf8;
+      background: var(--bg-card);
+      color: var(--text-main);
       white-space: pre;
     }
     .modal-footer {
@@ -556,8 +659,9 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       border: 1px solid var(--border-color);
       padding: 14px 18px;
       border-radius: 10px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
       font-size: 13px;
+      color: var(--text-main);
       display: flex;
       align-items: center;
       gap: 12px;
@@ -582,7 +686,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       align-items: center;
       justify-content: space-between;
       font-size: 13px;
-      color: #fef08a;
+      color: var(--warning);
     }
 
     /* Property Grid for Details Modal */
@@ -593,7 +697,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       margin-bottom: 18px;
     }
     .prop-card {
-      background: rgba(255, 255, 255, 0.03);
+      background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 10px 14px;
@@ -634,19 +738,22 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     }
     .source-mft {
       background: rgba(168, 85, 247, 0.15);
-      color: #c084fc;
+      color: #9333ea;
       border-color: rgba(168, 85, 247, 0.3);
     }
+    [data-theme="dark"] .source-mft { color: #c084fc; }
     .source-recycle {
       background: rgba(56, 189, 248, 0.15);
-      color: #38bdf8;
+      color: #0284c7;
       border-color: rgba(56, 189, 248, 0.3);
     }
+    [data-theme="dark"] .source-recycle { color: #38bdf8; }
     .source-carver {
       background: rgba(245, 158, 11, 0.15);
-      color: #fbbf24;
+      color: #d97706;
       border-color: rgba(245, 158, 11, 0.3);
     }
+    [data-theme="dark"] .source-carver { color: #fbbf24; }
 
     /* Same Drive Warning Banner */
     .same-drive-banner {
@@ -655,7 +762,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       border-radius: 8px;
       padding: 10px 16px;
       font-size: 13px;
-      color: #fbbf24;
+      color: var(--warning);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -673,7 +780,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     .folder-tree-sidebar {
       width: 270px;
       flex-shrink: 0;
-      background: rgba(0, 0, 0, 0.25);
+      background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: 10px;
       display: flex;
@@ -690,7 +797,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     }
     .tree-header {
       padding: 10px 14px;
-      background: rgba(255, 255, 255, 0.02);
+      background: var(--bg-card);
       border-bottom: 1px solid var(--border-color);
       display: flex;
       align-items: center;
@@ -722,7 +829,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       text-overflow: ellipsis;
     }
     .tree-item:hover {
-      background: rgba(255, 255, 255, 0.05);
+      background: var(--btn-sec-hover);
       color: var(--text-main);
     }
     .tree-item.active {
@@ -740,7 +847,8 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     }
     .tree-count {
       font-size: 10px;
-      background: rgba(255, 255, 255, 0.06);
+      background: var(--btn-sec-bg);
+      border: 1px solid var(--border-color);
       padding: 2px 6px;
       border-radius: 10px;
       font-family: var(--font-mono);
@@ -756,7 +864,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     /* Filter Toolbar */
     .filter-toolbar {
       padding: 10px 16px;
-      background: rgba(255, 255, 255, 0.02);
+      background: var(--bg-surface);
       border-bottom: 1px solid var(--border-color);
       display: flex;
       flex-wrap: wrap;
@@ -771,7 +879,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       flex-wrap: wrap;
     }
     .filter-select {
-      background: rgba(0, 0, 0, 0.4);
+      background: var(--bg-input);
       border: 1px solid var(--border-color);
       color: var(--text-main);
       padding: 6px 10px;
@@ -805,7 +913,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #080c14;
+      background: var(--bg-input);
       border-radius: 8px;
       overflow: auto;
       padding: 16px;
@@ -815,14 +923,14 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       max-height: 55vh;
       object-fit: contain;
       border-radius: 6px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
     }
     .preview-code {
       width: 100%;
       max-height: 55vh;
       overflow: auto;
-      background: #060910;
-      color: #7dd3fc;
+      background: var(--bg-input);
+      color: var(--accent-blue);
       padding: 14px;
       border-radius: 6px;
       font-family: var(--font-mono);
@@ -830,16 +938,203 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-all;
-      border: 1px solid rgba(255,255,255,0.05);
+      border: 1px solid var(--border-color);
     }
     .preview-binary-card {
       text-align: center;
       padding: 30px 20px;
       color: var(--text-dim);
     }
+
+    /* 0. Splash Screen Styles */
+    .splash-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: var(--bg-base);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+    .splash-screen.fade-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .splash-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 40px;
+      max-width: 440px;
+      animation: splashPop 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes splashPop {
+      0% { transform: scale(0.9); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .splash-logo-wrap {
+      width: 100px;
+      height: 100px;
+      margin-bottom: 22px;
+      position: relative;
+      animation: logoPulse 2.2s infinite ease-in-out;
+    }
+    @keyframes logoPulse {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 16px rgba(16, 185, 129, 0.35)); }
+      50% { transform: scale(1.04); filter: drop-shadow(0 0 28px rgba(16, 185, 129, 0.6)); }
+    }
+    .splash-title {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+    .splash-subtitle {
+      font-size: 13px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
+    .splash-welcome {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      padding: 6px 18px;
+      border-radius: 20px;
+      margin-bottom: 24px;
+    }
+    .splash-progress-track {
+      width: 250px;
+      height: 4px;
+      background: var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .splash-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981, #06b6d4);
+      border-radius: 4px;
+      animation: splashFill 1.7s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+    }
+    @keyframes splashFill {
+      0% { width: 0%; }
+      35% { width: 45%; }
+      75% { width: 85%; }
+      100% { width: 100%; }
+    }
+    .splash-status {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+    .splash-skip {
+      margin-top: 18px;
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 11px;
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .splash-skip:hover {
+      color: var(--accent);
+    }
+
+    /* Mobile Assist Modal Elements */
+    .mobile-steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin: 14px 0;
+    }
+    .mobile-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .mobile-step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
+
+  <!-- 0. Splash Loading Screen (1.8s) -->
+  <div class="splash-screen" id="splashScreen">
+    <div class="splash-card">
+      <div class="splash-logo-wrap">
+        <svg class="splash-logo" viewBox="0 0 120 120" width="100" height="100" fill="none">
+          <defs>
+            <radialGradient id="splGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="splGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#06b6d4"/>
+              <stop offset="50%" stop-color="#10b981"/>
+              <stop offset="100%" stop-color="#059669"/>
+            </linearGradient>
+            <linearGradient id="splCoreGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#34d399"/>
+              <stop offset="100%" stop-color="#22d3ee"/>
+            </linearGradient>
+            <filter id="splShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#10b981" flood-opacity="0.35"/>
+            </filter>
+          </defs>
+          <circle cx="60" cy="60" r="54" fill="url(#splGlow)"/>
+          <path d="M60 12 L98 28 L98 68 C98 88 82 104 60 110 C38 104 22 88 22 68 L22 28 Z"
+                stroke="url(#splGrad)" stroke-width="4.5" stroke-linejoin="round" fill="none" filter="url(#splShadow)"/>
+          <circle cx="60" cy="58" r="26" stroke="url(#splGrad)" stroke-width="5" stroke-linecap="round" stroke-dasharray="24 16.8"/>
+          <path d="M60 42 L64 54 L76 58 L64 62 L60 74 L56 62 L44 58 L56 54 Z" fill="url(#splCoreGrad)"/>
+          <circle cx="60" cy="32" r="3.5" fill="#22d3ee"/>
+          <circle cx="60" cy="84" r="3.5" fill="#10b981"/>
+          <circle cx="34" cy="58" r="3.5" fill="#10b981"/>
+          <circle cx="86" cy="58" r="3.5" fill="#22d3ee"/>
+        </svg>
+      </div>
+      <div class="splash-title">ByteRescue</div>
+      <div class="splash-subtitle">Profesyonel Veri & Dosya Kurtarma Motoru</div>
+      <div class="splash-welcome">✨ Hoş Geldiniz</div>
+      <div class="splash-progress-track">
+        <div class="splash-progress-bar"></div>
+      </div>
+      <div class="splash-status">Sistem bileşenleri ve sürücüler hazırlanıyor...</div>
+      <button class="splash-skip" onclick="dismissSplash()">Hemen Başla &rarr;</button>
+    </div>
+  </div>
 
   <!-- Admin Elevation Banner (Shown if not admin) -->
   <div class="admin-banner" id="adminBanner" style="display: none;">
@@ -855,8 +1150,16 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
   <!-- 1. Header -->
   <header>
     <div class="brand">
-      <div class="brand-icon">
-        <svg viewBox="0 0 24 24"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5zm0 2.18l7 3.89v4.93c0 4.54-3.07 8.79-7 9.94-3.93-1.15-7-5.4-7-9.94V8.07l7-3.89zM11 7v6h2V7h-2zm0 8v2h2v-2h-2z"/></svg>
+      <div class="brand-icon" title="ByteRescue Siber Kalkan & Veri Kurtarıcı">
+        <svg viewBox="0 0 120 120" fill="none">
+          <path d="M60 12 L98 28 L98 68 C98 88 82 104 60 110 C38 104 22 88 22 68 L22 28 Z" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" fill="none"/>
+          <circle cx="60" cy="58" r="26" stroke="#22d3ee" stroke-width="6" stroke-linecap="round" stroke-dasharray="24 16.8"/>
+          <path d="M60 42 L64 54 L76 58 L64 62 L60 74 L56 62 L44 58 L56 54 Z" fill="#ffffff"/>
+          <circle cx="60" cy="32" r="4" fill="#22d3ee"/>
+          <circle cx="60" cy="84" r="4" fill="#10b981"/>
+          <circle cx="34" cy="58" r="4" fill="#10b981"/>
+          <circle cx="86" cy="58" r="4" fill="#22d3ee"/>
+        </svg>
       </div>
       <div>
         <div class="brand-title">
@@ -876,11 +1179,15 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     </div>
 
     <div class="header-right">
+      <button class="btn btn-secondary btn-sm btn-theme" id="btnThemeToggle" title="Temayı Değiştir (Aydınlık / Karanlık)" onclick="toggleTheme()">
+        <span id="themeToggleIcon">☀️</span>
+        <span id="themeToggleText">Aydınlık</span>
+      </button>
       <button class="btn btn-secondary btn-sm" id="btnDestDir" title="Kurtarılan Dosyaların Kaydedileceği Dizin">
         <span>Hedef:</span>
         <strong id="destDirName">Masaüstü</strong>
       </button>
-      <button class="btn btn-secondary btn-sm" id="btnAbout" title="Geliştirici & Bilgi">
+      <button class="btn btn-secondary btn-sm" id="btnAbout" title="Geliştirici & Bilgi" onclick="openAboutModal()">
         <span>Bilgi</span>
       </button>
       <button class="btn btn-danger btn-sm" id="btnShutdownPC" title="İşlem Bitince Bilgisayarı Kapat">
@@ -899,6 +1206,15 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       <div class="section-label">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
         <span>Taranacak Sürücü veya Klasör</span>
+      </div>
+
+      <!-- Target Category Switcher -->
+      <div class="target-cat-tabs" id="targetCatTabs">
+        <button class="target-cat-btn active" data-cat="all">Tüm Aygıtlar</button>
+        <button class="target-cat-btn" data-cat="fixed">💻 Sabit Diskler</button>
+        <button class="target-cat-btn" data-cat="removable">🔌 USB & SD Kartlar</button>
+        <button class="target-cat-btn" data-cat="mobile">📱 Mobil / Telefon</button>
+        <button class="target-cat-btn" data-cat="special">📁 Klasör & Çöp</button>
       </div>
 
       <div class="targets-row" id="targetsList">
@@ -1097,6 +1413,115 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     </section>
   </main>
 
+  <!-- Mobile & USB Assistance Modal -->
+  <div class="modal-backdrop" id="mobileAssistModal">
+    <div class="modal-dialog" style="max-width: 680px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
+          <span>📱 USB & Mobil Telefon Veri Kurtarma Rehberi</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeMobileAssistModal()">Kapat</button>
+      </div>
+      <div class="modal-body" style="background: var(--bg-card); color: var(--text-main); font-family: var(--font-sans); white-space: normal; padding: 22px;">
+        <div style="font-size: 13px; margin-bottom: 16px; line-height: 1.6; color: var(--text-muted);">
+          Android telefonunuzdan veya USB harici bellek / SD kartınızdan silinen fotoğrafları, WhatsApp medyasını ve belgeleri kurtarmak için:
+        </div>
+
+        <div class="mobile-steps-list">
+          <div class="mobile-step">
+            <div class="mobile-step-num">1</div>
+            <div>
+              <strong style="color: var(--text-main);">Telefonu USB Kablosuyla Bilgisayara Bağlayın</strong>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
+                Telefonun ekran kilidini açın ve bildirim panelinden <strong>"Dosya Aktarımı (MTP)"</strong> veya <strong>"Fotoğraf Aktarımı (PTP)"</strong> modunu seçin.
+              </div>
+            </div>
+          </div>
+
+          <div class="mobile-step">
+            <div class="mobile-step-num">2</div>
+            <div>
+              <strong style="color: var(--text-main);">Windows Bu Bilgisayar Altında Telefonu Görün</strong>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
+                Cihazınız (Samsung, Xiaomi vb.) bir depolama aygıtı olarak listelenir.
+              </div>
+            </div>
+          </div>
+
+          <div class="mobile-step">
+            <div class="mobile-step-num">3</div>
+            <div>
+              <strong style="color: var(--text-main);">Hedef Klasörü Belirleyip Taramayı Başlatın</strong>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                Kurtarmak istediğiniz içerik türüne göre önerilen klasörler:
+                <ul style="margin: 6px 0 0 18px; font-size: 12px; color: var(--accent-blue);">
+                  <li><strong>DCIM / Camera:</strong> Kamera ile çekilen silinmiş fotoğraflar ve videolar</li>
+                  <li><strong>WhatsApp / Media:</strong> WhatsApp gelen/giden resim, ses ve belgeleri</li>
+                  <li><strong>Pictures / Screenshots:</strong> Ekran görüntüleri ve kayıtlı görseller</li>
+                  <li><strong>Download:</strong> İndirilen PDF, doküman ve arşiv dosyaları</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 18px; padding: 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+          <div>
+            <div style="font-size: 13px; font-weight: 700; color: var(--accent);">Telefon veya USB Klasörünü Doğrudan Seç</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Bağlı cihazın dahili depolama klasörünü seçip anında tarayın.</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="handleMobileBrowseFolder()">📂 Klasör Seç ve Tara</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeMobileAssistModal()">Anladım</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- About Modal (Kadir & ByteRescue) -->
+  <div class="modal-backdrop" id="aboutModal">
+    <div class="modal-dialog" style="max-width: 580px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
+          <span>⚡ ByteRescue // Hakkında</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeAboutModal()">Kapat</button>
+      </div>
+      <div class="modal-body" style="background: var(--bg-card); color: var(--text-main); font-family: var(--font-sans); white-space: normal; padding: 24px; text-align: center;">
+        <div style="width: 72px; height: 72px; margin: 0 auto 14px;">
+          <svg viewBox="0 0 120 120" width="72" height="72" fill="none">
+            <path d="M60 12 L98 28 L98 68 C98 88 82 104 60 110 C38 104 22 88 22 68 L22 28 Z" stroke="#10b981" stroke-width="5" stroke-linejoin="round" fill="none"/>
+            <circle cx="60" cy="58" r="26" stroke="#06b6d4" stroke-width="5" stroke-linecap="round" stroke-dasharray="24 16.8"/>
+            <path d="M60 42 L64 54 L76 58 L64 62 L60 74 L56 62 L44 58 L56 54 Z" fill="#34d399"/>
+            <circle cx="60" cy="32" r="3.5" fill="#22d3ee"/>
+            <circle cx="60" cy="84" r="3.5" fill="#10b981"/>
+            <circle cx="34" cy="58" r="3.5" fill="#10b981"/>
+            <circle cx="86" cy="58" r="3.5" fill="#22d3ee"/>
+          </svg>
+        </div>
+        <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); margin-bottom: 4px;">ByteRescue</h2>
+        <div style="font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Yeni Nesil Profesyonel Veri Kurtarma Paketi</div>
+        <div style="display:inline-block; font-size: 12px; font-weight: 600; color: var(--accent); background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 14px; border-radius: 20px; margin-bottom: 20px;">
+          Geliştirici: Kadir • Sürüm 2.4 Ultra
+        </div>
+
+        <div style="text-align: left; background: var(--bg-surface); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); font-size: 12px; line-height: 1.7; color: var(--text-muted); margin-bottom: 16px;">
+          <div>🔹 <strong>Altyapı:</strong> Yüksek başarımlı saf Native C++ (C++17) ve çok kanallı soket motoru</div>
+          <div>🔹 <strong>NTFS MFT Parser:</strong> Kalıcı silinen (Shift+Delete) dosyaların orijinal isimleriyle kurtarılması</div>
+          <div>🔹 <strong>Recycle Bin Meta ($I/$R):</strong> Geri dönüşüm kutusundan silinmiş dosyaların tam nitelikleri</div>
+          <div>🔹 <strong>USB & Mobil Desteği:</strong> Taşınabilir USB bellek, SD kart ve Android MTP ortamları</div>
+          <div>🔹 <strong>Önizleme & Hex İnceleme:</strong> Kurtarma öncesi görsel, metin ve onaltılık ham analiz</div>
+          <div>🔹 <strong>Çift Tema Desteği:</strong> Gözü yormayan modern karanlık ve aydınlık temalar</div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-dim);">Tamamen bağımsız, çevrimdışı ve tek parça standalone çalışır.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-sm" onclick="closeAboutModal()">Tamam</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Live Visual & Document Preview Modal -->
   <div class="modal-backdrop" id="previewModal">
     <div class="modal-dialog" style="max-width: 860px; max-height: 88vh;">
@@ -1178,6 +1603,74 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     let activeHexFile = null;
     let activePreviewFile = null;
     let activeDetailsFile = null;
+    let rawDrives = [];
+    let currentDriveCat = "all";
+
+    // Theme Management (Dark & Light)
+    function initTheme() {
+      const savedTheme = localStorage.getItem('byterescue_theme') || 'dark';
+      applyTheme(savedTheme);
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('byterescue_theme', theme);
+      const icon = document.getElementById('themeToggleIcon');
+      const text = document.getElementById('themeToggleText');
+      if (icon && text) {
+        if (theme === 'light') {
+          icon.textContent = '🌙';
+          text.textContent = 'Karanlık';
+        } else {
+          icon.textContent = '☀️';
+          text.textContent = 'Aydınlık';
+        }
+      }
+    }
+
+    window.toggleTheme = function() {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      showToast(next === 'light' ? 'Aydınlık tema aktif' : 'Karanlık tema aktif', 'info');
+    };
+
+    // Splash Auto-Dismiss
+    function initSplash() {
+      setTimeout(() => {
+        dismissSplash();
+      }, 1800);
+    }
+
+    window.dismissSplash = function() {
+      const splash = document.getElementById('splashScreen');
+      if (splash && !splash.classList.contains('fade-out')) {
+        splash.classList.add('fade-out');
+        setTimeout(() => {
+          splash.style.display = 'none';
+        }, 520);
+      }
+    };
+
+    // Modals: Mobile Assist & About
+    window.openMobileAssistModal = function() {
+      document.getElementById('mobileAssistModal').classList.add('open');
+    };
+    window.closeMobileAssistModal = function() {
+      document.getElementById('mobileAssistModal').classList.remove('open');
+    };
+    window.handleMobileBrowseFolder = async function() {
+      closeMobileAssistModal();
+      await handleBrowseFolder();
+    };
+
+    window.openAboutModal = function() {
+      document.getElementById('aboutModal').classList.add('open');
+    };
+    window.closeAboutModal = function() {
+      document.getElementById('aboutModal').classList.remove('open');
+    };
+
 
     // Elements
     const statusDot = document.getElementById('statusDot');
@@ -1197,6 +1690,9 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
 
     // Init
     window.addEventListener('DOMContentLoaded', async () => {
+      initTheme();
+      initSplash();
+      initTargetCatTabs();
       await loadDefaultDest();
       await loadDrives();
       checkSameDrive();
@@ -1238,44 +1734,83 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
         const drives = await res.json();
         if (!Array.isArray(drives) || drives.length === 0) return;
 
-        targetsList.innerHTML = '';
-        drives.forEach((d, idx) => {
-          const btn = document.createElement('button');
-          btn.className = 'target-pill' + (idx === 0 ? ' active' : '');
-          btn.dataset.path = d.path;
+        rawDrives = drives;
+        renderTargetDrives();
 
-          let icon = '💻';
-          if (d.type === 'recycle_bin') icon = '🗑️';
-          else if (d.id.includes('desktop')) icon = '🖥️';
-          else if (d.id.includes('downloads')) icon = '📥';
-          else if (d.id.includes('drive_d')) icon = '💾';
-
-          btn.innerHTML = `<span>${icon} ${d.name}</span><span class="sub">(${d.sizeHuman || d.badge})</span>`;
-          btn.onclick = () => selectTarget(d.path, btn);
-          targetsList.appendChild(btn);
-
-          if (idx === 0) currentPath = d.path;
-        });
-
-        // Add "Klasör Seç" button
-        const browseBtn = document.createElement('button');
-        browseBtn.className = 'target-pill';
-        browseBtn.innerHTML = `<span>📂 Klasör Seç...</span>`;
-        browseBtn.onclick = handleBrowseFolder;
-        targetsList.appendChild(browseBtn);
-
-        // Add "Test Diski" button
-        const testBtn = document.createElement('button');
-        testBtn.className = 'target-pill';
-        testBtn.innerHTML = `<span>🧪 Test Diski</span>`;
-        testBtn.onclick = handleTestDisk;
-        targetsList.appendChild(testBtn);
-
-        currentPathText.textContent = currentPath;
+        if (rawDrives.length > 0) {
+          currentPath = rawDrives[0].path;
+          currentPathText.textContent = currentPath;
+        }
         checkSameDrive();
       } catch (err) {
         console.error('Drives yüklenemedi:', err);
       }
+    }
+
+    function initTargetCatTabs() {
+      document.querySelectorAll('.target-cat-btn').forEach(btn => {
+        btn.onclick = () => {
+          document.querySelectorAll('.target-cat-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentDriveCat = btn.dataset.cat;
+          if (currentDriveCat === 'mobile') {
+            openMobileAssistModal();
+          }
+          renderTargetDrives();
+        };
+      });
+    }
+
+    function renderTargetDrives() {
+      targetsList.innerHTML = '';
+
+      let filtered = rawDrives.filter(d => {
+        if (currentDriveCat === 'all') return true;
+        if (currentDriveCat === 'fixed') return d.type === 'computer_drive';
+        if (currentDriveCat === 'removable') return d.type === 'usb_drive';
+        if (currentDriveCat === 'mobile') return d.type === 'mobile_device' || d.path === 'MOBILE_ASSIST';
+        if (currentDriveCat === 'special') return d.type === 'recycle_bin' || d.type === 'folder';
+        return true;
+      });
+
+      filtered.forEach((d, idx) => {
+        const btn = document.createElement('button');
+        const isAct = d.path === currentPath;
+        btn.className = 'target-pill' + (isAct ? ' active' : '') + (d.type === 'mobile_device' ? ' mobile-target' : '');
+        btn.dataset.path = d.path;
+
+        let icon = '💻';
+        if (d.type === 'recycle_bin') icon = '🗑️';
+        else if (d.type === 'usb_drive') icon = '🔌';
+        else if (d.type === 'mobile_device') icon = '📱';
+        else if (d.id.includes('desktop')) icon = '🖥️';
+        else if (d.id.includes('downloads')) icon = '📥';
+        else if (d.id.includes('drive_d')) icon = '💾';
+
+        btn.innerHTML = `<span>${icon} ${d.name}</span><span class="sub">(${d.sizeHuman || d.badge})</span>`;
+        btn.onclick = () => {
+          if (d.path === 'MOBILE_ASSIST' || d.type === 'mobile_device') {
+            openMobileAssistModal();
+          } else {
+            selectTarget(d.path, btn);
+          }
+        };
+        targetsList.appendChild(btn);
+      });
+
+      // Add "Klasör Seç" button
+      const browseBtn = document.createElement('button');
+      browseBtn.className = 'target-pill';
+      browseBtn.innerHTML = `<span>📂 Klasör Seç...</span>`;
+      browseBtn.onclick = handleBrowseFolder;
+      targetsList.appendChild(browseBtn);
+
+      // Add "Test Diski" button
+      const testBtn = document.createElement('button');
+      testBtn.className = 'target-pill';
+      testBtn.innerHTML = `<span>🧪 Test Diski</span>`;
+      testBtn.onclick = handleTestDisk;
+      targetsList.appendChild(testBtn);
     }
 
     function selectTarget(path, element) {

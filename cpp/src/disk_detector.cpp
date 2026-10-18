@@ -50,25 +50,34 @@ std::vector<DriveItem> DiskDetector::list_drives() {
             char fs_name[64] = { 0 };
             GetVolumeInformationA(root.c_str(), NULL, 0, NULL, NULL, NULL, fs_name, sizeof(fs_name));
 
+            UINT d_type = GetDriveTypeA(root.c_str());
+
             DriveItem drive;
             char letter = root[0];
             drive.id = std::string("drive_") + static_cast<char>(tolower(letter));
             drive.path = root;
-            drive.type = "computer_drive";
             drive.fs_type = (fs_name[0] != '\0') ? std::string(fs_name) : "NTFS";
 
-            if (letter == 'C' || letter == 'c') {
+            if (d_type == DRIVE_REMOVABLE) {
+                drive.type = "usb_drive";
+                drive.name = std::string(1, letter) + ": USB Flash Bellek / SD Kart";
+                drive.badge = drive.fs_type + " • USB Aygıt";
+                drive.description = root + " takılı taşınabilir USB bellek veya telefon SD kartı";
+            } else if (letter == 'C' || letter == 'c') {
+                drive.type = "computer_drive";
                 drive.name = "C: Sürücüsü (Sistem)";
                 drive.badge = drive.fs_type + " • Sistem Diski";
                 drive.description = "Windows ana sistem diski ve programlar";
             } else if (letter == 'D' || letter == 'd') {
+                drive.type = "computer_drive";
                 drive.name = "D: Sürücüsü (Veri Deposu)";
                 drive.badge = drive.fs_type + " • Depolama";
                 drive.description = "İkincil veri ve arşiv depolama diski";
             } else {
-                drive.name = std::string(1, letter) + ": Sürücüsü";
-                drive.badge = drive.fs_type + " • Yerel/Harici";
-                drive.description = root + " yerel depolama birimi (" + drive.fs_type + ")";
+                drive.type = "usb_drive";
+                drive.name = std::string(1, letter) + ": Harici / Yerel Disk";
+                drive.badge = drive.fs_type + " • Harici USB / Disk";
+                drive.description = root + " depolama birimi (" + drive.fs_type + ")";
             }
 
             if (ok) {
@@ -86,6 +95,18 @@ std::vector<DriveItem> DiskDetector::list_drives() {
             p += strlen(p) + 1;
         }
     }
+
+    // 1.1 Mobile & USB Phone Assistant Target
+    DriveItem mobile_item;
+    mobile_item.id = "mobile_usb_device";
+    mobile_item.name = "📱 USB ile Bağlı Telefon / Android Tara";
+    mobile_item.path = "MOBILE_ASSIST";
+    mobile_item.type = "mobile_device";
+    mobile_item.badge = "MTP / Android";
+    mobile_item.size_human = "Mobil";
+    mobile_item.description = "USB kablosu ile bağlı telefonun fotoğraflarını (DCIM), WhatsApp medyasını ve belgelerini tara";
+    mobile_item.is_accessible = true;
+    items.push_back(mobile_item);
 
     // 2. User Special Folders
     char user_profile[MAX_PATH] = { 0 };
