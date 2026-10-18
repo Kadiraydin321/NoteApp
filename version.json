@@ -1,7 +1,7 @@
 {
-  "versionCode": 11,
-  "versionName": "1.1.0",
-  "buildTime": 1792348000000,
+  "versionCode": 12,
+  "versionName": "1.1.1",
+  "buildTime": 1792349000000,
   "releaseDate": "18.10.2026",
-  "changeLog": "Sol menü (çekmece) tüm ekran yüksekliğini kaplayacak şekilde sabitlendi. Başlık alanı yukarıda sabit tutularak kategori ve etiket açılıp kapandığında menü çerçevesinin aşağı yukarı zıplaması önlendi; tüm içerik sabit menü içerisinde akıcı şekilde kayacak hale getirildi."
+  "changeLog": "Güncelleme yöneticisi singleton arka plan kapsamına taşındı: İndirme sırasında Ayarlar ekranından çıkıldığında indirme kesilmez, arka planda sorunsuz devam eder. Tekrar girildiğinde tekrar eden popup döngüsü engellendi; indirme ilerleme çubuğu ve 'Şimdi Yükle' hazır paketi eklendi."
 }
