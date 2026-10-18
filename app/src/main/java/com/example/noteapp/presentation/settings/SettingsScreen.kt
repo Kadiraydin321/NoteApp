@@ -79,6 +79,7 @@ fun SettingsScreen(
     onDownloadAndInstallUpdate: () -> Unit = {},
     onInstallReadyApk: () -> Unit = {},
     onDismissUpdateStatus: () -> Unit = {},
+    onMarkDialogShown: (Int) -> Unit = {},
     onNavigateToDesignStudio: () -> Unit = {},
     onBackClick: () -> Unit
 ) {
@@ -93,15 +94,25 @@ fun SettingsScreen(
     var pinInput by remember { mutableStateOf("") }
     var showUpdateDetailsDialog by remember { mutableStateOf(false) }
 
-    // Ayarlara her girişte güncellemeleri otomatik denetle
+    // Ayarlara girişte sadece halihazırda indirme veya hazır paket yoksa denetle
     LaunchedEffect(Unit) {
-        onCheckForUpdates()
+        if (!updateUiState.isDownloading &&
+            updateUiState.status !is UpdateStatus.Downloading &&
+            updateUiState.status !is UpdateStatus.ReadyToInstall
+        ) {
+            onCheckForUpdates()
+        }
     }
 
-    // Güncelleme bulunduğunda popup penceresini otomatik aç
+    // Güncelleme bulunduğunda popup penceresini bu sürüm için bir defa otomatik aç (indirme yapılıyorsa asla açma)
     LaunchedEffect(updateUiState.status) {
-        if (updateUiState.status is UpdateStatus.UpdateAvailable) {
+        val status = updateUiState.status
+        if (status is UpdateStatus.UpdateAvailable &&
+            !updateUiState.isDownloading &&
+            updateUiState.hasShownDialogForVersion != status.remoteVersionCode
+        ) {
             showUpdateDetailsDialog = true
+            onMarkDialogShown(status.remoteVersionCode)
         }
     }
 
@@ -210,6 +221,108 @@ fun SettingsScreen(
                             }
                         }
 
+                        is UpdateStatus.Downloading -> {
+                            val availableInfo = updateUiState.availableUpdateInfo
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.5.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    if (availableInfo != null) "v${availableInfo.remoteVersionName} İndiriliyor..." else "Güncelleme İndiriliyor...",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                LinearProgressIndicator(
+                                    progress = { if (status.progressPercent >= 0) status.progressPercent / 100f else 0f },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        if (status.progressPercent >= 0) "%${status.progressPercent}" else "İndiriliyor...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    if (status.totalBytes > 0) {
+                                        val downloadedMb = String.format(Locale.US, "%.1f", status.downloadedBytes / (1024f * 1024f))
+                                        val totalMb = String.format(Locale.US, "%.1f", status.totalBytes / (1024f * 1024f))
+                                        Text(
+                                            "$downloadedMb MB / $totalMb MB",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Text(
+                                    "İndirme işlemi arka planda devam eder; ayarlardan çıksanız bile kesilmez.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+
+                        is UpdateStatus.ReadyToInstall -> {
+                            val availableInfo = updateUiState.availableUpdateInfo
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color(0xFF4CAF50),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    "Güncelleme Paketi Hazır! 🎉",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF4CAF50)
+                                )
+                            }
+
+                            Text(
+                                if (availableInfo != null) "v${availableInfo.remoteVersionName} paketi başarıyla indirildi. Kurulumu başlatmak için dokunun."
+                                else "Güncelleme paketi başarıyla indirildi. Kurulumu başlatmak için dokunun.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Button(
+                                onClick = { onInstallReadyApk() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF2E7D32),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Icon(Icons.Default.DownloadDone, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("🚀 Şimdi Yükle", fontWeight = FontWeight.Bold)
+                            }
+                        }
+
                         is UpdateStatus.UpdateAvailable -> {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -230,29 +343,10 @@ fun SettingsScreen(
                             }
 
                             Text(
-                                "Mevcut sürüm: v${status.currentVersionName}  →  Yeni sürüm: v${status.remoteVersionName}",
+                                "Mevcut: v${status.currentVersionName}  →  Yeni: v${status.remoteVersionName}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-
-                            // İlerleme Durumu
-                            if (updateUiState.isDownloading) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    LinearProgressIndicator(
-                                        progress = { if (updateUiState.downloadProgress >= 0) updateUiState.downloadProgress / 100f else 0f },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    Text(
-                                        if (updateUiState.downloadProgress >= 0) "İndiriliyor: %${updateUiState.downloadProgress}" else "İndiriliyor...",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
 
                             // Butonlar: Detay ve Güncelle
                             Row(
@@ -277,33 +371,20 @@ fun SettingsScreen(
 
                                 Button(
                                     onClick = {
-                                        if (!updateUiState.isDownloading) {
-                                            onDownloadAndInstallUpdate()
-                                        }
+                                        onDownloadAndInstallUpdate()
                                     },
-                                    enabled = !updateUiState.isDownloading,
                                     modifier = Modifier
                                         .weight(1.3f)
                                         .height(48.dp),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    if (updateUiState.isDownloading) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("İndiriliyor...", fontWeight = FontWeight.Bold)
-                                    } else {
-                                        Icon(
-                                            Icons.Default.Download,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("Güncelle", fontWeight = FontWeight.Bold)
-                                    }
+                                    Icon(
+                                        Icons.Default.Download,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Güncelle", fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -1644,8 +1725,9 @@ fun SettingsScreen(
     }
 
     // 7. Güncelleme Popup Penceresi (Güncelleme bulunduğunda veya Detay butonuna basıldığında açılır)
-    if (showUpdateDetailsDialog && updateUiState.status is UpdateStatus.UpdateAvailable) {
-        val status = updateUiState.status as UpdateStatus.UpdateAvailable
+    val activeUpdateInfo = (updateUiState.status as? UpdateStatus.UpdateAvailable) ?: updateUiState.availableUpdateInfo
+    if (showUpdateDetailsDialog && activeUpdateInfo != null) {
+        val status = activeUpdateInfo
         AlertDialog(
             onDismissRequest = { showUpdateDetailsDialog = false },
             icon = {

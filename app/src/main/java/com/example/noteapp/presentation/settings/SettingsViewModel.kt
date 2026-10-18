@@ -52,6 +52,8 @@ data class UpdateUiState(
     val downloadedBytes: Long = 0L,
     val totalBytes: Long = 0L,
     val readyApkFile: File? = null,
+    val availableUpdateInfo: UpdateStatus.UpdateAvailable? = null,
+    val hasShownDialogForVersion: Int? = null,
     val message: String? = null
 )
 
@@ -74,6 +76,23 @@ class SettingsViewModel @Inject constructor(
 
     private val _updateUiState = MutableStateFlow(UpdateUiState())
     val updateUiState: StateFlow<UpdateUiState> = _updateUiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            updateManager.updateStatus.collect { status ->
+                _updateUiState.value = _updateUiState.value.copy(
+                    status = status,
+                    isDownloading = status is UpdateStatus.Downloading,
+                    downloadProgress = if (status is UpdateStatus.Downloading) status.progressPercent else _updateUiState.value.downloadProgress,
+                    downloadedBytes = if (status is UpdateStatus.Downloading) status.downloadedBytes else _updateUiState.value.downloadedBytes,
+                    totalBytes = if (status is UpdateStatus.Downloading) status.totalBytes else _updateUiState.value.totalBytes,
+                    readyApkFile = if (status is UpdateStatus.ReadyToInstall) status.apkFile else _updateUiState.value.readyApkFile,
+                    availableUpdateInfo = updateManager.lastAvailableUpdate ?: (status as? UpdateStatus.UpdateAvailable) ?: _updateUiState.value.availableUpdateInfo,
+                    hasShownDialogForVersion = updateManager.hasShownDialogForVersion
+                )
+            }
+        }
+    }
 
     fun setWidgetFilterMode(mode: WidgetFilterMode) {
         settingsManager.setWidgetFilterMode(mode)
@@ -437,14 +456,7 @@ class SettingsViewModel @Inject constructor(
 
     fun checkForUpdates() {
         viewModelScope.launch {
-            _updateUiState.value = _updateUiState.value.copy(
-                status = UpdateStatus.Checking,
-                message = null
-            )
-            val result = updateManager.checkForUpdates()
-            _updateUiState.value = _updateUiState.value.copy(
-                status = result
-            )
+            updateManager.checkForUpdates()
         }
     }
 
@@ -461,44 +473,19 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun downloadAndInstallUpdate() {
-        viewModelScope.launch {
-            _updateUiState.value = _updateUiState.value.copy(
-                isDownloading = true,
-                downloadProgress = 0,
-                message = null
-            )
-            try {
-                val apkFile = updateManager.downloadLatestApk { percent, downloaded, total ->
-                    _updateUiState.value = _updateUiState.value.copy(
-                        downloadProgress = percent,
-                        downloadedBytes = downloaded,
-                        totalBytes = total,
-                        status = UpdateStatus.Downloading(percent, downloaded, total)
-                    )
-                }
-                _updateUiState.value = _updateUiState.value.copy(
-                    isDownloading = false,
-                    readyApkFile = apkFile,
-                    status = UpdateStatus.ReadyToInstall(apkFile)
-                )
-                // Doğrudan yükleme ekranını aç
-                updateManager.installApk(apkFile)
-            } catch (e: Exception) {
-                _updateUiState.value = _updateUiState.value.copy(
-                    isDownloading = false,
-                    status = UpdateStatus.Error("Güncelleme indirilemedi: ${e.localizedMessage ?: "Bağlantı hatası"}")
-                )
-            }
-        }
+        updateManager.downloadAndInstallUpdate()
     }
 
     fun installReadyApk() {
-        _updateUiState.value.readyApkFile?.let { apkFile ->
-            updateManager.installApk(apkFile)
-        }
+        updateManager.installReadyApk()
     }
 
     fun dismissUpdateStatus() {
-        _updateUiState.value = UpdateUiState(status = UpdateStatus.Idle)
+        updateManager.dismissUpdateStatus()
+    }
+
+    fun markDialogShown(versionCode: Int) {
+        updateManager.markDialogShown(versionCode)
+        _updateUiState.value = _updateUiState.value.copy(hasShownDialogForVersion = versionCode)
     }
 }

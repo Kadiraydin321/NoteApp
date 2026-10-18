@@ -638,6 +638,7 @@ class MainActivity : FragmentActivity() {
                             onDownloadAndInstallUpdate = viewModel::downloadAndInstallUpdate,
                             onInstallReadyApk = viewModel::installReadyApk,
                             onDismissUpdateStatus = viewModel::dismissUpdateStatus,
+                            onMarkDialogShown = viewModel::markDialogShown,
                             onNavigateToDesignStudio = {
                                 navController.navigate("design_studio_screen")
                             },
