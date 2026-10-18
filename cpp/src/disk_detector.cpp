@@ -47,24 +47,28 @@ std::vector<DriveItem> DiskDetector::list_drives() {
             ULARGE_INTEGER free_bytes, total_bytes, total_free;
             bool ok = GetDiskFreeSpaceExA(root.c_str(), &free_bytes, &total_bytes, &total_free);
 
+            char fs_name[64] = { 0 };
+            GetVolumeInformationA(root.c_str(), NULL, 0, NULL, NULL, NULL, fs_name, sizeof(fs_name));
+
             DriveItem drive;
             char letter = root[0];
             drive.id = std::string("drive_") + static_cast<char>(tolower(letter));
             drive.path = root;
             drive.type = "computer_drive";
+            drive.fs_type = (fs_name[0] != '\0') ? std::string(fs_name) : "NTFS";
 
             if (letter == 'C' || letter == 'c') {
                 drive.name = "C: Sürücüsü (Sistem)";
-                drive.badge = "Dahili SSD / HDD";
+                drive.badge = drive.fs_type + " • Sistem Diski";
                 drive.description = "Windows ana sistem diski ve programlar";
             } else if (letter == 'D' || letter == 'd') {
                 drive.name = "D: Sürücüsü (Veri Deposu)";
-                drive.badge = "Dahili Depolama";
+                drive.badge = drive.fs_type + " • Depolama";
                 drive.description = "İkincil veri ve arşiv depolama diski";
             } else {
                 drive.name = std::string(1, letter) + ": Sürücüsü";
-                drive.badge = "Yerel Sürücü";
-                drive.description = root + " yerel depolama birimi";
+                drive.badge = drive.fs_type + " • Yerel/Harici";
+                drive.description = root + " yerel depolama birimi (" + drive.fs_type + ")";
             }
 
             if (ok) {
@@ -190,6 +194,7 @@ std::string DiskDetector::to_json(const std::vector<DriveItem>& items) {
         ss << "    \"sizeHuman\": \"" << it.size_human << "\",\n";
         ss << "    \"freeHuman\": \"" << it.free_human << "\",\n";
         ss << "    \"type\": \"" << it.type << "\",\n";
+        ss << "    \"fsType\": \"" << it.fs_type << "\",\n";
         ss << "    \"badge\": \"" << it.badge << "\",\n";
         ss << "    \"description\": \"" << it.description << "\",\n";
         ss << "    \"isAccessible\": " << (it.is_accessible ? "true" : "false") << "\n";
@@ -197,6 +202,14 @@ std::string DiskDetector::to_json(const std::vector<DriveItem>& items) {
     }
     ss << "]\n";
     return ss.str();
+}
+
+bool DiskDetector::is_same_drive(const std::string& path_a, const std::string& path_b) {
+    if (path_a.size() < 2 || path_b.size() < 2) return false;
+    if (path_a[1] == ':' && path_b[1] == ':') {
+        return toupper(static_cast<unsigned char>(path_a[0])) == toupper(static_cast<unsigned char>(path_b[0]));
+    }
+    return false;
 }
 
 } // namespace byterescue

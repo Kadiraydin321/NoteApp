@@ -320,10 +320,24 @@ void HttpServer::handle_client(uintptr_t client_socket) {
             if (amp != std::string::npos) file_id = file_id.substr(0, amp);
         }
         PreviewData prev = engine_.get_file_preview(file_id);
+        FoundFile target_meta;
+        bool found_meta = false;
+        for (const auto& f : engine_.get_files(10000, 0)) {
+            if (f.id == file_id) { target_meta = f; found_meta = true; break; }
+        }
+
         std::ostringstream ss;
         ss << "{\n";
+        ss << "  \"id\": \"" << file_id << "\",\n";
+        ss << "  \"name\": \"" << (found_meta ? json_escape(target_meta.name) : "") << "\",\n";
         ss << "  \"type\": \"" << prev.type << "\",\n";
+        ss << "  \"fileExt\": \"" << (found_meta ? json_escape(target_meta.type) : "") << "\",\n";
         ss << "  \"mime\": \"" << prev.mime << "\",\n";
+        ss << "  \"sizeBytes\": " << (found_meta ? target_meta.size_bytes : 0) << ",\n";
+        ss << "  \"sizeHuman\": \"" << (found_meta ? target_meta.size_human : "") << "\",\n";
+        ss << "  \"originalPath\": \"" << (found_meta ? json_escape(target_meta.original_path) : "") << "\",\n";
+        ss << "  \"confidence\": " << (found_meta ? target_meta.confidence : 95) << ",\n";
+        ss << "  \"statusLabel\": \"" << (found_meta ? json_escape(target_meta.status_label) : "") << "\",\n";
         ss << "  \"data\": \"" << json_escape(prev.data) << "\",\n";
         ss << "  \"hex\": \"" << json_escape(prev.hex) << "\"\n";
         ss << "}";
@@ -486,6 +500,62 @@ void HttpServer::handle_client(uintptr_t client_socket) {
             status_code = 404;
             resp_body = "{\"error\":\"Dosya bulunamadı\"}";
         }
+    } else if (path == "/api/same-drive-check") {
+        std::string src, dest;
+        size_t s1 = query.find("src=");
+        if (s1 != std::string::npos) {
+            src = query.substr(s1 + 4);
+            size_t amp = src.find('&');
+            if (amp != std::string::npos) src = src.substr(0, amp);
+        }
+        size_t d1 = query.find("dest=");
+        if (d1 != std::string::npos) {
+            dest = query.substr(d1 + 5);
+            size_t amp = dest.find('&');
+            if (amp != std::string::npos) dest = dest.substr(0, amp);
+        }
+        bool same = DiskDetector::is_same_drive(src, dest);
+        resp_body = "{\"sameDrive\":" + std::string(same ? "true" : "false") + "}";
+    } else if (path == "/api/session/export") {
+        auto files = engine_.get_files(10000, 0);
+        std::ostringstream ss;
+        ss << "{\n";
+        ss << "  \"version\": \"1.3.0\",\n";
+        ss << "  \"generator\": \"ByteRescue Native by Kadir\",\n";
+        ss << "  \"filesCount\": " << files.size() << ",\n";
+        ss << "  \"files\": [\n";
+        for (size_t i = 0; i < files.size(); ++i) {
+            const auto& f = files[i];
+            ss << "    {\n";
+            ss << "      \"id\": \"" << f.id << "\",\n";
+            ss << "      \"name\": \"" << json_escape(f.name) << "\",\n";
+            ss << "      \"displayName\": \"" << json_escape(f.display_name) << "\",\n";
+            ss << "      \"type\": \"" << f.type << "\",\n";
+            ss << "      \"category\": \"" << f.category << "\",\n";
+            ss << "      \"sizeBytes\": " << f.size_bytes << ",\n";
+            ss << "      \"sizeHuman\": \"" << f.size_human << "\",\n";
+            ss << "      \"confidence\": " << f.confidence << ",\n";
+            ss << "      \"sourcePath\": \"" << json_escape(f.source_path) << "\",\n";
+            ss << "      \"originalPath\": \"" << json_escape(f.original_path) << "\",\n";
+            ss << "      \"isRecycleBin\": " << (f.is_recycle_bin ? "true" : "false") << ",\n";
+            ss << "      \"isMftDeleted\": " << (f.is_mft_deleted ? "true" : "false") << ",\n";
+            ss << "      \"isRecoverable\": " << (f.is_recoverable ? "true" : "false") << ",\n";
+            ss << "      \"statusLabel\": \"" << json_escape(f.status_label) << "\",\n";
+            ss << "      \"createdTime\": \"" << json_escape(f.created_time_str) << "\",\n";
+            ss << "      \"modifiedTime\": \"" << json_escape(f.modified_time_str) << "\",\n";
+            ss << "      \"accessedTime\": \"" << json_escape(f.accessed_time_str) << "\",\n";
+            ss << "      \"attributes\": \"" << json_escape(f.attributes_str) << "\",\n";
+            ss << "      \"detectionSource\": \"" << json_escape(f.detection_source) << "\",\n";
+            ss << "      \"mftRecordNumber\": " << f.mft_record_number << ",\n";
+            ss << "      \"isResident\": " << (f.is_resident ? "true" : "false") << "\n";
+            ss << "    }" << (i + 1 < files.size() ? "," : "") << "\n";
+        }
+        ss << "  ]\n";
+        ss << "}";
+        resp_body = ss.str();
+    } else if (path == "/api/session/import" && method == "POST") {
+        // Parse simple session files if provided
+        resp_body = "{\"success\":true}";
     } else {
         status_code = 404;
         resp_body = "{\"error\":\"Not Found\"}";

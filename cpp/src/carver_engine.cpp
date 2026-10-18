@@ -1139,4 +1139,13 @@ std::string CarverEngine::create_test_disk(const std::string& output_path) {
     }
 }
 
+void CarverEngine::load_session_files(const std::vector<FoundFile>& files) {
+    std::lock_guard<std::mutex> lock(files_mutex_);
+    found_files_ = files;
+    std::lock_guard<std::mutex> slock(stats_mutex_);
+    stats_.files_found = found_files_.size();
+    stats_.status = "completed";
+    stats_.percentage = 100;
+}
+
 } // namespace byterescue

@@ -115,6 +115,9 @@ public:
     // File recovery
     RecoveryResult recover_files(const std::vector<std::string>& file_ids, const std::string& dest_dir);
 
+    // Session management
+    void load_session_files(const std::vector<FoundFile>& files);
+
     // Built-in test disk generator
     std::string create_test_disk(const std::string& output_path);
 

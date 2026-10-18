@@ -647,6 +647,196 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       color: #fbbf24;
       border-color: rgba(245, 158, 11, 0.3);
     }
+
+    /* Same Drive Warning Banner */
+    .same-drive-banner {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    /* Explorer Layout (Sidebar Tree + Table) */
+    .explorer-layout {
+      display: flex;
+      gap: 16px;
+      align-items: stretch;
+      min-height: 480px;
+    }
+    .folder-tree-sidebar {
+      width: 270px;
+      flex-shrink: 0;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: width 0.2s ease, margin 0.2s ease, opacity 0.2s ease;
+    }
+    .folder-tree-sidebar.collapsed {
+      width: 0;
+      margin-right: -16px;
+      opacity: 0;
+      pointer-events: none;
+      border: none;
+    }
+    .tree-header {
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tree-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+      max-height: 540px;
+    }
+    .tree-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tree-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+    }
+    .tree-item.active {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent);
+      font-weight: 700;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .tree-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tree-count {
+      font-size: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-family: var(--font-mono);
+      font-weight: normal;
+    }
+    .table-container {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Filter Toolbar */
+    .filter-toolbar {
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .filter-select {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+    }
+    .filter-select:focus {
+      border-color: var(--accent);
+    }
+    .filter-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .filter-toggle input {
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Live Preview Modal */
+    .preview-canvas {
+      width: 100%;
+      min-height: 280px;
+      max-height: 60vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #080c14;
+      border-radius: 8px;
+      overflow: auto;
+      padding: 16px;
+    }
+    .preview-img {
+      max-width: 100%;
+      max-height: 55vh;
+      object-fit: contain;
+      border-radius: 6px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    }
+    .preview-code {
+      width: 100%;
+      max-height: 55vh;
+      overflow: auto;
+      background: #060910;
+      color: #7dd3fc;
+      padding: 14px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .preview-binary-card {
+      text-align: center;
+      padding: 30px 20px;
+      color: var(--text-dim);
+    }
   </style>
 </head>
 <body>
@@ -734,6 +924,15 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
           <button class="btn btn-danger btn-sm" id="btnStopScan" disabled>Durdur</button>
         </div>
       </div>
+
+      <!-- Same Drive Overwrite Warning Banner -->
+      <div id="sameDriveWarning" class="same-drive-banner" style="display: none;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <span><strong>Kritik Güvenlik Koruması:</strong> Taranan sürücü ile kurtarma hedefi aynı (<strong id="warnDriveLetter">C:</strong>)! Kurtarılan dosyaların, silinmiş diğer sektörlerin üzerine yazılma riskini önlemek için kurtarma hedefi olarak farklı bir sürücü (örneğin USB bellek veya D: diski) seçmeniz şiddetle önerilir.</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btnChangeDestWarn" style="white-space: nowrap;">Hedefi Değiştir</button>
+      </div>
     </section>
 
     <!-- Metrics KPI Grid -->
@@ -788,31 +987,102 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
           <button class="tab-btn" data-cat="archives">Arşivler <span class="tab-badge" id="badgeArchives">0</span></button>
         </div>
 
-        <input type="text" class="search-input" id="searchInput" placeholder="Dosya veya uzantı ara...">
+        <input type="text" class="search-input" id="searchInput" placeholder="Dosya adı veya uzantı ara...">
       </div>
 
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th width="40"><input type="checkbox" id="selectAllCheckbox"></th>
-              <th width="70">Tür</th>
-              <th>Orijinal Dosya Adı & Konum</th>
-              <th width="100">Boyut</th>
-              <th width="150">Tespit Kaynağı</th>
-              <th width="140">Silinme / Tarih</th>
-              <th width="110">Durum</th>
-              <th width="180" style="text-align: right;">İşlemler</th>
-            </tr>
-          </thead>
-          <tbody id="filesTableBody">
-            <tr>
-              <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-dim);">
-                Henüz tarama başlatılmadı. Taranacak sürücü veya klasörü seçip <strong>Taramayı Başlat</strong> butonuna basın.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Advanced Filter Toolbar -->
+      <div class="filter-toolbar">
+        <div class="filter-group">
+          <button class="btn btn-secondary btn-sm" id="btnToggleTree" title="Klasör Ağacını Aç / Kapat">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            <span id="treeToggleLabel">Klasör Ağacı</span>
+          </button>
+
+          <select class="filter-select" id="filterSize" title="Boyut Filtresi">
+            <option value="all">Boyut: Tümü</option>
+            <option value="small">&lt; 1 MB (Küçük)</option>
+            <option value="medium">1 MB - 50 MB (Orta)</option>
+            <option value="large">50 MB - 500 MB (Büyük)</option>
+            <option value="huge">&gt; 500 MB (Çok Büyük)</option>
+          </select>
+
+          <select class="filter-select" id="filterDate" title="Silinme / Değiştirilme Tarihi">
+            <option value="all">Tarih: Tüm Zamanlar</option>
+            <option value="today">Son 24 Saat</option>
+            <option value="week">Son 7 Gün</option>
+            <option value="month">Son 30 Gün</option>
+          </select>
+
+          <select class="filter-select" id="filterSort" title="Sıralama">
+            <option value="default">Sıralama: Varsayılan</option>
+            <option value="size_desc">Boyut (Büyükten Küçüğe)</option>
+            <option value="size_asc">Boyut (Küçükten Büyüğe)</option>
+            <option value="date_desc">Tarih (En Yeni)</option>
+            <option value="date_asc">Tarih (En Eski)</option>
+            <option value="name_asc">Dosya Adı (A-Z)</option>
+          </select>
+
+          <label class="filter-toggle" title="Yalnızca %100 sağlam ve bozulmamış dosyaları listele">
+            <input type="checkbox" id="chkOnlyHealthy">
+            <span>Sadece Sağlam (%100)</span>
+          </label>
+        </div>
+
+        <div class="filter-group">
+          <button class="btn btn-secondary btn-sm" id="btnExportSession" title="Bulunan dosyaları .brescue oturumu olarak dışa aktar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>Oturumu Kaydet</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" id="btnImportSession" title="Önceden kaydedilmiş bir .brescue oturum dosyasını yükle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <span>Oturum Aç</span>
+          </button>
+          <input type="file" id="sessionFileInput" accept=".brescue,.json" style="display: none;">
+        </div>
+      </div>
+
+      <!-- Explorer Layout: Folder Tree + Files Table -->
+      <div class="explorer-layout">
+        <!-- Directory Tree Sidebar -->
+        <aside class="folder-tree-sidebar" id="folderTreeSidebar">
+          <div class="tree-header">
+            <span>📁 Klasör Ağacı</span>
+            <button class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 11px;" id="btnResetFolderTree" title="Tüm Dizinleri Göster">Tümü</button>
+          </div>
+          <div class="tree-list" id="folderTreeList">
+            <div class="tree-item active" onclick="selectFolder('')">
+              <span class="tree-label">📁 Tüm Konumlar</span>
+              <span class="tree-count" id="treeCountTotal">0</span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Table Container -->
+        <div class="table-container">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th width="40"><input type="checkbox" id="selectAllCheckbox"></th>
+                  <th width="65">Tür</th>
+                  <th>Orijinal Dosya Adı & Konum</th>
+                  <th width="95">Boyut</th>
+                  <th width="140">Tespit Kaynağı</th>
+                  <th width="135">Silinme / Tarih</th>
+                  <th width="105">Durum</th>
+                  <th width="215" style="text-align: right;">İşlemler</th>
+                </tr>
+              </thead>
+              <tbody id="filesTableBody">
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-dim);">
+                    Henüz tarama başlatılmadı. Taranacak sürücü veya klasörü seçip <strong>Taramayı Başlat</strong> butonuna basın.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <div class="selection-bar" id="selectionBar" style="display: none;">
@@ -826,6 +1096,30 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       </div>
     </section>
   </main>
+
+  <!-- Live Visual & Document Preview Modal -->
+  <div class="modal-backdrop" id="previewModal">
+    <div class="modal-dialog" style="max-width: 860px; max-height: 88vh;">
+      <div class="modal-header">
+        <div class="modal-title" id="previewModalTitle" style="display:flex; align-items:center; gap:8px;">
+          <span class="type-pill" id="previewTypePill">ÖNİZLEME</span>
+          <span id="previewModalFileName">Dosya Önizleme</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closePreviewModal()">Kapat</button>
+      </div>
+      <div class="modal-body" id="previewModalBody" style="background:#080c14; padding: 18px; white-space: normal; font-family: var(--font-sans);">
+        <!-- Injected via showPreviewModal -->
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <div id="previewModalMeta" style="font-size: 12px; color: var(--text-dim); font-family: var(--font-mono);"></div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" id="btnPreviewDetails" onclick="switchPreviewToDetails()">Özellikler</button>
+          <button class="btn btn-secondary btn-sm" id="btnPreviewHex" onclick="switchPreviewToHex()">Hex Görünümü</button>
+          <button class="btn btn-primary btn-sm" id="btnPreviewRecover">Bu Dosyayı Kurtar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- File Details Modal (Tüm Dosya Özellikleri) -->
   <div class="modal-backdrop" id="detailsModal">
@@ -876,7 +1170,14 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     let allFiles = [];
     let selectedFileIds = new Set();
     let currentFilter = "all";
+    let selectedFolder = "";
+    let filterSize = "all";
+    let filterDate = "all";
+    let filterSort = "default";
+    let onlyHealthy = false;
     let activeHexFile = null;
+    let activePreviewFile = null;
+    let activeDetailsFile = null;
 
     // Elements
     const statusDot = document.getElementById('statusDot');
@@ -898,8 +1199,25 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     window.addEventListener('DOMContentLoaded', async () => {
       await loadDefaultDest();
       await loadDrives();
+      checkSameDrive();
+      initFilterControls();
       startPolling();
     });
+
+    function checkSameDrive() {
+      const src = (currentPath || '').trim();
+      const dst = (destDir || '').trim();
+      const warnEl = document.getElementById('sameDriveWarning');
+      if (src.length >= 2 && src[1] === ':' && dst.length >= 2 && dst[1] === ':') {
+        if (src[0].toUpperCase() === dst[0].toUpperCase()) {
+          document.getElementById('warnDriveLetter').textContent = src.substring(0, 2).toUpperCase();
+          if (warnEl) warnEl.style.display = 'flex';
+          return true;
+        }
+      }
+      if (warnEl) warnEl.style.display = 'none';
+      return false;
+    }
 
     async function loadDefaultDest() {
       try {
@@ -909,6 +1227,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
           destDir = data.path;
           const parts = destDir.split(/[\\/]/).filter(Boolean);
           destDirName.textContent = parts[parts.length - 1] || destDir;
+          checkSameDrive();
         }
       } catch (_) {}
     }
@@ -953,6 +1272,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
         targetsList.appendChild(testBtn);
 
         currentPathText.textContent = currentPath;
+        checkSameDrive();
       } catch (err) {
         console.error('Drives yüklenemedi:', err);
       }
@@ -964,6 +1284,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       currentPathText.textContent = path;
       document.querySelectorAll('.target-pill').forEach(el => el.classList.remove('active'));
       if (element) element.classList.add('active');
+      checkSameDrive();
     }
 
     async function handleBrowseFolder() {
@@ -1124,6 +1445,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
         const res = await fetch('/api/files');
         allFiles = await res.json();
         updateCategoryBadges();
+        buildFolderTree(allFiles);
         renderFilesTable();
       } catch (_) {}
     }
@@ -1140,15 +1462,158 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       document.getElementById('badgeArchives').textContent = allFiles.filter(f => f.category === 'archives').length;
     }
 
+    function buildFolderTree(files) {
+      const treeList = document.getElementById('folderTreeList');
+      if (!treeList) return;
+
+      const folderCounts = {};
+      files.forEach(f => {
+        let p = f.originalPath || '';
+        if (p) {
+          const lastSlash = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'));
+          if (lastSlash > 0) {
+            const dir = p.substring(0, lastSlash);
+            folderCounts[dir] = (folderCounts[dir] || 0) + 1;
+          }
+        }
+      });
+
+      const totalCountEl = document.getElementById('treeCountTotal');
+      if (totalCountEl) totalCountEl.textContent = files.length;
+
+      let html = `
+        <div class="tree-item ${selectedFolder === '' ? 'active' : ''}" onclick="selectFolder('')">
+          <span class="tree-label">📁 Tüm Konumlar</span>
+          <span class="tree-count">${files.length}</span>
+        </div>
+      `;
+
+      const sortedFolders = Object.keys(folderCounts).sort();
+      sortedFolders.forEach(dir => {
+        const count = folderCounts[dir];
+        const parts = dir.split(/[\\/]/).filter(Boolean);
+        const leaf = parts[parts.length - 1] || dir;
+        const isActive = (selectedFolder === dir) ? 'active' : '';
+        html += `
+          <div class="tree-item ${isActive}" onclick="selectFolder('${escapeHtml(dir)}')" title="${escapeHtml(dir)}">
+            <span class="tree-label">📂 ${escapeHtml(leaf)}</span>
+            <span class="tree-count">${count}</span>
+          </div>
+        `;
+      });
+
+      treeList.innerHTML = html;
+    }
+
+    window.selectFolder = (folderPath) => {
+      selectedFolder = folderPath;
+      buildFolderTree(allFiles);
+      renderFilesTable();
+    };
+
+    function initFilterControls() {
+      const fSize = document.getElementById('filterSize');
+      if (fSize) fSize.onchange = (e) => { filterSize = e.target.value; renderFilesTable(); };
+
+      const fDate = document.getElementById('filterDate');
+      if (fDate) fDate.onchange = (e) => { filterDate = e.target.value; renderFilesTable(); };
+
+      const fSort = document.getElementById('filterSort');
+      if (fSort) fSort.onchange = (e) => { filterSort = e.target.value; renderFilesTable(); };
+
+      const chkHealthy = document.getElementById('chkOnlyHealthy');
+      if (chkHealthy) chkHealthy.onchange = (e) => { onlyHealthy = e.target.checked; renderFilesTable(); };
+
+      const btnToggle = document.getElementById('btnToggleTree');
+      const sidebar = document.getElementById('folderTreeSidebar');
+      if (btnToggle && sidebar) {
+        btnToggle.onclick = () => {
+          sidebar.classList.toggle('collapsed');
+          const isCollapsed = sidebar.classList.contains('collapsed');
+          const lbl = document.getElementById('treeToggleLabel');
+          if (lbl) lbl.textContent = isCollapsed ? 'Ağacı Göster' : 'Klasör Ağacı';
+        };
+      }
+
+      const btnResetTree = document.getElementById('btnResetFolderTree');
+      if (btnResetTree) {
+        btnResetTree.onclick = () => { selectFolder(''); };
+      }
+
+      const btnExport = document.getElementById('btnExportSession');
+      if (btnExport) btnExport.onclick = exportSession;
+
+      const btnImport = document.getElementById('btnImportSession');
+      const fileInput = document.getElementById('sessionFileInput');
+      if (btnImport && fileInput) {
+        btnImport.onclick = () => fileInput.click();
+        fileInput.onchange = handleImportSession;
+      }
+
+      const btnChangeWarn = document.getElementById('btnChangeDestWarn');
+      if (btnChangeWarn) {
+        btnChangeWarn.onclick = () => { document.getElementById('btnDestDir').click(); };
+      }
+    }
+
     function renderFilesTable() {
       const q = searchInput.value.toLowerCase().trim();
-      const filtered = allFiles.filter(f => {
-        if (currentFilter === 'mft') return f.isMftDeleted === true;
-        if (currentFilter === 'recycle') return f.isRecycleBin === true;
-        if (currentFilter !== 'all' && f.category !== currentFilter) return false;
+      const now = Date.now();
+
+      let filtered = allFiles.filter(f => {
+        // Tab category filter
+        if (currentFilter === 'mft' && !f.isMftDeleted) return false;
+        if (currentFilter === 'recycle' && !f.isRecycleBin) return false;
+        if (currentFilter !== 'all' && currentFilter !== 'mft' && currentFilter !== 'recycle' && f.category !== currentFilter) return false;
+
+        // Folder tree filter
+        if (selectedFolder) {
+          const orig = (f.originalPath || '').replace(/\\/g, '/').toLowerCase();
+          const sel = selectedFolder.replace(/\\/g, '/').toLowerCase();
+          if (!orig.startsWith(sel)) return false;
+        }
+
+        // Size filter
+        const sz = f.sizeBytes || 0;
+        if (filterSize === 'small' && sz >= 1024 * 1024) return false;
+        if (filterSize === 'medium' && (sz < 1024 * 1024 || sz >= 50 * 1024 * 1024)) return false;
+        if (filterSize === 'large' && (sz < 50 * 1024 * 1024 || sz >= 500 * 1024 * 1024)) return false;
+        if (filterSize === 'huge' && sz < 500 * 1024 * 1024) return false;
+
+        // Date filter
+        if (filterDate !== 'all') {
+          let fileTime = f.timestamp || 0;
+          if (f.modifiedTime && f.modifiedTime !== '-') {
+            const parsed = Date.parse(f.modifiedTime.replace(' ', 'T'));
+            if (!isNaN(parsed)) fileTime = parsed;
+          }
+          const diff = now - fileTime;
+          if (filterDate === 'today' && diff > 24 * 3600 * 1000) return false;
+          if (filterDate === 'week' && diff > 7 * 24 * 3600 * 1000) return false;
+          if (filterDate === 'month' && diff > 30 * 24 * 3600 * 1000) return false;
+        }
+
+        // Health filter
+        if (onlyHealthy && (f.isRecoverable === false || f.confidence < 90)) return false;
+
+        // Text search
         if (q && !f.name.toLowerCase().includes(q) && !f.type.toLowerCase().includes(q) && !(f.hexOffset && f.hexOffset.toLowerCase().includes(q))) return false;
+
         return true;
       });
+
+      // Sorting
+      if (filterSort === 'size_desc') {
+        filtered.sort((a, b) => (b.sizeBytes || 0) - (a.sizeBytes || 0));
+      } else if (filterSort === 'size_asc') {
+        filtered.sort((a, b) => (a.sizeBytes || 0) - (b.sizeBytes || 0));
+      } else if (filterSort === 'date_desc') {
+        filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      } else if (filterSort === 'date_asc') {
+        filtered.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      } else if (filterSort === 'name_asc') {
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+      }
 
       if (filtered.length === 0) {
         filesTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-dim);">${isScanning ? 'Aranıyor...' : 'Seçilen kriterde dosya bulunamadı.'}</td></tr>`;
@@ -1188,13 +1653,141 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
             <td><span style="font-size: 11px; color: var(--text-dim); font-family: var(--font-mono);">${escapeHtml(dateStr)}</span></td>
             <td>${statusBadge}</td>
             <td style="text-align: right; white-space: nowrap;">
+              <button class="btn btn-secondary btn-sm" onclick="showPreviewModal('${f.id}')" title="Görsel / Metin Önizleme">Önizle</button>
               <button class="btn btn-secondary btn-sm" onclick="showDetailsModal('${f.id}')" title="Tüm Dosya Niteliklerini Gör">Özellikler</button>
-              <button class="btn btn-secondary btn-sm" onclick="showHexModal('${f.id}')" title="Hex Dökümü">Hex</button>
               <button class="btn btn-primary btn-sm" onclick="recoverSingle('${f.id}')" ${canRecover ? '' : 'disabled title="Bu dosyanın verisi diskten temizlenmiş"'}>Kurtar</button>
             </td>
           </tr>
         `;
       }).join('');
+    }
+
+    // Live Visual & Document Preview Modal
+    window.showPreviewModal = async (fileId) => {
+      const f = allFiles.find(item => item.id === fileId);
+      if (!f) return;
+      activePreviewFile = fileId;
+      activeHexFile = fileId;
+      activeDetailsFile = f;
+
+      const pModal = document.getElementById('previewModal');
+      const pTitle = document.getElementById('previewModalFileName');
+      const pPill = document.getElementById('previewTypePill');
+      const pBody = document.getElementById('previewModalBody');
+      const pMeta = document.getElementById('previewModalMeta');
+
+      pTitle.textContent = f.name;
+      pPill.className = 'type-pill type-' + (f.type || 'bin').toLowerCase();
+      pPill.textContent = (f.type || 'BIN').toUpperCase();
+      pMeta.textContent = `${f.sizeHuman || formatBytes(f.sizeBytes)} • ${f.originalPath || 'Bilinmeyen Konum'}`;
+      pBody.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-dim);">Önizleme yükleniyor...</div>';
+      pModal.classList.add('open');
+
+      try {
+        const res = await fetch('/api/preview?id=' + encodeURIComponent(fileId));
+        const data = await res.json();
+
+        if (data.type === 'image' && data.data) {
+          pBody.innerHTML = `
+            <div class="preview-canvas">
+              <img src="${data.data}" class="preview-img" alt="Önizleme">
+            </div>
+          `;
+        } else if (data.type === 'text' && data.data) {
+          pBody.innerHTML = `
+            <div class="preview-canvas" style="align-items: stretch; justify-content: stretch;">
+              <pre class="preview-code">${escapeHtml(data.data)}</pre>
+            </div>
+          `;
+        } else {
+          pBody.innerHTML = `
+            <div class="preview-canvas">
+              <div class="preview-binary-card">
+                <div style="font-size: 38px; margin-bottom: 10px;">📦</div>
+                <div style="font-size: 15px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${escapeHtml(f.name)}</div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">Bu dosya türü için doğrudan görsel/metin önizleme üretilemez.</div>
+                <div style="font-size: 12px; font-family: var(--font-mono); color: var(--accent); margin-bottom: 18px;">Boyut: ${f.sizeHuman || formatBytes(f.sizeBytes)} • Kurtarılabilirlik: %${f.confidence || 95}</div>
+                <button class="btn btn-secondary btn-sm" onclick="switchPreviewToHex()">Hex Kodlarını Görüntüle</button>
+              </div>
+            </div>
+          `;
+        }
+      } catch (err) {
+        pBody.innerHTML = `<div style="color: var(--danger); padding: 20px;">Önizleme hatası: ${escapeHtml(err.message)}</div>`;
+      }
+
+      document.getElementById('btnPreviewRecover').onclick = () => {
+        closePreviewModal();
+        recoverSingle(f.id);
+      };
+    };
+
+    window.closePreviewModal = () => {
+      document.getElementById('previewModal').classList.remove('open');
+    };
+
+    window.switchPreviewToDetails = () => {
+      closePreviewModal();
+      if (activePreviewFile) showDetailsModal(activePreviewFile);
+    };
+
+    window.switchPreviewToHex = () => {
+      closePreviewModal();
+      if (activePreviewFile) showHexModal(activePreviewFile);
+    };
+
+    // Session Export & Import
+    function exportSession() {
+      if (!allFiles || allFiles.length === 0) {
+        showToast('Dışa aktarılacak dosya taraması bulunmuyor', 'warning');
+        return;
+      }
+      const sessionData = {
+        app: 'ByteRescue',
+        version: '1.3.0',
+        author: 'Kadir',
+        date: new Date().toISOString(),
+        filesCount: allFiles.length,
+        files: allFiles
+      };
+      const jsonStr = JSON.stringify(sessionData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const nowStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      a.href = url;
+      a.download = `ByteRescue_Oturum_${nowStr}.brescue`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Tarama oturumu kaydedildi (${allFiles.length} dosya)`, 'success');
+    }
+
+    function handleImportSession(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          const loadedFiles = parsed.files || (Array.isArray(parsed) ? parsed : []);
+          if (!Array.isArray(loadedFiles) || loadedFiles.length === 0) {
+            showToast('Oturum dosyasında geçerli veri bulunamadı', 'error');
+            return;
+          }
+          allFiles = loadedFiles;
+          updateCategoryBadges();
+          buildFolderTree(allFiles);
+          renderFilesTable();
+          showToast(`✅ ${loadedFiles.length} dosya içeren oturum başarıyla yüklendi!`, 'success');
+        } catch (err) {
+          showToast('Oturum dosyası okunamadı: ' + err.message, 'error');
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
     }
 
     window.toggleSelect = (id) => {
@@ -1234,28 +1827,21 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
 
     searchInput.oninput = () => renderFilesTable();
 
-    // Hex & Preview Modal
+    // Hex Modal
     window.showHexModal = async (fileId) => {
       activeHexFile = fileId;
       document.getElementById('hexModal').classList.add('open');
-      document.getElementById('hexModalBody').innerHTML = '<div style="padding: 20px; color: var(--text-dim);">Önizleme ve Hex yükleniyor...</div>';
+      document.getElementById('hexModalBody').innerHTML = '<div style="padding: 20px; color: var(--text-dim);">Hex yükleniyor...</div>';
       try {
         const res = await fetch('/api/preview?id=' + encodeURIComponent(fileId));
         const data = await res.json();
         let html = '';
-        if (data.type === 'image' && data.data) {
-          html += `<div style="text-align: center; margin-bottom: 16px; background: rgba(0,0,0,0.5); padding: 14px; border-radius: 8px;">
-            <img src="${data.data}" style="max-height: 280px; max-width: 100%; border-radius: 6px; object-fit: contain; box-shadow: 0 4px 14px rgba(0,0,0,0.6);" alt="Kurtarılan Görsel">
-          </div>`;
-        } else if (data.type === 'text' && data.data) {
-          html += `<div style="padding: 12px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 14px; font-family: var(--font-mono); font-size: 11px; color: #f3f4f6; max-height: 180px; overflow-y: auto; white-space: pre-wrap; border: 1px solid var(--border-color);">${escapeHtml(data.data)}</div>`;
-        }
         if (data.hex) {
           html += `<div style="font-family: var(--font-mono); font-size: 11px; color: #38bdf8; white-space: pre;">${escapeHtml(data.hex)}</div>`;
         }
-        document.getElementById('hexModalBody').innerHTML = html;
+        document.getElementById('hexModalBody').innerHTML = html || 'Hex içeriği okunamadı.';
       } catch (err) {
-        document.getElementById('hexModalBody').innerHTML = `<div style="color: var(--danger); padding: 12px;">Önizleme yüklenemedi: ${escapeHtml(err.message)}</div>`;
+        document.getElementById('hexModalBody').innerHTML = `<div style="color: var(--danger); padding: 12px;">Hex yüklenemedi: ${escapeHtml(err.message)}</div>`;
       }
     };
 
@@ -1271,8 +1857,6 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     };
 
     // Details Modal
-    let activeDetailsFile = null;
-
     window.showDetailsModal = (fileId) => {
       const f = allFiles.find(item => item.id === fileId);
       if (!f) return;
@@ -1406,6 +1990,13 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
         showToast('Kurtarılacak dosya seçilmedi', 'warning');
         return;
       }
+
+      // Check same drive warning before recovering
+      if (checkSameDrive()) {
+        const confirmed = confirm('⚠️ KRİTİK GÜVENLİK UYARISI:\n\nKaynak sürücü ile kurtarma hedefi aynı (' + (currentPath.substring(0, 2).toUpperCase()) + ')!\nKurtarma sırasında diske yazılan dosyalar, kurtarılmayı bekleyen diğer silinmiş dosyaların üzerine yazabilir.\n\nYine de bu sürücüye kurtarmak istediğinize emin misiniz?');
+        if (!confirmed) return;
+      }
+
       showToast(`${fileIds.length} dosya kurtarılıyor -> ${destDir}...`, 'info');
       try {
         const res = await fetch('/api/recover', {
@@ -1435,6 +2026,7 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
           destDir = data.path;
           const parts = destDir.split(/[\\/]/).filter(Boolean);
           destDirName.textContent = parts[parts.length - 1] || destDir;
+          checkSameDrive();
           showToast('Hedef kurtarma klasörü belirlendi: ' + destDir, 'success');
         }
       } catch (err) {
