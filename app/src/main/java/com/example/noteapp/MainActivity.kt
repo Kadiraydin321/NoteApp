@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,10 +29,12 @@ import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -112,11 +115,12 @@ class MainActivity : FragmentActivity() {
 
             NoteAppTheme(
                 themeMode = appSettings.themeMode,
-                dynamicColor = appSettings.dynamicColor
+                dynamicColor = appSettings.dynamicColor,
+                colorPalette = appSettings.colorPalette
             ) {
                 var showWelcomeScreen by remember { mutableStateOf(true) }
                 LaunchedEffect(Unit) {
-                    delay(100)
+                    delay(1000)
                     showWelcomeScreen = false
                 }
 
@@ -266,9 +270,16 @@ class MainActivity : FragmentActivity() {
                     composable("notes_screen") {
                         val viewModel = hiltViewModel<NotesViewModel>()
                         val state by viewModel.state.collectAsState()
+                        val quickSyncState by viewModel.quickSyncState.collectAsState()
+                        val noteSettingsState by viewModel.settings.collectAsState()
 
                         NotesScreen(
                             state = state,
+                            quickSyncState = quickSyncState,
+                            syncHost = noteSettingsState.lastSyncHost,
+                            onQuickSyncSend = viewModel::quickSyncSend,
+                            onQuickSyncPull = viewModel::quickSyncPull,
+                            onDismissQuickSyncMessage = viewModel::dismissQuickSyncMessage,
                             onSearchChange = viewModel::onSearchQueryChanged,
                             onNoteClick = { note ->
                                 if (note.isLocked) {
@@ -578,16 +589,21 @@ class MainActivity : FragmentActivity() {
                         val viewModel = hiltViewModel<SettingsViewModel>()
                         val settingsState by viewModel.settings.collectAsState()
                         val backupUiState by viewModel.backupUiState.collectAsState()
+                        val syncUiState by viewModel.syncUiState.collectAsState()
+                        val updateUiState by viewModel.updateUiState.collectAsState()
 
                         SettingsScreen(
                             initialFocusSection = focus,
                             settings = settingsState,
                             backupUiState = backupUiState,
+                            syncUiState = syncUiState,
+                            updateUiState = updateUiState,
                             onWidgetFilterChange = viewModel::setWidgetFilterMode,
                             onWidgetShowLockedChange = viewModel::setWidgetShowLocked,
                             onWidgetShowContentChange = viewModel::setWidgetShowContent,
                             onDefaultColorChange = viewModel::setDefaultNoteColor,
                             onDynamicColorChange = viewModel::setDynamicColor,
+                            onColorPaletteChange = viewModel::setColorPalette,
                             onThemeModeChange = viewModel::setThemeMode,
                             onLayoutModeChange = viewModel::setLayoutMode,
                             onMasterPinChange = viewModel::setMasterPin,
@@ -598,6 +614,16 @@ class MainActivity : FragmentActivity() {
                             onExportAndShare = { ctx, pass -> viewModel.exportAndShare(ctx, pass) },
                             onImportFromUri = { uri, clear, pass -> viewModel.importBackupFromUri(uri, clear, pass) },
                             onDismissBackupMessage = viewModel::dismissMessage,
+                            onCheckSyncConnection = viewModel::checkSyncConnection,
+                            onAutoDiscoverServer = viewModel::autoDiscoverServer,
+                            onSendNotesToDesktop = viewModel::sendNotesToDesktop,
+                            onPullNotesFromDesktop = viewModel::pullNotesFromDesktop,
+                            onDismissSyncMessage = viewModel::dismissSyncMessage,
+                            onCheckForUpdates = viewModel::checkForUpdates,
+                            onCheckAndInstallUpdate = { force -> viewModel.checkAndInstallUpdate(force) },
+                            onDownloadAndInstallUpdate = viewModel::downloadAndInstallUpdate,
+                            onInstallReadyApk = viewModel::installReadyApk,
+                            onDismissUpdateStatus = viewModel::dismissUpdateStatus,
                             onBackClick = {
                                 navController.popBackStack()
                             }
@@ -638,32 +664,51 @@ class MainActivity : FragmentActivity() {
                     }
                 }
 
-                if (showWelcomeScreen) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showWelcomeScreen,
+                    enter = androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(300))
+                ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(MaterialTheme.colorScheme.background),
                         contentAlignment = Alignment.Center
                     ) {
+                        val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "welcomeEmoji")
+                        val bounceScale by infiniteTransition.animateFloat(
+                            initialValue = 0.94f,
+                            targetValue = 1.08f,
+                            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                animation = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                            ),
+                            label = "scale"
+                        )
+
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             Text(
+                                text = "😊",
+                                fontSize = 54.sp,
+                                modifier = Modifier.graphicsLayer {
+                                    scaleX = bounceScale
+                                    scaleY = bounceScale
+                                }
+                            )
+                            Text(
                                 text = "Not Defterim",
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Hoş geldiniz",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
-                            )
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                strokeWidth = 2.5.dp,
-                                color = MaterialTheme.colorScheme.primary
+                                text = "Tekrar hoş geldin!",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f)
                             )
                         }
                     }
@@ -783,9 +828,13 @@ class MainActivity : FragmentActivity() {
             }
         }
 
-        // Widget eski + butonuna basıldıysa yeni not ekranı
-        if (intent.getBooleanExtra(NotesWidgetProvider.EXTRA_NEW_NOTE, false)) {
+        // Hızlı Ayarlar Kutucuğu (Quick Settings Tile) veya Widget + butonuna basıldıysa yeni not ekranı
+        if (intent.getBooleanExtra(NotesWidgetProvider.EXTRA_NEW_NOTE, false) ||
+            intent.getBooleanExtra("open_new_note", false) ||
+            intent.action == "com.example.noteapp.ACTION_QUICK_NOTE") {
             intent.removeExtra(NotesWidgetProvider.EXTRA_NEW_NOTE)
+            intent.removeExtra("open_new_note")
+            intent.action = Intent.ACTION_MAIN
             NotesWidgetProvider.closeAllPopups(this)
             onNavigate("note_detail_screen")
             return

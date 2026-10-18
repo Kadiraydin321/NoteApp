@@ -28,10 +28,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.example.noteapp.data.settings.AppColorPalette
 import com.example.noteapp.data.settings.AppSettings
 import com.example.noteapp.data.settings.NotesLayoutMode
 import com.example.noteapp.data.settings.ThemeMode
 import com.example.noteapp.data.settings.WidgetFilterMode
+import com.example.noteapp.data.updater.UpdateStatus
 import com.example.noteapp.presentation.detail.NoteColors
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -45,11 +47,14 @@ fun SettingsScreen(
     initialFocusSection: String? = null,
     settings: AppSettings,
     backupUiState: BackupUiState,
+    syncUiState: SyncUiState = SyncUiState(),
+    updateUiState: UpdateUiState = UpdateUiState(),
     onWidgetFilterChange: (WidgetFilterMode) -> Unit,
     onWidgetShowLockedChange: (Boolean) -> Unit,
     onWidgetShowContentChange: (Boolean) -> Unit = {},
     onDefaultColorChange: (Int) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
+    onColorPaletteChange: (AppColorPalette) -> Unit = {},
     onThemeModeChange: (ThemeMode) -> Unit = {},
     onLayoutModeChange: (NotesLayoutMode) -> Unit = {},
     onMasterPinChange: (String?) -> Unit = {},
@@ -60,6 +65,16 @@ fun SettingsScreen(
     onExportAndShare: (Context, String?) -> Unit,
     onImportFromUri: (Uri, Boolean, String?) -> Unit,
     onDismissBackupMessage: () -> Unit,
+    onCheckSyncConnection: (String) -> Unit = {},
+    onAutoDiscoverServer: (String?) -> Unit = {},
+    onSendNotesToDesktop: (String, String, Boolean, String?) -> Unit = { _, _, _, _ -> },
+    onPullNotesFromDesktop: (String, String, Boolean, String?) -> Unit = { _, _, _, _ -> },
+    onDismissSyncMessage: () -> Unit = {},
+    onCheckForUpdates: () -> Unit = {},
+    onCheckAndInstallUpdate: (Boolean) -> Unit = {},
+    onDownloadAndInstallUpdate: () -> Unit = {},
+    onInstallReadyApk: () -> Unit = {},
+    onDismissUpdateStatus: () -> Unit = {},
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -71,6 +86,33 @@ fun SettingsScreen(
     var importPasswordInput by remember { mutableStateOf("") }
     var showSetPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
+    var showUpdateDetailsDialog by remember { mutableStateOf(false) }
+
+    // Ayarlara her girişte güncellemeleri otomatik denetle
+    LaunchedEffect(Unit) {
+        onCheckForUpdates()
+    }
+
+    // Güncelleme bulunduğunda popup penceresini otomatik aç
+    LaunchedEffect(updateUiState.status) {
+        if (updateUiState.status is UpdateStatus.UpdateAvailable) {
+            showUpdateDetailsDialog = true
+        }
+    }
+
+    var syncHostInput by remember(settings.lastSyncHost) {
+        mutableStateOf(settings.lastSyncHost.ifBlank { "192.168.1." })
+    }
+    var syncPinInput by remember(settings.lastSyncPin) {
+        mutableStateOf(settings.lastSyncPin)
+    }
+    var syncClearExisting by remember { mutableStateOf(false) }
+
+    LaunchedEffect(syncUiState.discoveredHost) {
+        syncUiState.discoveredHost?.let {
+            syncHostInput = it
+        }
+    }
 
     // Yeni dosya oluşturarak dışa aktarma (SAF CreateDocument)
     val createDocumentLauncher = rememberLauncherForActivityResult(
@@ -124,7 +166,266 @@ fun SettingsScreen(
         ) {
 
             // ==========================================
-            // BÖLÜM 1: YEDEKLEME & DIŞA / İÇE AKTARMA
+            // BÖLÜM 1: GÜNCELLEME (OTOMATİK DENETİM & DETAYLAR)
+            // ==========================================
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = when (updateUiState.status) {
+                        is UpdateStatus.UpdateAvailable -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                        is UpdateStatus.Error -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    }
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    when (val status = updateUiState.status) {
+                        is UpdateStatus.Checking -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.5.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    "Güncellemeler denetleniyor...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        is UpdateStatus.UpdateAvailable -> {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.NewReleases,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Text(
+                                    "Güncelleme Var! 🚀",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            Text(
+                                "Mevcut sürüm: v${status.currentVersionName}  →  Yeni sürüm: v${status.remoteVersionName}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            // İlerleme Durumu
+                            if (updateUiState.isDownloading) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    LinearProgressIndicator(
+                                        progress = { if (updateUiState.downloadProgress >= 0) updateUiState.downloadProgress / 100f else 0f },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Text(
+                                        if (updateUiState.downloadProgress >= 0) "İndiriliyor: %${updateUiState.downloadProgress}" else "İndiriliyor...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            // Butonlar: Detay ve Güncelle
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { showUpdateDetailsDialog = true },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Detay", fontWeight = FontWeight.SemiBold)
+                                }
+
+                                Button(
+                                    onClick = {
+                                        if (!updateUiState.isDownloading) {
+                                            onDownloadAndInstallUpdate()
+                                        }
+                                    },
+                                    enabled = !updateUiState.isDownloading,
+                                    modifier = Modifier
+                                        .weight(1.3f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    if (updateUiState.isDownloading) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("İndiriliyor...", fontWeight = FontWeight.Bold)
+                                    } else {
+                                        Icon(
+                                            Icons.Default.Download,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Güncelle", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+                        is UpdateStatus.Error -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.WifiOff,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Text(
+                                        status.message.ifBlank { "İnternet bağlantısı kurulamadığı için güncelleme kontrol edilemedi." },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { onCheckForUpdates() },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = "Tekrar Dene",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        is UpdateStatus.UpToDate -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            "Uygulamanız güncel",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            "Sürüm: v${status.currentVersionName}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = { onCheckForUpdates() },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = "Yeniden Denetle",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        else -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Update,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Text(
+                                        "Güncellemeler kontrol ediliyor...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { onCheckForUpdates() },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = "Denetle",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ==========================================
+            // BÖLÜM 2: YEDEKLEME & DIŞA / İÇE AKTARMA
             // ==========================================
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -212,6 +513,218 @@ fun SettingsScreen(
                         Text("Yedekten Geri Yükle (İçe Aktar)")
                     }
 
+                }
+            }
+
+            // ==========================================
+            // BÖLÜM 1.5: MASAÜSTÜ Wİ-Fİ SENKRONİZASYONU (📱 ⇄ 💻)
+            // ==========================================
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Devices,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(26.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                "Masaüstü Wi-Fi Senkronizasyonu",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "Bilgisayar ile yerel ağ üzerinden kablosuz eşitleme",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Text(
+                        "Bilgisayarınızda 'Not Defterim Masaüstü' uygulamasını açıp 'Wi-Fi Senkronizasyonu' sekmesindeki IP adresi ve 4 haneli PIN kodunu girin.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    HorizontalDivider()
+
+                    // IP / Sunucu Adresi ve PIN Girişi
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = syncHostInput,
+                            onValueChange = { syncHostInput = it },
+                            label = { Text("Bilgisayar IP Adresi") },
+                            placeholder = { Text("192.168.1.X veya 10.0.2.2") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1.8f)
+                        )
+
+                        OutlinedTextField(
+                            value = syncPinInput,
+                            onValueChange = { if (it.length <= 4 && it.all { c -> c.isDigit() }) syncPinInput = it },
+                            label = { Text("PIN") },
+                            placeholder = { Text("4 Hane") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                            )
+                        )
+                    }
+
+                    // Otomatik Bul & Bağlantıyı Test Et Butonları
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FilledTonalButton(
+                            onClick = {
+                                onAutoDiscoverServer(syncHostInput)
+                            },
+                            enabled = !syncUiState.isDiscovering && !syncUiState.isOperating,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (syncUiState.isDiscovering) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Taranıyor...")
+                            } else {
+                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Ağda Bul 🔍")
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                onCheckSyncConnection(syncHostInput)
+                            },
+                            enabled = syncHostInput.isNotBlank() && !syncUiState.statusChecking && !syncUiState.isOperating,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (syncUiState.statusChecking) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Bağlanıyor...")
+                            } else {
+                                Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Test Et")
+                            }
+                        }
+                    }
+
+                    if (syncUiState.isConnected == true) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "✓ Bağlandı: ${syncUiState.serverStatus?.appName ?: "Masaüstü"} (${syncUiState.serverStatus?.notesCount ?: 0} not)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+
+                    // Temizle & Eşitle Seçeneği
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Mevcut Notların Üzerine Yaz",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                if (syncClearExisting) "Karşı taraftaki eski notlar silinir, sadece yeni liste kalır"
+                                else "Mevcut notlar korunur ve eşleşen/yeni notlar eklenir (Tavsiye edilen)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = syncClearExisting,
+                            onCheckedChange = { syncClearExisting = it }
+                        )
+                    }
+
+                    HorizontalDivider()
+
+                    // Gönder ve Çek Butonları
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                onSendNotesToDesktop(
+                                    syncHostInput,
+                                    syncPinInput,
+                                    syncClearExisting,
+                                    settings.masterPin
+                                )
+                            },
+                            enabled = syncHostInput.isNotBlank() && syncPinInput.length == 4 && !syncUiState.isOperating,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Gönder 📤")
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
+                                onPullNotesFromDesktop(
+                                    syncHostInput,
+                                    syncPinInput,
+                                    syncClearExisting,
+                                    settings.masterPin
+                                )
+                            },
+                            enabled = syncHostInput.isNotBlank() && syncPinInput.length == 4 && !syncUiState.isOperating,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Çek 📥")
+                        }
+                    }
                 }
             }
 
@@ -490,7 +1003,7 @@ fun SettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Dinamik Renkler (Material You)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                             Text(
-                                "Android 12+ sistem duvar kağıdı renklerine göre arayüzü şekillendirir",
+                                "Android 12+ sistem duvar kağıdı renklerine göre arayüzü şekillendirir (Kapalıyken aşağıdaki özel paletler kullanılır)",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -499,6 +1012,86 @@ fun SettingsScreen(
                             checked = settings.dynamicColor,
                             onCheckedChange = onDynamicColorChange
                         )
+                    }
+
+                    // Özel Renk Paletleri Seçimi
+                    Text("Özel Renk & Atmosfer Paleti:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AppColorPalette.values().forEach { palette ->
+                            val isSelected = (!settings.dynamicColor && settings.colorPalette == palette) ||
+                                    (settings.dynamicColor && settings.colorPalette == palette)
+                            val previewColors = when (palette) {
+                                AppColorPalette.WARM_AMBER -> listOf(Color(0xFFFFB74D), Color(0xFFFFAB91), Color(0xFF2E241E))
+                                AppColorPalette.MIDNIGHT_ROSE -> listOf(Color(0xFFFFB0CD), Color(0xFFE4BDC8), Color(0xFF2E2026))
+                                AppColorPalette.FOREST_EMERALD -> listOf(Color(0xFF81D89D), Color(0xFFA2CED9), Color(0xFF202A22))
+                                AppColorPalette.DEEP_OCEAN -> listOf(Color(0xFF97CCF8), Color(0xFFB9C8DA), Color(0xFF202731))
+                                AppColorPalette.SLATE_MINIMAL -> listOf(Color(0xFFD0D3D9), Color(0xFFC4C7CC), Color(0xFF26292E))
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (settings.dynamicColor) {
+                                            onDynamicColorChange(false)
+                                        }
+                                        onColorPaletteChange(palette)
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // 3 renkli önizleme noktacığı
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        previewColors.forEach { dotColor ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .background(dotColor)
+                                                    .border(0.5.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            palette.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            palette.subtitle,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Icon(
+                                            Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Varsayılan Not Rengi
@@ -644,12 +1237,12 @@ fun SettingsScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "Not Defterim · v1.1.0",
+                        "Not Defterim · v1.0.1 (En Güncel)",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Tamamen Çevrimdışı, Güvenli ve Taşınabilir Yedekleme",
+                        "Tamamen Çevrimdışı, Güvenli, Hızlı ve Optimize",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -877,6 +1470,206 @@ fun SettingsScreen(
                     pinInput = ""
                 }) {
                     Text("İptal")
+                }
+            }
+        )
+    }
+
+    // 5. Senkronizasyon İşlemi Sürüyor Göstergesi
+    if (syncUiState.isOperating) {
+        Dialog(onDismissRequest = {}) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator()
+                    Text(
+                        text = syncUiState.operationTitle ?: "Masaüstü ile senkronize ediliyor...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+
+    // 6. Senkronizasyon Bilgilendirme / Sonuç İletişim Kutusu
+    syncUiState.message?.let { msg ->
+        AlertDialog(
+            onDismissRequest = onDismissSyncMessage,
+            icon = {
+                Icon(
+                    imageVector = if (syncUiState.isSuccess == true) Icons.Default.CheckCircle else Icons.Default.Error,
+                    contentDescription = null,
+                    tint = if (syncUiState.isSuccess == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(if (syncUiState.isSuccess == true) "Senkronizasyon Başarılı" else "Senkronizasyon Bilgisi")
+            },
+            text = { Text(msg) },
+            confirmButton = {
+                TextButton(onClick = onDismissSyncMessage) {
+                    Text("Tamam")
+                }
+            }
+        )
+    }
+
+    // 7. Güncelleme Popup Penceresi (Güncelleme bulunduğunda veya Detay butonuna basıldığında açılır)
+    if (showUpdateDetailsDialog && updateUiState.status is UpdateStatus.UpdateAvailable) {
+        val status = updateUiState.status as UpdateStatus.UpdateAvailable
+        AlertDialog(
+            onDismissRequest = { showUpdateDetailsDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.CloudDownload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    "Güncelleme Var! 🚀",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Sürüm Karşılaştırma Kutusu
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    "Mevcut Sürüm:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "v${status.currentVersionName} (Kod: ${status.currentVersionCode})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    "Yeni Sürüm:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    "v${status.remoteVersionName} (Kod: ${status.remoteVersionCode})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            if (status.releaseDate.isNotBlank()) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "Yayın Tarihi:",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        status.releaseDate,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Yapılan Değişiklikler
+                    Text(
+                        "Son Güncellemede Yapılan Değişiklikler:",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        status.message.ifBlank { "Hata düzeltmeleri ve kararlılık iyileştirmeleri." },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showUpdateDetailsDialog = false
+                        onDownloadAndInstallUpdate()
+                    }
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("🚀 Güncelle")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpdateDetailsDialog = false }) {
+                    Text("Daha Sonra")
+                }
+            }
+        )
+    }
+
+    // 8. İndirme Tamamlandı Bildirimi
+    if (updateUiState.status is UpdateStatus.ReadyToInstall) {
+        AlertDialog(
+            onDismissRequest = onDismissUpdateStatus,
+            icon = {
+                Icon(
+                    Icons.Default.InstallMobile,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text("Güncelleme İndirildi") },
+            text = {
+                Text("APK başarıyla indirildi. Yükleme işlemini başlatmak için Yükle butonuna dokunun.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    onDismissUpdateStatus()
+                    onInstallReadyApk()
+                }) {
+                    Text("Şimdi Yükle")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissUpdateStatus) {
+                    Text("Kapat")
                 }
             }
         )
