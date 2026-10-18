@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
@@ -708,15 +709,24 @@ class MainActivity : FragmentActivity() {
                             .background(MaterialTheme.colorScheme.background),
                         contentAlignment = Alignment.Center
                     ) {
-                        val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "welcomeEmoji")
+                        val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "welcomeLogo")
                         val bounceScale by infiniteTransition.animateFloat(
-                            initialValue = 0.94f,
-                            targetValue = 1.08f,
+                            initialValue = 0.96f,
+                            targetValue = 1.04f,
                             animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                                animation = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                                animation = androidx.compose.animation.core.tween(750, easing = androidx.compose.animation.core.FastOutSlowInEasing),
                                 repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
                             ),
                             label = "scale"
+                        )
+                        val glowAlpha by infiniteTransition.animateFloat(
+                            initialValue = 0.20f,
+                            targetValue = 0.45f,
+                            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                animation = androidx.compose.animation.core.tween(750, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                            ),
+                            label = "glow"
                         )
 
                         Column(
@@ -730,46 +740,45 @@ class MainActivity : FragmentActivity() {
                                     scaleY = bounceScale
                                 }
                             ) {
-                                // Yumuşak ışıltı / halo arka plan halkası
+                                // Kırmızı & Siyah Modern Ambiyans Işıltısı
                                 Box(
                                     modifier = Modifier
-                                        .size(126.dp)
+                                        .size(136.dp)
                                         .background(
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                                            shape = CircleShape
-                                        )
-                                )
-                                Image(
-                                    painter = painterResource(id = R.drawable.memoji_welcome),
-                                    contentDescription = "Hoş Geldin Memoji",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(116.dp)
-                                        .clip(CircleShape)
-                                        .border(
-                                            width = 3.dp,
-                                            brush = Brush.linearGradient(
+                                            brush = Brush.radialGradient(
                                                 listOf(
-                                                    MaterialTheme.colorScheme.primary,
-                                                    MaterialTheme.colorScheme.tertiary
+                                                    Color(0xFFDC2626).copy(alpha = glowAlpha),
+                                                    Color.Transparent
                                                 )
                                             ),
                                             shape = CircleShape
                                         )
                                 )
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_app_logo),
+                                    contentDescription = "Not Defterim Logo",
+                                    modifier = Modifier
+                                        .size(108.dp)
+                                        .clip(RoundedCornerShape(26.dp))
+                                )
                             }
-                            Text(
-                                text = "Not Defterim",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "Tekrar hoş geldin! ✨",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "Not Defterim",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = "Sade • Hızlı • Güvenli",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFFDC2626)
+                                )
+                            }
                         }
                     }
                 }

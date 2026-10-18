@@ -1,49 +1,110 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Lifted paper tile -->
+    <!-- 1. Not Defteri Arka Gölgesi (Soft Drop Shadow) -->
     <path
-        android:fillColor="#261E72"
-        android:pathData="M31,20 L65,20 L81,36 L81,78 C81,82.4 77.4,86 73,86 L31,86 C26.6,86 23,82.4 23,78 L23,28 C23,23.6 26.6,20 31,20 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M31,16 L64,16 L80,32 L80,76 C80,80.4 76.4,84 72,84 L31,84 C26.6,84 23,80.4 23,76 L23,24 C23,19.6 26.6,16 31,16 Z" />
-    <path
-        android:fillColor="#DCE2FF"
-        android:pathData="M64,16 L64,28 C64,30.2 65.8,32 68,32 L80,32 Z" />
+        android:fillColor="#4D000000"
+        android:pathData="M37,27 L61,27 L77,43 L77,77 C77,81.4 73.4,85 69,85 L37,85 C32.6,85 29,81.4 29,77 L29,35 C29,30.6 32.6,27 37,27 Z" />
 
-    <!-- Note heading and task lines -->
-    <path
-        android:fillColor="#4F46E5"
-        android:pathData="M33,31 L60,31 C61.7,31 63,32.3 63,34 C63,35.7 61.7,37 60,37 L33,37 C31.3,37 30,35.7 30,34 C30,32.3 31.3,31 33,31 Z" />
-    <path
-        android:fillColor="#14B8A6"
-        android:pathData="M36,45 C39.9,45 43,48.1 43,52 C43,55.9 39.9,59 36,59 C32.1,59 29,55.9 29,52 C29,48.1 32.1,45 36,45 Z" />
+    <!-- 2. Ana Not Sayfası - Saf Beyaz ve Yumuşak Kıvrımlı (White Document Body) -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M32.4,51.7 L34.6,49.7 L36.1,51.3 L39.5,47.6 L41.6,49.5 L36,55.6 Z" />
-    <path
-        android:fillColor="#A5B4FC"
-        android:pathData="M49,48 L68,48 C69.7,48 71,49.3 71,51 C71,52.7 69.7,54 68,54 L49,54 C47.3,54 46,52.7 46,51 C46,49.3 47.3,48 49,48 Z" />
-    <path
-        android:fillColor="#14B8A6"
-        android:pathData="M36,62 C39.9,62 43,65.1 43,69 C43,72.9 39.9,76 36,76 C32.1,76 29,72.9 29,69 C29,65.1 32.1,62 36,62 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M32.4,68.7 L34.6,66.7 L36.1,68.3 L39.5,64.6 L41.6,66.5 L36,72.6 Z" />
-    <path
-        android:fillColor="#A5B4FC"
-        android:pathData="M49,65 L66,65 C67.7,65 69,66.3 69,68 C69,69.7 67.7,71 66,71 L49,71 C47.3,71 46,69.7 46,68 C46,66.3 47.3,65 49,65 Z" />
+        android:pathData="M37,24 L61,24 L76,39 L76,74 C76,78.4 72.4,82 68,82 L37,82 C32.6,82 29,78.4 29,74 L29,32 C29,27.6 32.6,24 37,24 Z" />
 
-    <!-- Coral pencil accent -->
+    <!-- 3. Sayfa Katlama Köşesi (Folded Flap & Corner Shadow) -->
     <path
-        android:fillColor="#F97360"
-        android:pathData="M68,77 L81,62 C82.7,60 85.6,59.8 87.5,61.6 C89.4,63.4 89.5,66.3 87.7,68.2 L74.8,82.2 L67,84 Z" />
+        android:fillColor="#1A000000"
+        android:pathData="M60,24 L60,39 L76,39 Z" />
     <path
-        android:fillColor="#312E81"
-        android:pathData="M67,84 L69,76 L74.8,82.2 Z" />
+        android:fillColor="#F3F4F6"
+        android:pathData="M61,24 L61,36 C61,37.7 62.3,39 64,39 L76,39 Z" />
+
+    <!-- 4. Canlı Kırmızı Yer İmi Kurdelesi (Crimson Red Bookmark Ribbon) -->
+    <path
+        android:pathData="M37,22 L46,22 L46,47 L41.5,43 L37,47 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="41.5"
+                android:startY="22"
+                android:endX="41.5"
+                android:endY="47"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#EF4444" />
+                <item android:offset="1.0" android:color="#B91C1C" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Kurdele Üst Kıvrım Detayı (Koyu Kırmızı Vurgu) -->
+    <path
+        android:fillColor="#991B1B"
+        android:pathData="M37,22 L46,22 L46,24 L37,24 Z" />
+
+    <!-- 5. Not Başlık ve Çizgileri (Modern Minimalist Dark Lines) -->
+    <!-- Başlık Çizgisi (Koyu Siyah / Grafit) -->
+    <path
+        android:fillColor="#111827"
+        android:pathData="M51,29 L67,29 C68.1,29 69,29.9 69,31 C69,32.1 68.1,33 67,33 L51,33 C49.9,33 49,32.1 49,31 C49,29.9 49.9,29 51,29 Z" />
+
+    <!-- Birinci Not Satırı (Grafit Çizgi) -->
+    <path
+        android:fillColor="#1F2937"
+        android:pathData="M36,52 L69,52 C70.1,52 71,52.9 71,54 C71,55.1 70.1,56 69,56 L36,56 C34.9,56 34,55.1 34,54 C34,52.9 34.9,52 36,52 Z" />
+
+    <!-- İkinci Not Satırı (Orta Koyu Çizgi) -->
+    <path
+        android:fillColor="#374151"
+        android:pathData="M36,60 L59,60 C60.1,60 61,60.9 61,62 C61,63.1 60.1,64 59,64 L36,64 C34.9,64 34,63.1 34,62 C34,60.9 34.9,60 36,60 Z" />
+
+    <!-- Üçüncü Not Satırı (Açık Gri Kısa Çizgi) -->
+    <path
+        android:fillColor="#9CA3AF"
+        android:pathData="M36,68 L50,68 C51.1,68 52,68.9 52,70 C52,71.1 51.1,72 50,72 L36,72 C34.9,72 34,71.1 34,70 C34,68.9 34.9,68 36,68 Z" />
+
+    <!-- 6. Modern Kırmızı & Siyah Kalem / Stylus (Modern Stylus Pen) -->
+    <!-- Kalem Gölgesi -->
+    <path
+        android:fillColor="#33000000"
+        android:pathData="M64,78 L80,62 L83,65 L67,81 Z" />
+
+    <!-- Kalem Gövdesi (Kırmızı Canlı Gövde) -->
+    <path
+        android:pathData="M65.5,74.5 L78.5,61.5 L82,65 L69,78 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="65.5"
+                android:startY="74.5"
+                android:endX="82"
+                android:endY="65"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#DC2626" />
+                <item android:offset="1.0" android:color="#EF4444" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Kalem Tepe Kapağı (Siyah Grafit Kapak) -->
+    <path
+        android:fillColor="#111827"
+        android:pathData="M78.5,61.5 L81.5,58.5 C82.3,57.7 83.7,57.7 84.5,58.5 L85,59 C85.8,59.8 85.8,61.2 85,62 L82,65 Z" />
+
+    <!-- Kalem Beyaz Yüzük / Halka Detayı -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M77.5,62.5 L79.5,60.5 L80.5,61.5 L78.5,63.5 Z" />
+
+    <!-- Kalem Uç Konisi (Siyah) -->
+    <path
+        android:fillColor="#111827"
+        android:pathData="M65.5,74.5 L69,78 L63,80.5 Z" />
+
+    <!-- Kalem En Uç Noktası (Saf Beyaz Uç / Stylus Nib) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M64.2,79.3 L63,80.5 L64.8,78.5 Z" />
+
 </vector>

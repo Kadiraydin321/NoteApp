@@ -6,7 +6,7 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Ana Arka Plan Gradyanı: Canlı İndigo - Kraliyet Moru -->
+    <!-- Ana Karbon / Mat Siyah Arka Plan (Red/Black/White Konsepti) -->
     <path
         android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
@@ -16,14 +16,14 @@
                 android:endX="96"
                 android:endY="100"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#4338CA" />
-                <item android:offset="0.45" android:color="#4F46E5" />
-                <item android:offset="1.0" android:color="#7C3AED" />
+                <item android:offset="0.0" android:color="#1A1C22" />
+                <item android:offset="0.5" android:color="#111216" />
+                <item android:offset="1.0" android:color="#0B0C0E" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Üst Köşe Yumuşak Işık Yansıması -->
+    <!-- Üst Köşe Yumuşak Işık Yansıması (Beyaz Vurgu) -->
     <path
         android:pathData="M0,0 L76,0 L0,76 Z">
         <aapt:attr name="android:fillColor">
@@ -33,19 +33,31 @@
                 android:endX="45"
                 android:endY="45"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#33FFFFFF" />
+                <item android:offset="0.0" android:color="#18FFFFFF" />
                 <item android:offset="1.0" android:color="#00FFFFFF" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Dinamik Dalga / Diyagonal Işık Deseni -->
+    <!-- Dinamik Dalga / Diyagonal Karbon Dokusu -->
     <path
-        android:fillColor="#12FFFFFF"
+        android:fillColor="#08FFFFFF"
         android:pathData="M-5,45 L65,-5 L85,-5 L-5,85 Z" />
 
+    <!-- Sağ Alt Köşe: Sıcak & Canlı Kırmızı Ambiyans Parıltısı -->
     <path
-        android:fillColor="#0DFFFFFF"
-        android:pathData="M25,113 L113,25 L113,50 L50,113 Z" />
+        android:pathData="M35,108 L108,35 L108,108 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="108"
+                android:startY="108"
+                android:endX="55"
+                android:endY="55"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#24E50914" />
+                <item android:offset="1.0" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
 </vector>
