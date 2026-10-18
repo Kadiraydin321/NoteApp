@@ -1,7 +1,7 @@
 {
-  "versionCode": 6,
-  "versionName": "1.0.5",
-  "buildTime": 1792339205777,
+  "versionCode": 7,
+  "versionName": "1.0.6",
+  "buildTime": 1792340305227,
   "releaseDate": "18.10.2026",
-  "changeLog": "Sol menü için 5+ ögede otomatik akordiyon katlanma, kompakt inline daraltma ve Ayarlar'dan seçilebilir 4 farklı çekmece arayüz modu eklendi."
+  "changeLog": "Tasarım Stüdyosu sayfası eklendi: Canlı mini ekran simülasyonu, 5 hazır tasarım şablonu, kart köşe & derinlik stilleri ve buton konumu görsel özelleştirmeleri."
 }
