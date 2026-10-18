@@ -1,7 +1,7 @@
 {
-  "versionCode": 3,
-  "versionName": "1.0.2",
-  "buildTime": 1792333000942,
+  "versionCode": 4,
+  "versionName": "1.0.3",
+  "buildTime": 1792333431963,
   "releaseDate": "18.10.2026",
-  "changeLog": "Otomatik denetim, bilgilendirme popup penceresi ve kontrollü indirme onayı"
+  "changeLog": "Sevimli 3D Memoji karşılama ekranı, regex ve arama performansı optimizasyonları"
 }
