@@ -1,7 +1,7 @@
 {
-  "versionCode": 9,
-  "versionName": "1.0.8",
-  "buildTime": 1792342000000,
+  "versionCode": 10,
+  "versionName": "1.0.9",
+  "buildTime": 1792344000000,
   "releaseDate": "18.10.2026",
-  "changeLog": "Uygulama logosu kırmızı, siyah ve beyaz renkleriyle baştan aşağı sade ve modern olarak yeniden tasarlandı. Yükleme ekranındaki karakter kaldırılarak yeni şık logo ve modern ambiyans animasyonu yerleştirildi."
+  "changeLog": "Kapsamlı performans ve bellek optimizasyonu yapıldı: Liste kaydırma donmaları giderildi (donanım katmanı yükü kaldırıldı), Enum.entries ile gereksiz bellek tahsisleri sıfırlandı, güncelleme indirme ilerleme yayını sınırlandırılarak UI kasmaları önlendi ve önbellek temizleme mekanizması eklendi."
 }
