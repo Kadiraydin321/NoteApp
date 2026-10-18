@@ -22,6 +22,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
@@ -688,16 +695,43 @@ class MainActivity : FragmentActivity() {
 
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            Text(
-                                text = "😊",
-                                fontSize = 54.sp,
+                            Box(
+                                contentAlignment = Alignment.Center,
                                 modifier = Modifier.graphicsLayer {
                                     scaleX = bounceScale
                                     scaleY = bounceScale
                                 }
-                            )
+                            ) {
+                                // Yumuşak ışıltı / halo arka plan halkası
+                                Box(
+                                    modifier = Modifier
+                                        .size(126.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                            shape = CircleShape
+                                        )
+                                )
+                                Image(
+                                    painter = painterResource(id = R.drawable.memoji_welcome),
+                                    contentDescription = "Hoş Geldin Memoji",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(116.dp)
+                                        .clip(CircleShape)
+                                        .border(
+                                            width = 3.dp,
+                                            brush = Brush.linearGradient(
+                                                listOf(
+                                                    MaterialTheme.colorScheme.primary,
+                                                    MaterialTheme.colorScheme.tertiary
+                                                )
+                                            ),
+                                            shape = CircleShape
+                                        )
+                                )
+                            }
                             Text(
                                 text = "Not Defterim",
                                 style = MaterialTheme.typography.headlineMedium,
@@ -705,10 +739,10 @@ class MainActivity : FragmentActivity() {
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Tekrar hoş geldin!",
+                                text = "Tekrar hoş geldin! ✨",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f)
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
                             )
                         }
                     }

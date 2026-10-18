@@ -13,6 +13,7 @@ import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +22,16 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.noteapp.data.settings.AppSettings
+import com.example.noteapp.data.sync.DesktopSyncClient
+import com.example.noteapp.data.sync.SyncResult
 import javax.inject.Inject
+
+data class QuickSyncState(
+    val isOperating: Boolean = false,
+    val message: String? = null,
+    val isSuccess: Boolean? = null
+)
 
 enum class NotesViewMode {
     ALL,
@@ -50,6 +60,10 @@ enum class NoteSortOrder(val title: String) {
 
 private val hashtagRegex = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
 
+private val turkishCollator = java.text.Collator.getInstance(java.util.Locale("tr", "TR")).apply {
+    strength = java.text.Collator.PRIMARY
+}
+
 @Immutable
 data class NotesState(
     val notes: List<Note> = emptyList(),
@@ -70,8 +84,14 @@ data class NotesState(
 class NotesViewModel @Inject constructor(
     private val app: Application,
     private val repository: NoteRepository,
-    private val settingsManager: AppSettingsManager
+    private val settingsManager: AppSettingsManager,
+    private val desktopSyncClient: DesktopSyncClient
 ) : ViewModel() {
+
+    val settings: StateFlow<AppSettings> = settingsManager.settings
+
+    private val _quickSyncState = MutableStateFlow(QuickSyncState())
+    val quickSyncState: StateFlow<QuickSyncState> = _quickSyncState.asStateFlow()
 
     private val _state = MutableStateFlow(NotesState(layoutMode = settingsManager.settings.value.layoutMode))
     val state: StateFlow<NotesState> = _state.asStateFlow()
@@ -200,7 +220,7 @@ class NotesViewModel @Inject constructor(
 
     fun onSearchQueryChanged(query: String) {
         _state.value = _state.value.copy(searchQuery = query)
-        recalculateNotes()
+        recalculateNotes(debounce = query.isNotBlank())
     }
 
     fun onCategorySelect(category: Category?) {
@@ -228,15 +248,25 @@ class NotesViewModel @Inject constructor(
     }
 
     /** Run full-text matching, tag extraction, and sorting away from the UI thread. */
-    private fun recalculateNotes() {
+    private fun recalculateNotes(debounce: Boolean = false) {
         derivedNotesJob?.cancel()
         val snapshot = _state.value
         derivedNotesJob = viewModelScope.launch {
+            if (debounce) {
+                delay(120)
+            }
             val visibleNotes = withContext(Dispatchers.Default) {
+                val query = snapshot.searchQuery.trim()
+                val hasQuery = query.isNotEmpty()
+                val selectedTag = snapshot.selectedTag
+                val tagToken = if (selectedTag != null) "#$selectedTag" else null
+
                 val filtered = snapshot.notes.filter { note ->
-                    val matchesSearch = snapshot.searchQuery.isBlank() ||
-                            note.title.contains(snapshot.searchQuery, ignoreCase = true) ||
-                            note.content.contains(snapshot.searchQuery, ignoreCase = true)
+                    val matchesSearch = !hasQuery ||
+                            note.title.contains(query, ignoreCase = true) ||
+                            note.content.contains(query, ignoreCase = true)
+                    if (!matchesSearch) return@filter false
+
                     val matchesType = when (snapshot.filterType) {
                         NoteTypeFilter.ALL -> true
                         NoteTypeFilter.PINNED -> note.isPinned
@@ -245,15 +275,14 @@ class NotesViewModel @Inject constructor(
                         NoteTypeFilter.AUDIO -> note.attachments.any { it.endsWith(".mp4") || it.endsWith(".m4a") }
                         NoteTypeFilter.REMINDERS -> note.reminderTime != null && note.reminderTime > 0
                     }
-                    val matchesTag = snapshot.selectedTag == null ||
-                            note.content.contains("#${snapshot.selectedTag}", ignoreCase = true) ||
-                            note.title.contains("#${snapshot.selectedTag}", ignoreCase = true)
-                    matchesSearch && matchesType && matchesTag
+                    if (!matchesType) return@filter false
+
+                    val matchesTag = tagToken == null ||
+                            note.content.contains(tagToken, ignoreCase = true) ||
+                            note.title.contains(tagToken, ignoreCase = true)
+                    matchesTag
                 }
 
-                val turkishCollator = java.text.Collator.getInstance(java.util.Locale("tr", "TR")).apply {
-                    strength = java.text.Collator.PRIMARY
-                }
                 fun modifiedTime(note: Note): Long = when {
                     note.updatedAt > 0L -> note.updatedAt
                     note.timestamp > 0L -> note.timestamp
@@ -293,25 +322,31 @@ class NotesViewModel @Inject constructor(
     }
 
     private fun updateHashtagCache(notes: List<Note>) {
-        if (hashtagSourceNotes === notes) return
-        hashtagSourceNotes = notes
         hashtagsJob?.cancel()
         hashtagsJob = viewModelScope.launch {
             val tags = withContext(Dispatchers.Default) {
-                notes.flatMap { note ->
-                    hashtagRegex.findAll("${note.title} ${note.content}").map { it.groupValues[1] }
-                }.distinct().sorted()
+                val tagSet = LinkedHashSet<String>()
+                for (note in notes) {
+                    val combined = "${note.title} ${note.content}"
+                    if ('#' in combined) {
+                        for (match in hashtagRegex.findAll(combined)) {
+                            val clean = match.groupValues[1].trim()
+                            if (clean.isNotEmpty()) {
+                                tagSet.add(clean)
+                            }
+                        }
+                    }
+                }
+                tagSet.sortedWith(turkishCollator)
             }
-            if (_state.value.notes === notes) {
-                _state.value = _state.value.copy(allHashtags = tags)
-            }
+            _state.value = _state.value.copy(allHashtags = tags)
         }
     }
 
     fun extractAllHashtags(): List<String> {
         return _state.value.notes.flatMap { note ->
-            hashtagRegex.findAll("${note.title} ${note.content}").map { it.groupValues[1] }
-        }.distinct().sorted()
+            hashtagRegex.findAll("${note.title} ${note.content}").map { it.groupValues[1].trim() }
+        }.filter { it.isNotEmpty() }.distinct().sortedWith(turkishCollator)
     }
 
     // Çoklu Seçim Fonksiyonları
@@ -449,5 +484,80 @@ class NotesViewModel @Inject constructor(
         viewModelScope.launch {
             repository.deleteCategory(category)
         }
+    }
+
+    /**
+     * Ana ekrandan son kullanılan IP ve PIN ile doğrudan masaüstüne notları aktarır.
+     */
+    fun quickSyncSend() {
+        val host = settings.value.lastSyncHost
+        val pin = settings.value.lastSyncPin
+        if (host.isBlank() || pin.length != 4) {
+            _quickSyncState.value = QuickSyncState(
+                message = "Lütfen önce Ayarlar > Wi-Fi Senkronizasyonu'ndan bilgisayar IP ve PIN kodunu belirleyin.",
+                isSuccess = false
+            )
+            return
+        }
+        viewModelScope.launch {
+            _quickSyncState.value = QuickSyncState(isOperating = true)
+            val result = desktopSyncClient.sendNotesToDesktop(
+                hostOrUrl = host,
+                pin = pin,
+                clearExisting = false,
+                vaultPassword = settings.value.masterPin
+            )
+            when (result) {
+                is SyncResult.Success -> {
+                    _quickSyncState.value = QuickSyncState(isOperating = false, message = result.message, isSuccess = true)
+                }
+                is SyncResult.Error -> {
+                    _quickSyncState.value = QuickSyncState(isOperating = false, message = result.message, isSuccess = false)
+                }
+                is SyncResult.NeedsPassword -> {
+                    _quickSyncState.value = QuickSyncState(isOperating = false, message = result.message, isSuccess = false)
+                }
+            }
+        }
+    }
+
+    /**
+     * Ana ekrandan son kullanılan IP ve PIN ile doğrudan masaüstünden notları çeker.
+     */
+    fun quickSyncPull() {
+        val host = settings.value.lastSyncHost
+        val pin = settings.value.lastSyncPin
+        if (host.isBlank() || pin.length != 4) {
+            _quickSyncState.value = QuickSyncState(
+                message = "Lütfen önce Ayarlar > Wi-Fi Senkronizasyonu'ndan bilgisayar IP ve PIN kodunu belirleyin.",
+                isSuccess = false
+            )
+            return
+        }
+        viewModelScope.launch {
+            _quickSyncState.value = QuickSyncState(isOperating = true)
+            val result = desktopSyncClient.pullNotesFromDesktop(
+                hostOrUrl = host,
+                pin = pin,
+                clearExisting = false,
+                vaultPassword = settings.value.masterPin
+            )
+            when (result) {
+                is SyncResult.Success -> {
+                    NotesWidgetProvider.updateAllWidgets(app)
+                    _quickSyncState.value = QuickSyncState(isOperating = false, message = result.message, isSuccess = true)
+                }
+                is SyncResult.Error -> {
+                    _quickSyncState.value = QuickSyncState(isOperating = false, message = result.message, isSuccess = false)
+                }
+                is SyncResult.NeedsPassword -> {
+                    _quickSyncState.value = QuickSyncState(isOperating = false, message = result.message, isSuccess = false)
+                }
+            }
+        }
+    }
+
+    fun dismissQuickSyncMessage() {
+        _quickSyncState.value = QuickSyncState()
     }
 }

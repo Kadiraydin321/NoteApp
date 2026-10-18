@@ -35,6 +35,8 @@ import java.util.ArrayDeque
 import javax.inject.Inject
 
 private val emptyChecklistLineRegex = Regex("^(?:[-*+]\\s*)?\\[[ xX]?\\]\\s*$")
+private val WIKILINK_REGEX = Regex("\\[\\[([^\\]]+)\\]\\]")
+private val HASHTAG_REGEX = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
 
 private fun String.isEffectivelyBlankNoteContent(): Boolean =
     lineSequence().all { line -> line.isBlank() || emptyChecklistLineRegex.matches(line.trim()) }
@@ -399,13 +401,11 @@ class NoteDetailViewModel @Inject constructor(
     }
 
     fun extractWikilinks(content: String): List<String> {
-        val regex = Regex("\\[\\[([^\\]]+)\\]\\]")
-        return regex.findAll(content).map { it.groupValues[1].trim() }.distinct().toList()
+        return WIKILINK_REGEX.findAll(content).map { it.groupValues[1].trim() }.distinct().toList()
     }
 
     fun extractHashtags(content: String): List<String> {
-        val regex = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
-        return regex.findAll(content).map { it.groupValues[1] }.distinct().toList()
+        return HASHTAG_REGEX.findAll(content).map { it.groupValues[1] }.distinct().toList()
     }
 
     fun refreshBacklinks() {
