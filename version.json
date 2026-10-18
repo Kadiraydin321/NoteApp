@@ -1,7 +1,7 @@
 {
   "versionCode": 3,
   "versionName": "1.0.2",
-  "buildTime": 1792329171891,
+  "buildTime": 1792333000942,
   "releaseDate": "18.10.2026",
-  "changeLog": "Otomatik güncelleme denetimi, Detay popup penceresi ve internet bağlantısı uyarısı"
+  "changeLog": "Otomatik denetim, bilgilendirme popup penceresi ve kontrollü indirme onayı"
 }
