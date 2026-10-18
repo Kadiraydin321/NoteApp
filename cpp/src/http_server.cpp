@@ -143,16 +143,29 @@ static std::string json_escape(const std::string& s) {
 
 void HttpServer::handle_client(uintptr_t client_socket) {
     SOCKET sock = static_cast<SOCKET>(client_socket);
-    std::vector<char> req_buf(16384, 0);
-    int received = recv(sock, req_buf.data(), static_cast<int>(req_buf.size()) - 1, 0);
 
-    if (received <= 0) {
+    // 1. Read HTTP headers until \r\n\r\n
+    std::string req;
+    char buffer[4096];
+    size_t header_end = std::string::npos;
+
+    while (header_end == std::string::npos) {
+        int bytes = recv(sock, buffer, sizeof(buffer), 0);
+        if (bytes <= 0) break;
+        req.append(buffer, bytes);
+        header_end = req.find("\r\n\r\n");
+        if (req.size() > 65536) break;
+    }
+
+    if (header_end == std::string::npos) {
         closesocket(sock);
         return;
     }
 
-    std::string req(req_buf.data(), received);
-    std::istringstream req_stream(req);
+    std::string header_str = req.substr(0, header_end);
+    std::string body = req.substr(header_end + 4);
+
+    std::istringstream req_stream(header_str);
     std::string method, full_path, http_ver;
     req_stream >> method >> full_path >> http_ver;
 
@@ -164,11 +177,28 @@ void HttpServer::handle_client(uintptr_t client_socket) {
         query = full_path.substr(q_pos + 1);
     }
 
-    // Extract body if any
-    std::string body;
-    size_t body_pos = req.find("\r\n\r\n");
-    if (body_pos != std::string::npos) {
-        body = req.substr(body_pos + 4);
+    // 2. Parse Content-Length and read full body
+    size_t content_length = 0;
+    size_t cl_pos = header_str.find("Content-Length:");
+    if (cl_pos == std::string::npos) cl_pos = header_str.find("content-length:");
+    if (cl_pos != std::string::npos) {
+        size_t end_line = header_str.find("\r\n", cl_pos);
+        std::string cl_val = header_str.substr(cl_pos + 15, end_line - (cl_pos + 15));
+        try {
+            content_length = std::stoull(cl_val);
+        } catch (...) {}
+    }
+
+    if (header_str.find("100-continue") != std::string::npos || header_str.find("100-Continue") != std::string::npos) {
+        const char* resp_100 = "HTTP/1.1 100 Continue\r\n\r\n";
+        send(sock, resp_100, static_cast<int>(strlen(resp_100)), 0);
+    }
+
+    while (body.size() < content_length) {
+        int bytes_to_read = static_cast<int>((std::min<size_t>)(sizeof(buffer), content_length - body.size()));
+        int bytes = recv(sock, buffer, bytes_to_read, 0);
+        if (bytes <= 0) break;
+        body.append(buffer, bytes);
     }
 
     std::string content_type = "application/json; charset=utf-8";
@@ -266,6 +296,8 @@ void HttpServer::handle_client(uintptr_t client_socket) {
             ss << "    \"sourcePath\": \"" << json_escape(f.source_path) << "\",\n";
             ss << "    \"originalPath\": \"" << json_escape(f.original_path) << "\",\n";
             ss << "    \"isRecycleBin\": " << (f.is_recycle_bin ? "true" : "false") << ",\n";
+            ss << "    \"isRecoverable\": " << (f.is_recoverable ? "true" : "false") << ",\n";
+            ss << "    \"statusLabel\": \"" << json_escape(f.status_label) << "\",\n";
             ss << "    \"previewSnippet\": \"" << json_escape(f.preview_snippet) << "\"\n";
             ss << "  }" << (i + 1 < files.size() ? "," : "") << "\n";
         }
@@ -323,13 +355,25 @@ void HttpServer::handle_client(uintptr_t client_socket) {
                 while ((p = list_str.find('"', p)) != std::string::npos) {
                     size_t p2 = list_str.find('"', p + 1);
                     if (p2 == std::string::npos) break;
-                    file_ids.push_back(list_str.substr(p + 1, p2 - p - 1));
+                    std::string id_val = list_str.substr(p + 1, p2 - p - 1);
+                    if (!id_val.empty()) file_ids.push_back(id_val);
                     p = p2 + 1;
+                }
+            } else {
+                // Single string fallback
+                size_t colon = body.find(':', fi);
+                size_t q1 = body.find('"', colon);
+                size_t q2 = body.find('"', q1 + 1);
+                if (q1 != std::string::npos && q2 != std::string::npos) {
+                    file_ids.push_back(body.substr(q1 + 1, q2 - q1 - 1));
                 }
             }
         }
 
+        std::cout << "[+] /api/recover cagrildi. Hedef: " << dest_dir << " Dosya adedi: " << file_ids.size() << "\n";
         RecoveryResult res = engine_.recover_files(file_ids, dest_dir);
+        std::cout << "[+] Kurtarma sonucu: " << res.recovered_count << " basarili, " << res.failed_count << " basarisiz.\n";
+
         std::ostringstream ss;
         ss << "{\n";
         ss << "  \"success\": " << (res.success ? "true" : "false") << ",\n";

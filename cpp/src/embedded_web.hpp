@@ -893,6 +893,11 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
       }
 
       try {
+        if (isScanning) {
+          await fetch('/api/scan/stop', { method: 'POST' });
+          await new Promise(r => setTimeout(r, 300));
+        }
+
         const res = await fetch('/api/scan/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1031,10 +1036,15 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
 
       filesTableBody.innerHTML = filtered.map(f => {
         const isChecked = selectedFileIds.has(f.id) ? 'checked' : '';
+        const canRecover = f.isRecoverable !== false && f.confidence > 0;
+        const statusBadge = canRecover 
+          ? `<span style="font-size: 10px; font-weight: 700; background: rgba(16,185,129,0.15); color: var(--accent); padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(16,185,129,0.3);">%${f.confidence || 100} ${f.statusLabel || 'Kurtarılabilir'}</span>`
+          : `<span style="font-size: 10px; font-weight: 700; background: rgba(239,68,68,0.15); color: #fca5a5; padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(239,68,68,0.3);">${f.statusLabel || 'Veri Yok'}</span>`;
+
         return `
-          <tr>
-            <td><input type="checkbox" class="file-chk" data-id="${f.id}" ${isChecked} onchange="toggleSelect('${f.id}')"></td>
-            <td><span class="type-pill type-${f.type.toLowerCase()}">${f.type.toUpperCase()}</span></td>
+          <tr style="${canRecover ? '' : 'opacity: 0.7;'}">
+            <td><input type="checkbox" class="file-chk" data-id="${f.id}" ${isChecked} ${canRecover ? '' : 'disabled'} onchange="toggleSelect('${f.id}')"></td>
+            <td><span class="type-pill type-${(f.type || 'bin').toLowerCase()}">${(f.type || 'BIN').toUpperCase()}</span></td>
             <td>
               <div class="file-name-cell">
                 <span class="file-name">${escapeHtml(f.name)}</span>
@@ -1043,10 +1053,10 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
             </td>
             <td><strong>${f.sizeHuman || formatBytes(f.sizeBytes)}</strong></td>
             <td><span style="font-family: var(--font-mono); color: var(--accent-blue); font-size: 11px;">${f.hexOffset}</span></td>
-            <td><span style="color: var(--accent); font-weight: 600;">%${f.confidence || 95}</span></td>
+            <td>${statusBadge}</td>
             <td style="text-align: right;">
               <button class="btn btn-secondary btn-sm" onclick="showHexModal('${f.id}')">Hex İncele</button>
-              <button class="btn btn-primary btn-sm" onclick="recoverSingle('${f.id}')">Kurtar</button>
+              <button class="btn btn-primary btn-sm" onclick="recoverSingle('${f.id}')" ${canRecover ? '' : 'disabled title="Bu dosyanın verisi diskten temizlenmiş"'}>Kurtar</button>
             </td>
           </tr>
         `;
@@ -1061,7 +1071,11 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
 
     selectAllCheckbox.onchange = () => {
       if (selectAllCheckbox.checked) {
-        allFiles.forEach(f => selectedFileIds.add(f.id));
+        allFiles.forEach(f => {
+          if (f.isRecoverable !== false && f.confidence > 0) {
+            selectedFileIds.add(f.id);
+          }
+        });
       } else {
         selectedFileIds.clear();
       }
@@ -1133,6 +1147,10 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
     };
 
     async function executeRecovery(fileIds) {
+      if (!fileIds || fileIds.length === 0) {
+        showToast('Kurtarılacak dosya seçilmedi', 'warning');
+        return;
+      }
       showToast(`${fileIds.length} dosya kurtarılıyor -> ${destDir}...`, 'info');
       try {
         const res = await fetch('/api/recover', {
@@ -1141,10 +1159,12 @@ const char EMBEDDED_INDEX_HTML[] = R"html(
           body: JSON.stringify({ fileIds, destDir })
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.success && data.recoveredCount > 0) {
           showToast(`✅ ${data.recoveredCount} dosya başarıyla kurtarıldı! (${destDir})`, 'success');
+        } else if (data.failedCount > 0 && data.recoveredCount === 0) {
+          showToast(`⚠️ Seçilen dosyanın içeriği diskten temizlenmiş / üzerine yazılmış.`, 'error');
         } else {
-          showToast(`Hata: ${data.error || 'Kurtarılamadı'}`, 'error');
+          showToast(`Kurtarılamadı: ${data.error || '0 dosya kurtarıldı'}`, 'error');
         }
       } catch (err) {
         showToast('Kurtarma hatası: ' + err.message, 'error');

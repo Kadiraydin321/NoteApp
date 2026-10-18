@@ -38,6 +38,8 @@ struct FoundFile {
     std::string source_path;
     std::string original_path;
     bool is_recycle_bin = false;
+    bool is_recoverable = true;
+    std::string status_label = "Kurtarılabilir";
     std::string preview_snippet;
     uint64_t timestamp = 0;
 };
@@ -112,7 +114,7 @@ private:
     void run_scan_worker(ScanOptions options);
     void scan_directory_recursive(const std::string& dir_path, const ScanOptions& options, uint64_t& scanned_acc);
     void scan_file_carving(const std::string& file_path, const ScanOptions& options, uint64_t& scanned_acc);
-    void parse_recycle_bin_item(const std::string& i_file_path, const std::string& current_dir);
+    void parse_recycle_bin_item(const std::string& i_file_path, const std::string& current_dir, const std::string& target_scope);
 
     std::vector<FileSignature> signatures_;
     std::vector<FoundFile> found_files_;

@@ -204,30 +204,35 @@ void CarverEngine::run_scan_worker(ScanOptions options) {
 
     try {
         fs::path p(options.source_path);
-        if (!fs::exists(p)) {
-            std::lock_guard<std::mutex> lock(stats_mutex_);
-            stats_.status = "error";
-            stats_.error_message = "Hedef yol bulunamadı: " + options.source_path;
-            is_running_.store(false);
-            return;
+
+        // 1. Identify drives to check for Recycle Bin deleted files
+        std::vector<std::string> drives_to_check;
+        std::string root = p.root_name().string();
+        if (root.empty() && options.source_path.size() >= 2 && options.source_path[1] == ':') {
+            root = options.source_path.substr(0, 2);
+        }
+        if (!root.empty()) {
+            drives_to_check.push_back(root);
+        } else {
+            drives_to_check.push_back("C:");
+            drives_to_check.push_back("D:");
         }
 
-        if (fs::is_directory(p)) {
-            scan_directory_recursive(options.source_path, options, scanned_acc);
+        for (const auto& d : drives_to_check) {
+            std::string rec_path = d + "\\$Recycle.Bin";
+            std::error_code ec;
+            if (fs::exists(rec_path, ec)) {
+                scan_directory_recursive(rec_path, options, scanned_acc);
+            }
+        }
 
-            // Also check Windows Recycle Bin for files deleted from this directory/volume
-            std::string root = p.root_name().string();
-            if (root.empty() && options.source_path.size() >= 2 && options.source_path[1] == ':') {
-                root = options.source_path.substr(0, 2);
-            }
-            if (!root.empty()) {
-                std::string recycle_path = root + "\\$Recycle.Bin";
-                if (fs::exists(recycle_path) && options.source_path.find("$Recycle.Bin") == std::string::npos && options.source_path.find("$RECYCLE.BIN") == std::string::npos) {
-                    scan_directory_recursive(recycle_path, options, scanned_acc);
-                }
-            }
-        } else {
-            // Single disk image or file carving
+        // 2. Scan the source directory itself if it is not the Recycle Bin
+        if (fs::exists(p) && fs::is_directory(p) &&
+            options.source_path.find("$Recycle.Bin") == std::string::npos &&
+            options.source_path.find("$RECYCLE.BIN") == std::string::npos) {
+            scan_directory_recursive(options.source_path, options, scanned_acc);
+        } else if (fs::exists(p) && fs::is_regular_file(p)) {
+            // Raw carve disk image or single container file
             scan_file_carving(options.source_path, options, scanned_acc);
         }
 
@@ -235,6 +240,10 @@ void CarverEngine::run_scan_worker(ScanOptions options) {
         if (!should_stop_.load()) {
             stats_.status = "completed";
             stats_.percentage = 100;
+            {
+                std::lock_guard<std::mutex> flock(files_mutex_);
+                stats_.files_found = found_files_.size();
+            }
         }
     } catch (const std::exception& ex) {
         std::lock_guard<std::mutex> lock(stats_mutex_);
@@ -251,6 +260,8 @@ void CarverEngine::scan_directory_recursive(const std::string& dir_path, const S
 
     auto start_time = std::chrono::steady_clock::now();
     uint64_t last_stat_update = 0;
+
+    bool is_recycle_bin_dir = (dir_path.find("$Recycle.Bin") != std::string::npos || dir_path.find("$RECYCLE.BIN") != std::string::npos);
 
     while (!dir_queue.empty() && !should_stop_.load()) {
         while (is_paused_.load() && !should_stop_.load()) {
@@ -272,28 +283,61 @@ void CarverEngine::scan_directory_recursive(const std::string& dir_path, const S
             std::string filename = entry.path().filename().string();
 
             if (entry.is_directory(ec)) {
-                // Avoid recursive loops or huge node_modules
-                if (filename != "node_modules" && filename != ".git" && filename != "$RECYCLE.BIN" && dir_queue.size() < 10000) {
-                    dir_queue.push_back(path_str);
-                } else if (filename == "$RECYCLE.BIN" || filename == "$Recycle.Bin") {
+                // Avoid recursive loops or huge unrelated folders
+                if (filename != "node_modules" && filename != ".git" && filename != "AppData" && dir_queue.size() < 2000) {
                     dir_queue.push_back(path_str);
                 }
             } else if (entry.is_regular_file(ec)) {
                 uint64_t file_size = entry.file_size(ec);
                 scanned_acc += file_size;
 
-                // Check for Windows Recycle Bin Metadata File ($I...)
-                if (filename.rfind("$I", 0) == 0 && file_size >= 28) {
-                    parse_recycle_bin_item(path_str, current);
+                if (is_recycle_bin_dir || current.find("$Recycle.Bin") != std::string::npos || current.find("$RECYCLE.BIN") != std::string::npos) {
+                    // Check for Windows Recycle Bin Metadata File ($I...)
+                    if (filename.rfind("$I", 0) == 0 && file_size >= 28) {
+                        parse_recycle_bin_item(path_str, current, options.source_path);
+                    }
+                    // Do not carve random binaries or $R files inside Recycle Bin
                 } else {
-                    // Quick inspection or carving
-                    scan_file_carving(path_str, options, scanned_acc);
+                    // In user directory: check for temporary, backup, or autosaved versions of deleted files
+                    if (filename.rfind("~$", 0) == 0 || filename.rfind(".~", 0) == 0 ||
+                        filename.rfind(".tmp") != std::string::npos || filename.rfind(".bak") != std::string::npos) {
+                        FoundFile item;
+                        item.id = "tmp_" + std::to_string(found_files_.size());
+                        item.name = filename;
+                        item.display_name = filename;
+                        item.type = entry.path().extension().string();
+                        if (!item.type.empty() && item.type[0] == '.') item.type = item.type.substr(1);
+                        item.category = "documents";
+                        item.size_bytes = file_size;
+                        item.size_human = format_size(file_size);
+                        item.offset = 0;
+                        item.hex_offset = "0x00000000";
+                        item.confidence = 90;
+                        item.source_path = path_str;
+                        item.original_path = path_str;
+                        item.is_recycle_bin = false;
+                        item.is_recoverable = true;
+                        item.status_label = "Yedek / Geçici Dosya";
+                        item.preview_snippet = "Gölge/Yedek Dosya: " + path_str;
+                        item.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                        {
+                            std::lock_guard<std::mutex> lock(files_mutex_);
+                            found_files_.push_back(item);
+                        }
+                    } else if (options.deep_carve) {
+                        // Only carve if the file is an actual disk image or archive container
+                        std::string ext = entry.path().extension().string();
+                        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                        if (ext == ".img" || ext == ".bin" || ext == ".iso" || ext == ".vhd" || ext == ".dd") {
+                            scan_file_carving(path_str, options, scanned_acc);
+                        }
+                    }
                 }
 
                 // Update real-time stats
                 auto now = std::chrono::steady_clock::now();
                 auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-                if (elapsed_ms - last_stat_update > 200) {
+                if (elapsed_ms - last_stat_update > 150) {
                     last_stat_update = elapsed_ms;
                     double sec = elapsed_ms / 1000.0;
                     double mb = scanned_acc / (1024.0 * 1024.0);
@@ -312,31 +356,44 @@ void CarverEngine::scan_directory_recursive(const std::string& dir_path, const S
     }
 }
 
-void CarverEngine::parse_recycle_bin_item(const std::string& i_file_path, const std::string& current_dir) {
+void CarverEngine::parse_recycle_bin_item(const std::string& i_file_path, const std::string& current_dir, const std::string& target_scope) {
     try {
+        std::vector<uint8_t> buf;
+#ifdef _WIN32
+        HANDLE hFile = CreateFileA(i_file_path.c_str(), GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) return;
+        DWORD fSize = GetFileSize(hFile, NULL);
+        if (fSize < 28 || fSize > 65536) { CloseHandle(hFile); return; }
+        buf.resize(fSize);
+        DWORD bytesRead = 0;
+        ReadFile(hFile, buf.data(), fSize, &bytesRead, NULL);
+        CloseHandle(hFile);
+        if (bytesRead < 28) return;
+#else
         std::ifstream f(i_file_path, std::ios::binary);
         if (!f.is_open()) return;
-
         f.seekg(0, std::ios::end);
         size_t size = f.tellg();
         f.seekg(0, std::ios::beg);
         if (size < 28) return;
-
-        std::vector<uint8_t> buf(size);
+        buf.resize(size);
         f.read(reinterpret_cast<char*>(buf.data()), size);
+#endif
 
+        uint64_t ver = *reinterpret_cast<uint64_t*>(&buf[0]);
         uint64_t orig_size = *reinterpret_cast<uint64_t*>(&buf[8]);
-        uint32_t path_len = *reinterpret_cast<uint32_t*>(&buf[24]);
 
         std::string orig_path;
-        if (size >= 28 + path_len * 2) {
-            const uint8_t* u16 = &buf[28];
-            for (uint32_t i = 0; i < path_len && (28 + i * 2 + 1) < size; ++i) {
+        if (ver == 1 && buf.size() >= 544) {
+            // Windows Vista/7/8 format: 260 UTF-16 characters at offset 24
+            const uint8_t* u16 = &buf[24];
+            for (size_t i = 0; i < 260 && (24 + i * 2 + 1) < buf.size(); ++i) {
                 uint16_t ch = static_cast<uint16_t>(u16[i * 2]) | (static_cast<uint16_t>(u16[i * 2 + 1]) << 8);
                 if (ch == 0) break;
-                if (ch < 0x80) {
-                    orig_path.push_back(static_cast<char>(ch));
-                } else if (ch < 0x800) {
+                if (ch < 0x80) orig_path.push_back(static_cast<char>(ch));
+                else if (ch < 0x800) {
                     orig_path.push_back(static_cast<char>(0xC0 | (ch >> 6)));
                     orig_path.push_back(static_cast<char>(0x80 | (ch & 0x3F)));
                 } else {
@@ -345,14 +402,83 @@ void CarverEngine::parse_recycle_bin_item(const std::string& i_file_path, const 
                     orig_path.push_back(static_cast<char>(0x80 | (ch & 0x3F)));
                 }
             }
+        } else {
+            // Windows 10/11 format: uint32 path_len at offset 24, UTF-16 path at offset 28
+            uint32_t path_len = *reinterpret_cast<uint32_t*>(&buf[24]);
+            if (buf.size() >= 28 + path_len * 2) {
+                const uint8_t* u16 = &buf[28];
+                for (uint32_t i = 0; i < path_len && (28 + i * 2 + 1) < buf.size(); ++i) {
+                    uint16_t ch = static_cast<uint16_t>(u16[i * 2]) | (static_cast<uint16_t>(u16[i * 2 + 1]) << 8);
+                    if (ch == 0) break;
+                    if (ch < 0x80) orig_path.push_back(static_cast<char>(ch));
+                    else if (ch < 0x800) {
+                        orig_path.push_back(static_cast<char>(0xC0 | (ch >> 6)));
+                        orig_path.push_back(static_cast<char>(0x80 | (ch & 0x3F)));
+                    } else {
+                        orig_path.push_back(static_cast<char>(0xE0 | (ch >> 12)));
+                        orig_path.push_back(static_cast<char>(0x80 | ((ch >> 6) & 0x3F)));
+                        orig_path.push_back(static_cast<char>(0x80 | (ch & 0x3F)));
+                    }
+                }
+            }
+        }
+
+        // Scope filter: if target_scope is a specific folder, check if orig_path belongs to it
+        if (!target_scope.empty()) {
+            std::string s_scope = target_scope;
+            std::string s_orig = orig_path;
+            std::transform(s_scope.begin(), s_scope.end(), s_scope.begin(), ::tolower);
+            std::transform(s_orig.begin(), s_orig.end(), s_orig.begin(), ::tolower);
+            std::replace(s_scope.begin(), s_scope.end(), '/', '\\');
+            std::replace(s_orig.begin(), s_orig.end(), '/', '\\');
+
+            while (!s_scope.empty() && s_scope.back() == '\\') {
+                s_scope.pop_back();
+            }
+
+            bool is_drive_root = (s_scope.size() <= 3 && s_scope.find(':') != std::string::npos);
+            bool is_recycle_bin = (s_scope.find("recycle.bin") != std::string::npos);
+
+            if (!is_drive_root && !is_recycle_bin) {
+                // If not in this directory or subdirectories, skip
+                if (s_orig != s_scope && s_orig.rfind(s_scope + "\\", 0) != 0) {
+                    return;
+                }
+            }
         }
 
         fs::path p(i_file_path);
         std::string i_name = p.filename().string();
         std::string r_name = "$R" + i_name.substr(2);
         fs::path r_path = fs::path(current_dir) / r_name;
+        std::string r_str = r_path.string();
 
-        bool has_data_file = fs::exists(r_path);
+        bool has_data_file = false;
+        uint64_t r_file_size = 0;
+
+#ifdef _WIN32
+        DWORD r_attrs = GetFileAttributesA(r_str.c_str());
+        if (r_attrs != INVALID_FILE_ATTRIBUTES) {
+            has_data_file = true;
+            HANDLE hR = CreateFileA(r_str.c_str(), GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+            if (hR != INVALID_HANDLE_VALUE) {
+                LARGE_INTEGER li;
+                if (GetFileSizeEx(hR, &li)) {
+                    r_file_size = static_cast<uint64_t>(li.QuadPart);
+                }
+                CloseHandle(hR);
+            }
+        }
+#else
+        std::error_code ec_r;
+        has_data_file = fs::exists(r_path, ec_r);
+        if (has_data_file && !ec_r) {
+            r_file_size = fs::file_size(r_path, ec_r);
+        }
+#endif
+
         std::string final_name = fs::path(orig_path).filename().string();
         if (final_name.empty()) final_name = "silinen_" + i_name;
 
@@ -368,26 +494,45 @@ void CarverEngine::parse_recycle_bin_item(const std::string& i_file_path, const 
         else if (ext_lower == "zip" || ext_lower == "rar" || ext_lower == "7z" || ext_lower == "tar" || ext_lower == "gz") cat = "archives";
         else if (ext_lower == "txt" || ext_lower == "pdf" || ext_lower == "docx" || ext_lower == "xlsx" || ext_lower == "pptx" || ext_lower == "csv" || ext_lower == "json" || ext_lower == "md") cat = "documents";
 
+        uint64_t final_size = (has_data_file && r_file_size > 0) ? r_file_size : orig_size;
+
         FoundFile item;
-        item.id = "file_" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + "_" + std::to_string(found_files_.size());
+        item.id = "rec_" + i_name;
         item.name = final_name;
         item.display_name = final_name;
         item.type = ext.empty() ? "bin" : ext;
         item.category = cat;
-        item.size_bytes = has_data_file ? fs::file_size(r_path) : orig_size;
+        item.size_bytes = final_size;
         item.size_human = format_size(item.size_bytes);
         item.offset = 0;
-        item.hex_offset = to_hex_string(item.offset);
-        item.confidence = 98;
-        item.source_path = has_data_file ? r_path.string() : i_file_path;
-        item.original_path = orig_path;
+        item.hex_offset = "0x00000000";
         item.is_recycle_bin = true;
+        item.original_path = orig_path;
         item.preview_snippet = "Orijinal Konum: " + orig_path;
         item.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
+        if (has_data_file) {
+            item.confidence = 100;
+            item.is_recoverable = true;
+            item.status_label = "%100 Kurtarılabilir";
+            item.source_path = r_str;
+        } else {
+            item.confidence = 0;
+            item.is_recoverable = false;
+            item.status_label = "Veri Üzerine Yazılmış";
+            item.source_path = "";
+        }
+
         {
             std::lock_guard<std::mutex> lock(files_mutex_);
-            found_files_.push_back(item);
+            // Avoid duplicate additions
+            bool exists_already = false;
+            for (const auto& existing : found_files_) {
+                if (existing.id == item.id) { exists_already = true; break; }
+            }
+            if (!exists_already) {
+                found_files_.push_back(item);
+            }
         }
     } catch (...) {}
 }
@@ -498,20 +643,41 @@ std::string CarverEngine::get_hex_dump(const std::string& file_id, size_t length
         }
     }
     if (!found) return "Dosya bulunamadı.";
+    if (target.source_path.empty()) return "Veri üzerine yazılmış (Yalnızca metaveri mevcut).";
 
-    std::ifstream file(target.source_path, std::ios::binary);
-    if (!file.is_open()) return "Kaynak dosya açılamadı: " + target.source_path;
-
-    file.seekg(target.offset);
     std::vector<uint8_t> buf(length);
-    file.read(reinterpret_cast<char*>(buf.data()), length);
-    size_t bytes_read = file.gcount();
+    size_t bytes_read = 0;
+
+#ifdef _WIN32
+    HANDLE hFile = CreateFileA(target.source_path.c_str(), GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        if (target.offset > 0) {
+            LARGE_INTEGER li;
+            li.QuadPart = target.offset;
+            SetFilePointerEx(hFile, li, NULL, FILE_BEGIN);
+        }
+        DWORD read_dw = 0;
+        ReadFile(hFile, buf.data(), static_cast<DWORD>(length), &read_dw, NULL);
+        bytes_read = read_dw;
+        CloseHandle(hFile);
+    }
+#else
+    std::ifstream file(target.source_path, std::ios::binary);
+    if (file.is_open()) {
+        file.seekg(target.offset);
+        file.read(reinterpret_cast<char*>(buf.data()), length);
+        bytes_read = file.gcount();
+    }
+#endif
+
+    if (bytes_read == 0) return "Kaynak dosya okunamadı: " + target.source_path;
 
     std::ostringstream ss;
     for (size_t i = 0; i < bytes_read; i += 16) {
         ss << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << (target.offset + i) << "  ";
 
-        // Hex bytes
         for (size_t j = 0; j < 16; ++j) {
             if (i + j < bytes_read) {
                 ss << std::uppercase << std::setfill('0') << std::setw(2) << std::hex << static_cast<int>(buf[i + j]) << " ";
@@ -522,7 +688,6 @@ std::string CarverEngine::get_hex_dump(const std::string& file_id, size_t length
         }
 
         ss << " |";
-        // ASCII printable
         for (size_t j = 0; j < 16; ++j) {
             if (i + j < bytes_read) {
                 uint8_t c = buf[i + j];
@@ -587,23 +752,44 @@ PreviewData CarverEngine::get_file_preview(const std::string& file_id) {
     }
 
     prev.hex = get_hex_dump(file_id, 256);
+    if (target.source_path.empty()) {
+        prev.type = "text";
+        prev.data = "Bu dosyanın asıl içeriği üzerine yazılmış veya temizlenmiş. Yalnızca metaveri kaydı kurtarıldı.";
+        return prev;
+    }
 
     std::string ext = target.type;
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
-    std::ifstream file(target.source_path, std::ios::binary);
-    if (!file.is_open()) {
-        prev.type = "text";
-        return prev;
-    }
-
-    file.seekg(target.offset);
-    size_t preview_len = static_cast<size_t>(std::min<uint64_t>(target.size_bytes, 4 * 1024 * 1024)); // max 4MB preview
+    size_t preview_len = static_cast<size_t>(std::min<uint64_t>(target.size_bytes, 4 * 1024 * 1024));
     if (preview_len == 0) preview_len = 64 * 1024;
-
     std::vector<uint8_t> buf(preview_len);
-    file.read(reinterpret_cast<char*>(buf.data()), preview_len);
-    size_t bytes_read = file.gcount();
+    size_t bytes_read = 0;
+
+#ifdef _WIN32
+    HANDLE hFile = CreateFileA(target.source_path.c_str(), GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        if (target.offset > 0) {
+            LARGE_INTEGER li;
+            li.QuadPart = target.offset;
+            SetFilePointerEx(hFile, li, NULL, FILE_BEGIN);
+        }
+        DWORD read_dw = 0;
+        ReadFile(hFile, buf.data(), static_cast<DWORD>(preview_len), &read_dw, NULL);
+        bytes_read = read_dw;
+        CloseHandle(hFile);
+    }
+#else
+    std::ifstream file(target.source_path, std::ios::binary);
+    if (file.is_open()) {
+        file.seekg(target.offset);
+        file.read(reinterpret_cast<char*>(buf.data()), preview_len);
+        bytes_read = file.gcount();
+    }
+#endif
+
     buf.resize(bytes_read);
 
     if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" || ext == "webp") {
@@ -650,42 +836,91 @@ RecoveryResult CarverEngine::recover_files(const std::vector<std::string>& file_
             }
         }
 
+        std::cout << "[CarverEngine::recover_files] to_recover eleman sayisi: " << to_recover.size() << "\n";
+
         for (const auto& item : to_recover) {
-            std::ifstream in(item.source_path, std::ios::binary);
-            if (!in.is_open()) {
+            if (item.source_path.empty() || !item.is_recoverable) {
+                std::cout << "[-] Dosya atlandi (veri yok): " << item.name << "\n";
                 res.failed_count++;
                 continue;
             }
 
             fs::path out_path = dest / item.name;
-            // Avoid collisions
             int counter = 1;
-            while (fs::exists(out_path)) {
+            std::error_code ec_out;
+            while (fs::exists(out_path, ec_out)) {
                 std::string stem = fs::path(item.name).stem().string();
                 std::string ext = fs::path(item.name).extension().string();
                 out_path = dest / (stem + "_" + std::to_string(counter++) + ext);
             }
 
-            std::ofstream out(out_path, std::ios::binary);
-            if (!out.is_open()) {
+            bool write_ok = false;
+#ifdef _WIN32
+            HANDLE hIn = CreateFileA(item.source_path.c_str(), GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+
+            if (hIn != INVALID_HANDLE_VALUE) {
+                if (item.offset > 0) {
+                    LARGE_INTEGER li;
+                    li.QuadPart = item.offset;
+                    SetFilePointerEx(hIn, li, NULL, FILE_BEGIN);
+                }
+
+                HANDLE hOut = CreateFileA(out_path.string().c_str(), GENERIC_WRITE,
+                    FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+                if (hOut != INVALID_HANDLE_VALUE) {
+                    DWORD to_read = static_cast<DWORD>(item.size_bytes);
+                    DWORD total_written = 0;
+                    std::vector<char> buf(64 * 1024);
+
+                    while (total_written < to_read) {
+                        DWORD chunk = (std::min)(static_cast<DWORD>(buf.size()), to_read - total_written);
+                        DWORD bytes_read = 0;
+                        if (!ReadFile(hIn, buf.data(), chunk, &bytes_read, NULL) || bytes_read == 0) {
+                            break;
+                        }
+                        DWORD bytes_written = 0;
+                        if (!WriteFile(hOut, buf.data(), bytes_read, &bytes_written, NULL) || bytes_written == 0) {
+                            break;
+                        }
+                        total_written += bytes_written;
+                    }
+
+                    CloseHandle(hOut);
+                    write_ok = (total_written > 0 || to_read == 0);
+                }
+                CloseHandle(hIn);
+            }
+#else
+            std::ifstream in(item.source_path, std::ios::binary);
+            if (in.is_open()) {
+                std::ofstream out(out_path, std::ios::binary);
+                if (out.is_open()) {
+                    in.seekg(item.offset);
+                    size_t bytes_to_copy = static_cast<size_t>(item.size_bytes);
+                    std::vector<char> buffer(64 * 1024);
+                    while (bytes_to_copy > 0 && in) {
+                        size_t step = std::min(bytes_to_copy, buffer.size());
+                        in.read(buffer.data(), step);
+                        size_t read_bytes = in.gcount();
+                        if (read_bytes == 0) break;
+                        out.write(buffer.data(), read_bytes);
+                        bytes_to_copy -= read_bytes;
+                    }
+                    write_ok = true;
+                }
+            }
+#endif
+            if (write_ok) {
+                std::cout << "[+] Kurtarildi: " << out_path.string() << " (" << item.size_bytes << " bayt)\n";
+                res.recovered_count++;
+                res.saved_files.push_back(out_path.string());
+            } else {
+                std::cout << "[-] Kurtarma basarisiz: " << item.source_path << "\n";
                 res.failed_count++;
-                continue;
             }
-
-            in.seekg(item.offset);
-            size_t bytes_to_copy = static_cast<size_t>(item.size_bytes);
-            std::vector<char> buffer(64 * 1024);
-            while (bytes_to_copy > 0 && in) {
-                size_t step = std::min(bytes_to_copy, buffer.size());
-                in.read(buffer.data(), step);
-                size_t read_bytes = in.gcount();
-                if (read_bytes == 0) break;
-                out.write(buffer.data(), read_bytes);
-                bytes_to_copy -= read_bytes;
-            }
-
-            res.recovered_count++;
-            res.saved_files.push_back(out_path.string());
         }
 
         // Generate JSON recovery report
@@ -697,12 +932,17 @@ RecoveryResult CarverEngine::recover_files(const std::vector<std::string>& file_
             r_out << "  \"gelistirici\": \"Kadir\",\n";
             r_out << "  \"kurtarilan_dosya_sayisi\": " << res.recovered_count << ",\n";
             r_out << "  \"hatali_dosya_sayisi\": " << res.failed_count << ",\n";
-            r_out << "  \"hedef_dizin\": \"" << dest_dir << "\"\n";
+            std::string esc_dest;
+            for (char c : dest_dir) {
+                if (c == '\\') esc_dest += "\\\\";
+                else esc_dest += c;
+            }
+            r_out << "  \"hedef_dizin\": \"" << esc_dest << "\"\n";
             r_out << "}\n";
             res.report_path = report_file.string();
         }
 
-        res.success = true;
+        res.success = (res.recovered_count > 0);
     } catch (const std::exception& ex) {
         res.error = ex.what();
         res.success = false;
