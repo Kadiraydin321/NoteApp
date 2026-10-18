@@ -283,8 +283,8 @@ fun NotesScreen(
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier
+                    .fillMaxHeight()
                     .widthIn(max = 320.dp)
-                    .verticalScroll(rememberScrollState())
             ) {
                 Spacer(Modifier.height(12.dp))
                 Row(
@@ -329,7 +329,13 @@ fun NotesScreen(
                 }
                 HorizontalDivider()
 
-                NavigationDrawerItem(
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    NavigationDrawerItem(
                     icon = { Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = null) },
                     label = { Text("Tüm Notlar") },
                     selected = state.viewMode == NotesViewMode.ALL &&
@@ -650,7 +656,9 @@ fun NotesScreen(
                         }
                     }
                 }
-                Spacer(Modifier.height(32.dp))
+                    Spacer(Modifier.navigationBarsPadding())
+                    Spacer(Modifier.height(24.dp))
+                }
             }
         }
     ) {
