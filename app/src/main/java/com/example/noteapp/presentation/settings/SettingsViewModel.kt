@@ -114,6 +114,26 @@ class SettingsViewModel @Inject constructor(
         settingsManager.setDrawerCollapseMode(mode)
     }
 
+    fun setCardCornerStyle(style: com.example.noteapp.data.settings.CardCornerStyle) {
+        settingsManager.setCardCornerStyle(style)
+    }
+
+    fun setCardElevationStyle(style: com.example.noteapp.data.settings.CardElevationStyle) {
+        settingsManager.setCardElevationStyle(style)
+    }
+
+    fun setQuickActionLocation(location: com.example.noteapp.data.settings.QuickActionLocation) {
+        settingsManager.setQuickActionLocation(location)
+    }
+
+    fun setSearchBarShape(shape: com.example.noteapp.data.settings.SearchBarShape) {
+        settingsManager.setSearchBarShape(shape)
+    }
+
+    fun applyDesignPreset(preset: com.example.noteapp.data.settings.DesignPreset) {
+        settingsManager.applyDesignPreset(preset)
+    }
+
     fun setMasterPin(pin: String?) {
         settingsManager.setMasterPin(pin)
     }

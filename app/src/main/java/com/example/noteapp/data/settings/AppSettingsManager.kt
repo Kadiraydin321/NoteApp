@@ -34,6 +34,41 @@ enum class DrawerCollapseMode(val title: String, val description: String) {
     EXPANDED_ALL("Tümünü Göster (Klasik)", "Hiçbir daraltma olmadan tüm liste doğrudan açık durur")
 }
 
+enum class CardCornerStyle(val title: String, val radiusDp: Int) {
+    ROUNDED("Modern Yuvarlak", 18),
+    SHARP("Keskin & Minimal", 6),
+    SQUIRCLE("Süper Oval / Sabun", 28)
+}
+
+enum class CardElevationStyle(val title: String) {
+    ELEVATED("Yumuşak Gölgeli"),
+    BORDERED("Zarif Çerçeveli"),
+    GLASS("Yarı Saydam / Cam")
+}
+
+enum class QuickActionLocation(val title: String, val description: String) {
+    DRAWER_HEADER("Sol Menü Başlığı", "Çark ve senkronizasyon simgeleri 'Not Defterim' yanında"),
+    TOP_APP_BAR("Ana Ekran Üst Çubuğu", "Çark ve senkronizasyon simgeleri ana sayfa sağ üst çubuğunda")
+}
+
+enum class SearchBarShape(val title: String, val cornerDp: Int) {
+    PILL("Modern Oval Hap", 24),
+    ROUNDED_RECT("Kavisli Dikdörtgen", 12)
+}
+
+enum class DesignPreset(
+    val title: String,
+    val subtitle: String,
+    val iconEmoji: String
+) {
+    CUSTOM("Özel Ayarlar", "Kişiselleştirilmiş tasarım kombinasyonu", "🎨"),
+    MODERN_MATERIAL("Modern Defterim", "Dengeli, yumuşak kavisli ve gölgeli", "🌟"),
+    MINIMAL_NOTION("Minimal & Notion", "Keskin köşeler, zarif ince çerçeveler", "💎"),
+    STUDIO_GLASS("Stüdyo Cam", "Yarı saydam cam, ekstra oval modern estetik", "🔮"),
+    VINTAGE_JOURNAL("Vintage Defter", "Klasik not defteri, sıcak amber ve geniş liste", "📜"),
+    COMPACT_POWER("Kompakt Güç", "Yoğun bilgi, hızlı erişim ve keskin hatlar", "⚡")
+}
+
 data class AppSettings(
     val widgetFilterMode: WidgetFilterMode = WidgetFilterMode.ALL,
     val widgetShowLockedNotes: Boolean = false,
@@ -50,7 +85,12 @@ data class AppSettings(
     val lastSyncHost: String = "",
     val lastSyncPin: String = "",
     val colorPalette: AppColorPalette = AppColorPalette.WARM_AMBER,
-    val drawerCollapseMode: DrawerCollapseMode = DrawerCollapseMode.AUTO_ACCORDION
+    val drawerCollapseMode: DrawerCollapseMode = DrawerCollapseMode.AUTO_ACCORDION,
+    val cardCornerStyle: CardCornerStyle = CardCornerStyle.ROUNDED,
+    val cardElevationStyle: CardElevationStyle = CardElevationStyle.BORDERED,
+    val quickActionLocation: QuickActionLocation = QuickActionLocation.DRAWER_HEADER,
+    val searchBarShape: SearchBarShape = SearchBarShape.PILL,
+    val designPreset: DesignPreset = DesignPreset.MODERN_MATERIAL
 )
 
 @Singleton
@@ -123,6 +163,21 @@ class AppSettingsManager @Inject constructor(
             DrawerCollapseMode.AUTO_ACCORDION
         }
 
+        val cardCornerStr = prefs.getString(KEY_CARD_CORNER_STYLE, CardCornerStyle.ROUNDED.name) ?: CardCornerStyle.ROUNDED.name
+        val cardCornerStyle = try { CardCornerStyle.valueOf(cardCornerStr) } catch (_: Exception) { CardCornerStyle.ROUNDED }
+
+        val cardElevationStr = prefs.getString(KEY_CARD_ELEVATION_STYLE, CardElevationStyle.BORDERED.name) ?: CardElevationStyle.BORDERED.name
+        val cardElevationStyle = try { CardElevationStyle.valueOf(cardElevationStr) } catch (_: Exception) { CardElevationStyle.BORDERED }
+
+        val quickActionLocationStr = prefs.getString(KEY_QUICK_ACTION_LOCATION, QuickActionLocation.DRAWER_HEADER.name) ?: QuickActionLocation.DRAWER_HEADER.name
+        val quickActionLocation = try { QuickActionLocation.valueOf(quickActionLocationStr) } catch (_: Exception) { QuickActionLocation.DRAWER_HEADER }
+
+        val searchBarShapeStr = prefs.getString(KEY_SEARCH_BAR_SHAPE, SearchBarShape.PILL.name) ?: SearchBarShape.PILL.name
+        val searchBarShape = try { SearchBarShape.valueOf(searchBarShapeStr) } catch (_: Exception) { SearchBarShape.PILL }
+
+        val designPresetStr = prefs.getString(KEY_DESIGN_PRESET, DesignPreset.MODERN_MATERIAL.name) ?: DesignPreset.MODERN_MATERIAL.name
+        val designPreset = try { DesignPreset.valueOf(designPresetStr) } catch (_: Exception) { DesignPreset.MODERN_MATERIAL }
+
         return AppSettings(
             widgetFilterMode = filterMode,
             widgetShowLockedNotes = showLocked,
@@ -139,7 +194,115 @@ class AppSettingsManager @Inject constructor(
             lastSyncHost = syncHost,
             lastSyncPin = syncPin,
             colorPalette = colorPalette,
-            drawerCollapseMode = drawerCollapseMode
+            drawerCollapseMode = drawerCollapseMode,
+            cardCornerStyle = cardCornerStyle,
+            cardElevationStyle = cardElevationStyle,
+            quickActionLocation = quickActionLocation,
+            searchBarShape = searchBarShape,
+            designPreset = designPreset
+        )
+    }
+
+    fun setCardCornerStyle(style: CardCornerStyle) {
+        prefs.edit().putString(KEY_CARD_CORNER_STYLE, style.name).putString(KEY_DESIGN_PRESET, DesignPreset.CUSTOM.name).apply()
+        _settings.value = _settings.value.copy(cardCornerStyle = style, designPreset = DesignPreset.CUSTOM)
+    }
+
+    fun setCardElevationStyle(style: CardElevationStyle) {
+        prefs.edit().putString(KEY_CARD_ELEVATION_STYLE, style.name).putString(KEY_DESIGN_PRESET, DesignPreset.CUSTOM.name).apply()
+        _settings.value = _settings.value.copy(cardElevationStyle = style, designPreset = DesignPreset.CUSTOM)
+    }
+
+    fun setQuickActionLocation(location: QuickActionLocation) {
+        prefs.edit().putString(KEY_QUICK_ACTION_LOCATION, location.name).putString(KEY_DESIGN_PRESET, DesignPreset.CUSTOM.name).apply()
+        _settings.value = _settings.value.copy(quickActionLocation = location, designPreset = DesignPreset.CUSTOM)
+    }
+
+    fun setSearchBarShape(shape: SearchBarShape) {
+        prefs.edit().putString(KEY_SEARCH_BAR_SHAPE, shape.name).putString(KEY_DESIGN_PRESET, DesignPreset.CUSTOM.name).apply()
+        _settings.value = _settings.value.copy(searchBarShape = shape, designPreset = DesignPreset.CUSTOM)
+    }
+
+    fun applyDesignPreset(preset: DesignPreset) {
+        if (preset == DesignPreset.CUSTOM) return
+
+        val corner: CardCornerStyle
+        val elevation: CardElevationStyle
+        val quickLoc: QuickActionLocation
+        val searchShape: SearchBarShape
+        val layout: NotesLayoutMode
+        val palette: AppColorPalette
+        val collapse: DrawerCollapseMode
+
+        when (preset) {
+            DesignPreset.MODERN_MATERIAL -> {
+                corner = CardCornerStyle.ROUNDED
+                elevation = CardElevationStyle.BORDERED
+                quickLoc = QuickActionLocation.DRAWER_HEADER
+                searchShape = SearchBarShape.PILL
+                layout = NotesLayoutMode.STAGGERED_GRID
+                palette = AppColorPalette.WARM_AMBER
+                collapse = DrawerCollapseMode.AUTO_ACCORDION
+            }
+            DesignPreset.MINIMAL_NOTION -> {
+                corner = CardCornerStyle.SHARP
+                elevation = CardElevationStyle.BORDERED
+                quickLoc = QuickActionLocation.TOP_APP_BAR
+                searchShape = SearchBarShape.ROUNDED_RECT
+                layout = NotesLayoutMode.LIST
+                palette = AppColorPalette.SLATE_MINIMAL
+                collapse = DrawerCollapseMode.INLINE_EXPAND
+            }
+            DesignPreset.STUDIO_GLASS -> {
+                corner = CardCornerStyle.SQUIRCLE
+                elevation = CardElevationStyle.GLASS
+                quickLoc = QuickActionLocation.DRAWER_HEADER
+                searchShape = SearchBarShape.PILL
+                layout = NotesLayoutMode.STAGGERED_GRID
+                palette = AppColorPalette.MIDNIGHT_ROSE
+                collapse = DrawerCollapseMode.ALWAYS_ACCORDION
+            }
+            DesignPreset.VINTAGE_JOURNAL -> {
+                corner = CardCornerStyle.ROUNDED
+                elevation = CardElevationStyle.ELEVATED
+                quickLoc = QuickActionLocation.DRAWER_HEADER
+                searchShape = SearchBarShape.PILL
+                layout = NotesLayoutMode.LIST
+                palette = AppColorPalette.WARM_AMBER
+                collapse = DrawerCollapseMode.EXPANDED_ALL
+            }
+            DesignPreset.COMPACT_POWER -> {
+                corner = CardCornerStyle.SHARP
+                elevation = CardElevationStyle.BORDERED
+                quickLoc = QuickActionLocation.TOP_APP_BAR
+                searchShape = SearchBarShape.ROUNDED_RECT
+                layout = NotesLayoutMode.COMPACT_LIST
+                palette = AppColorPalette.DEEP_OCEAN
+                collapse = DrawerCollapseMode.AUTO_ACCORDION
+            }
+            DesignPreset.CUSTOM -> return
+        }
+
+        prefs.edit()
+            .putString(KEY_CARD_CORNER_STYLE, corner.name)
+            .putString(KEY_CARD_ELEVATION_STYLE, elevation.name)
+            .putString(KEY_QUICK_ACTION_LOCATION, quickLoc.name)
+            .putString(KEY_SEARCH_BAR_SHAPE, searchShape.name)
+            .putString(KEY_LAYOUT_MODE, layout.name)
+            .putString(KEY_COLOR_PALETTE, palette.name)
+            .putString(KEY_DRAWER_COLLAPSE_MODE, collapse.name)
+            .putString(KEY_DESIGN_PRESET, preset.name)
+            .apply()
+
+        _settings.value = _settings.value.copy(
+            cardCornerStyle = corner,
+            cardElevationStyle = elevation,
+            quickActionLocation = quickLoc,
+            searchBarShape = searchShape,
+            layoutMode = layout,
+            colorPalette = palette,
+            drawerCollapseMode = collapse,
+            designPreset = preset
         )
     }
 
@@ -246,6 +409,11 @@ class AppSettingsManager @Inject constructor(
         private const val KEY_LAST_SYNC_PIN = "last_sync_pin"
         private const val KEY_COLOR_PALETTE = "app_color_palette"
         private const val KEY_DRAWER_COLLAPSE_MODE = "drawer_collapse_mode"
+        private const val KEY_CARD_CORNER_STYLE = "card_corner_style"
+        private const val KEY_CARD_ELEVATION_STYLE = "card_elevation_style"
+        private const val KEY_QUICK_ACTION_LOCATION = "quick_action_location"
+        private const val KEY_SEARCH_BAR_SHAPE = "search_bar_shape"
+        private const val KEY_DESIGN_PRESET = "design_preset"
 
         // Helper for Widget Service to access synchronously without injection
         fun getWidgetFilterMode(context: Context): WidgetFilterMode {

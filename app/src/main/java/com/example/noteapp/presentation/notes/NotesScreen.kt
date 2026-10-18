@@ -11,6 +11,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -39,7 +40,11 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.ui.res.painterResource
 import com.example.noteapp.R
+import com.example.noteapp.data.settings.CardCornerStyle
+import com.example.noteapp.data.settings.CardElevationStyle
 import com.example.noteapp.data.settings.DrawerCollapseMode
+import com.example.noteapp.data.settings.QuickActionLocation
+import com.example.noteapp.data.settings.SearchBarShape
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -109,6 +114,10 @@ fun NotesScreen(
     onQuickSyncPull: () -> Unit = {},
     onDismissQuickSyncMessage: () -> Unit = {},
     drawerCollapseMode: DrawerCollapseMode = DrawerCollapseMode.AUTO_ACCORDION,
+    cardCornerStyle: CardCornerStyle = CardCornerStyle.ROUNDED,
+    cardElevationStyle: CardElevationStyle = CardElevationStyle.BORDERED,
+    quickActionLocation: QuickActionLocation = QuickActionLocation.DRAWER_HEADER,
+    searchBarShape: SearchBarShape = SearchBarShape.PILL,
     onSettingsClick: () -> Unit
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -254,29 +263,31 @@ fun NotesScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = {
-                            scope.launch { drawerState.close() }
-                            showQuickSyncDialog = true
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.Sync,
-                                contentDescription = "Masaüstü ile Eşitle",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        IconButton(onClick = {
-                            scope.launch { drawerState.close() }
-                            onSettingsClick()
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Ayarlar",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    if (quickActionLocation == QuickActionLocation.DRAWER_HEADER) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = {
+                                scope.launch { drawerState.close() }
+                                showQuickSyncDialog = true
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Sync,
+                                    contentDescription = "Masaüstü ile Eşitle",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            IconButton(onClick = {
+                                scope.launch { drawerState.close() }
+                                onSettingsClick()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Ayarlar",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -769,6 +780,22 @@ fun NotesScreen(
                                     )
                                 }
                             }
+                            if (quickActionLocation == QuickActionLocation.TOP_APP_BAR) {
+                                IconButton(onClick = { showQuickSyncDialog = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Sync,
+                                        contentDescription = "Masaüstü ile Eşitle",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                IconButton(onClick = onSettingsClick) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Ayarlar",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     )
                 }
@@ -880,7 +907,7 @@ fun NotesScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(searchBarShape.cornerDp.dp),
                     singleLine = true
                 )
 
@@ -1004,6 +1031,8 @@ fun NotesScreen(
                                             viewMode = state.viewMode,
                                             isSelected = isSelected,
                                             isSelectionMode = isSelectionMode,
+                                            cornerStyle = cardCornerStyle,
+                                            elevationStyle = cardElevationStyle,
                                             onClick = {
                                                 if (isSelectionMode) onToggleNoteSelection(note.id)
                                                 else onNoteClick(note)
@@ -1039,6 +1068,8 @@ fun NotesScreen(
                                             viewMode = state.viewMode,
                                             isSelected = isSelected,
                                             isSelectionMode = isSelectionMode,
+                                            cornerStyle = cardCornerStyle,
+                                            elevationStyle = cardElevationStyle,
                                             onClick = {
                                                 if (isSelectionMode) onToggleNoteSelection(note.id)
                                                 else onNoteClick(note)
@@ -1076,6 +1107,8 @@ fun NotesScreen(
                                             viewMode = state.viewMode,
                                             isSelected = isSelected,
                                             isSelectionMode = isSelectionMode,
+                                            cornerStyle = cardCornerStyle,
+                                            elevationStyle = cardElevationStyle,
                                             onClick = {
                                                 if (isSelectionMode) onToggleNoteSelection(note.id)
                                                 else onNoteClick(note)
@@ -1576,6 +1609,8 @@ fun NoteCard(
     viewMode: NotesViewMode,
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
+    cornerStyle: CardCornerStyle = CardCornerStyle.ROUNDED,
+    elevationStyle: CardElevationStyle = CardElevationStyle.BORDERED,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     onPinClick: () -> Unit,
@@ -1599,21 +1634,37 @@ fun NoteCard(
         parseMarkdownCardPreview(note.content)
     }
 
+    val cardShape = RoundedCornerShape(cornerStyle.radiusDp.dp)
+    val cardBorder = when {
+        isSelected -> BorderStroke(2.5.dp, MaterialTheme.colorScheme.primary)
+        elevationStyle == CardElevationStyle.BORDERED -> BorderStroke(1.2.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+        elevationStyle == CardElevationStyle.GLASS -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+        else -> null
+    }
+    val cardElevation = when (elevationStyle) {
+        CardElevationStyle.ELEVATED -> CardDefaults.cardElevation(defaultElevation = 3.dp)
+        else -> CardDefaults.cardElevation(defaultElevation = 0.dp)
+    }
+    val cardBg = when (elevationStyle) {
+        CardElevationStyle.GLASS -> colorSpec.backgroundColor.copy(alpha = 0.65f)
+        else -> colorSpec.backgroundColor
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .then(
-                if (isSelected) Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(18.dp))
+                if (cardBorder != null) Modifier.border(cardBorder, cardShape)
                 else Modifier
             )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
-        shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = cardShape,
+        elevation = cardElevation,
         colors = CardDefaults.cardColors(
-            containerColor = colorSpec.backgroundColor
+            containerColor = cardBg
         )
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -1813,6 +1864,8 @@ fun CompactNoteCard(
     viewMode: NotesViewMode,
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
+    cornerStyle: CardCornerStyle = CardCornerStyle.ROUNDED,
+    elevationStyle: CardElevationStyle = CardElevationStyle.BORDERED,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     onPinClick: () -> Unit,
@@ -1831,13 +1884,23 @@ fun CompactNoteCard(
         SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(note.timestamp))
     }
 
+    val compactRadius = (cornerStyle.radiusDp * 0.75f).coerceAtLeast(4f).dp
+    val compactShape = RoundedCornerShape(compactRadius)
+    val cardBorder = when {
+        isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        elevationStyle == CardElevationStyle.BORDERED -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        elevationStyle == CardElevationStyle.GLASS -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+        else -> null
+    }
+
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = colorSpec.backgroundColor,
+        shape = compactShape,
+        color = if (elevationStyle == CardElevationStyle.GLASS) colorSpec.backgroundColor.copy(alpha = 0.7f) else colorSpec.backgroundColor,
+        shadowElevation = if (elevationStyle == CardElevationStyle.ELEVATED) 2.dp else 0.dp,
         modifier = modifier
             .fillMaxWidth()
             .then(
-                if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp))
+                if (cardBorder != null) Modifier.border(cardBorder, compactShape)
                 else Modifier
             )
             .combinedClickable(

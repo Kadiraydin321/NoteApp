@@ -285,6 +285,10 @@ class MainActivity : FragmentActivity() {
                             quickSyncState = quickSyncState,
                             syncHost = noteSettingsState.lastSyncHost,
                             drawerCollapseMode = noteSettingsState.drawerCollapseMode,
+                            cardCornerStyle = noteSettingsState.cardCornerStyle,
+                            cardElevationStyle = noteSettingsState.cardElevationStyle,
+                            quickActionLocation = noteSettingsState.quickActionLocation,
+                            searchBarShape = noteSettingsState.searchBarShape,
                             onQuickSyncSend = viewModel::quickSyncSend,
                             onQuickSyncPull = viewModel::quickSyncPull,
                             onDismissQuickSyncMessage = viewModel::dismissQuickSyncMessage,
@@ -633,9 +637,29 @@ class MainActivity : FragmentActivity() {
                             onDownloadAndInstallUpdate = viewModel::downloadAndInstallUpdate,
                             onInstallReadyApk = viewModel::installReadyApk,
                             onDismissUpdateStatus = viewModel::dismissUpdateStatus,
+                            onNavigateToDesignStudio = {
+                                navController.navigate("design_studio_screen")
+                            },
                             onBackClick = {
                                 navController.popBackStack()
                             }
+                        )
+                    }
+
+                    composable("design_studio_screen") {
+                        val viewModel = hiltViewModel<SettingsViewModel>()
+                        val settingsState by viewModel.settings.collectAsState()
+
+                        com.example.noteapp.presentation.settings.DesignStudioScreen(
+                            settings = settingsState,
+                            onBackClick = { navController.popBackStack() },
+                            onApplyPreset = viewModel::applyDesignPreset,
+                            onCardCornerStyleChange = viewModel::setCardCornerStyle,
+                            onCardElevationStyleChange = viewModel::setCardElevationStyle,
+                            onQuickActionLocationChange = viewModel::setQuickActionLocation,
+                            onSearchBarShapeChange = viewModel::setSearchBarShape,
+                            onColorPaletteChange = viewModel::setColorPalette,
+                            onLayoutModeChange = viewModel::setLayoutMode
                         )
                     }
                 }
