@@ -565,9 +565,95 @@
     }
     .toast.success { border-color: var(--accent); }
     .toast.error { border-color: var(--danger); }
+
+    /* Admin Elevation Banner */
+    .admin-banner {
+      background: linear-gradient(90deg, rgba(234, 179, 8, 0.12) 0%, rgba(245, 158, 11, 0.08) 100%);
+      border-bottom: 1px solid rgba(234, 179, 8, 0.25);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #fef08a;
+    }
+
+    /* Property Grid for Details Modal */
+    .prop-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .prop-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .prop-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .prop-value {
+      font-size: 13px;
+      color: var(--text-main);
+      font-weight: 600;
+      word-break: break-all;
+    }
+    .prop-value-accent {
+      color: var(--accent);
+    }
+    .prop-value-blue {
+      color: var(--accent-blue);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .source-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .source-mft {
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+      border-color: rgba(168, 85, 247, 0.3);
+    }
+    .source-recycle {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+    .source-carver {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.3);
+    }
   </style>
 </head>
 <body>
+
+  <!-- Admin Elevation Banner (Shown if not admin) -->
+  <div class="admin-banner" id="adminBanner" style="display: none;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-size: 16px;">⚡</span>
+      <span><strong>Kalıcı Olarak Silinen (Shift+Delete)</strong> dosyaları doğrudan NTFS MFT tablosundan kurtarmak için Windows yönetici yetkisi önerilir.</span>
+    </div>
+    <button class="btn btn-warning btn-sm" id="btnRestartElevated" onclick="restartElevated()">
+      <span>🛡️ Yönetici Olarak Yeniden Başlat</span>
+    </button>
+  </div>
 
   <!-- 1. Header -->
   <header>
@@ -687,6 +773,8 @@
       <div class="content-header">
         <div class="filter-tabs">
           <button class="tab-btn active" data-cat="all">Tümü <span class="tab-badge" id="badgeAll">0</span></button>
+          <button class="tab-btn" data-cat="mft">Kalıcı Silinenler (MFT) <span class="tab-badge" id="badgeMft">0</span></button>
+          <button class="tab-btn" data-cat="recycle">Geri Dönüşüm <span class="tab-badge" id="badgeRecycle">0</span></button>
           <button class="tab-btn" data-cat="images">Resimler <span class="tab-badge" id="badgeImages">0</span></button>
           <button class="tab-btn" data-cat="documents">Belgeler <span class="tab-badge" id="badgeDocs">0</span></button>
           <button class="tab-btn" data-cat="media">Medya <span class="tab-badge" id="badgeMedia">0</span></button>
@@ -701,17 +789,18 @@
           <thead>
             <tr>
               <th width="40"><input type="checkbox" id="selectAllCheckbox"></th>
-              <th width="80">Tür</th>
-              <th>Dosya Adı & Konum</th>
+              <th width="70">Tür</th>
+              <th>Orijinal Dosya Adı & Konum</th>
               <th width="100">Boyut</th>
-              <th width="120">Ofset</th>
-              <th width="80">Güven</th>
-              <th width="150" style="text-align: right;">İşlem</th>
+              <th width="150">Tespit Kaynağı</th>
+              <th width="140">Silinme / Tarih</th>
+              <th width="110">Durum</th>
+              <th width="180" style="text-align: right;">İşlemler</th>
             </tr>
           </thead>
           <tbody id="filesTableBody">
             <tr>
-              <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-dim);">
+              <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-dim);">
                 Henüz tarama başlatılmadı. Taranacak sürücü veya klasörü seçip <strong>Taramayı Başlat</strong> butonuna basın.
               </td>
             </tr>
@@ -730,6 +819,25 @@
       </div>
     </section>
   </main>
+
+  <!-- File Details Modal (Tüm Dosya Özellikleri) -->
+  <div class="modal-backdrop" id="detailsModal">
+    <div class="modal-dialog" style="max-width: 820px;">
+      <div class="modal-header">
+        <div class="modal-title" id="detailsModalTitle" style="display:flex; align-items:center; gap:8px;">
+          <span>📋 Dosya Nitelikleri & Özellikleri</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btnCloseDetailsModal" onclick="closeDetailsModal()">Kapat</button>
+      </div>
+      <div class="modal-body" id="detailsModalBody" style="background: var(--bg-card); color: var(--text-main); font-family: var(--font-sans); white-space: normal; padding: 20px;">
+        <!-- Injected via showDetailsModal -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btnDetailsHex" onclick="switchDetailsToHex()">Hex İncele</button>
+        <button class="btn btn-primary btn-sm" id="btnDetailsRecover">Bu Dosyayı Kurtar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Hex Viewer Modal -->
   <div class="modal-backdrop" id="hexModal">
@@ -956,6 +1064,13 @@
           if (stats.isAdmin) {
             const ab = document.getElementById('adminBadge');
             if (ab) ab.style.display = 'inline-block';
+            const aban = document.getElementById('adminBanner');
+            if (aban) aban.style.display = 'none';
+          } else {
+            const ab = document.getElementById('adminBadge');
+            if (ab) ab.style.display = 'none';
+            const aban = document.getElementById('adminBanner');
+            if (aban) aban.style.display = 'flex';
           }
 
           if (stats.status === 'running') {
@@ -1008,6 +1123,10 @@
 
     function updateCategoryBadges() {
       document.getElementById('badgeAll').textContent = allFiles.length;
+      const bMft = document.getElementById('badgeMft');
+      if (bMft) bMft.textContent = allFiles.filter(f => f.isMftDeleted).length;
+      const bRec = document.getElementById('badgeRecycle');
+      if (bRec) bRec.textContent = allFiles.filter(f => f.isRecycleBin).length;
       document.getElementById('badgeImages').textContent = allFiles.filter(f => f.category === 'images').length;
       document.getElementById('badgeDocs').textContent = allFiles.filter(f => f.category === 'documents').length;
       document.getElementById('badgeMedia').textContent = allFiles.filter(f => f.category === 'media').length;
@@ -1017,13 +1136,15 @@
     function renderFilesTable() {
       const q = searchInput.value.toLowerCase().trim();
       const filtered = allFiles.filter(f => {
+        if (currentFilter === 'mft') return f.isMftDeleted === true;
+        if (currentFilter === 'recycle') return f.isRecycleBin === true;
         if (currentFilter !== 'all' && f.category !== currentFilter) return false;
-        if (q && !f.name.toLowerCase().includes(q) && !f.type.toLowerCase().includes(q) && !f.hexOffset.toLowerCase().includes(q)) return false;
+        if (q && !f.name.toLowerCase().includes(q) && !f.type.toLowerCase().includes(q) && !(f.hexOffset && f.hexOffset.toLowerCase().includes(q))) return false;
         return true;
       });
 
       if (filtered.length === 0) {
-        filesTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-dim);">${isScanning ? 'Aranıyor...' : 'Seçilen kriterde dosya bulunamadı.'}</td></tr>`;
+        filesTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-dim);">${isScanning ? 'Aranıyor...' : 'Seçilen kriterde dosya bulunamadı.'}</td></tr>`;
         return;
       }
 
@@ -1034,21 +1155,34 @@
           ? `<span style="font-size: 10px; font-weight: 700; background: rgba(16,185,129,0.15); color: var(--accent); padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(16,185,129,0.3);">%${f.confidence || 100} ${f.statusLabel || 'Kurtarılabilir'}</span>`
           : `<span style="font-size: 10px; font-weight: 700; background: rgba(239,68,68,0.15); color: #fca5a5; padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(239,68,68,0.3);">${f.statusLabel || 'Veri Yok'}</span>`;
 
+        let srcBadge = '<span class="source-pill source-carver">Derin Carver</span>';
+        if (f.isMftDeleted) {
+          srcBadge = '<span class="source-pill source-mft">NTFS MFT (Kalıcı)</span>';
+        } else if (f.isRecycleBin) {
+          srcBadge = '<span class="source-pill source-recycle">Geri Dönüşüm</span>';
+        } else if (f.detectionSource) {
+          srcBadge = `<span class="source-pill source-carver">${escapeHtml(f.detectionSource)}</span>`;
+        }
+
+        const dateStr = f.modifiedTime && f.modifiedTime !== '-' ? f.modifiedTime : (f.createdTime && f.createdTime !== '-' ? f.createdTime : '-');
+
         return `
           <tr style="${canRecover ? '' : 'opacity: 0.7;'}">
             <td><input type="checkbox" class="file-chk" data-id="${f.id}" ${isChecked} ${canRecover ? '' : 'disabled'} onchange="toggleSelect('${f.id}')"></td>
             <td><span class="type-pill type-${(f.type || 'bin').toLowerCase()}">${(f.type || 'BIN').toUpperCase()}</span></td>
             <td>
-              <div class="file-name-cell">
+              <div class="file-name-cell" style="cursor: pointer;" onclick="showDetailsModal('${f.id}')" title="Tüm Dosya Özelliklerini İncele">
                 <span class="file-name">${escapeHtml(f.name)}</span>
                 ${f.originalPath ? `<span class="file-orig-path">${escapeHtml(f.originalPath)}</span>` : ''}
               </div>
             </td>
             <td><strong>${f.sizeHuman || formatBytes(f.sizeBytes)}</strong></td>
-            <td><span style="font-family: var(--font-mono); color: var(--accent-blue); font-size: 11px;">${f.hexOffset}</span></td>
+            <td>${srcBadge}</td>
+            <td><span style="font-size: 11px; color: var(--text-dim); font-family: var(--font-mono);">${escapeHtml(dateStr)}</span></td>
             <td>${statusBadge}</td>
-            <td style="text-align: right;">
-              <button class="btn btn-secondary btn-sm" onclick="showHexModal('${f.id}')">Hex İncele</button>
+            <td style="text-align: right; white-space: nowrap;">
+              <button class="btn btn-secondary btn-sm" onclick="showDetailsModal('${f.id}')" title="Tüm Dosya Niteliklerini Gör">Özellikler</button>
+              <button class="btn btn-secondary btn-sm" onclick="showHexModal('${f.id}')" title="Hex Dökümü">Hex</button>
               <button class="btn btn-primary btn-sm" onclick="recoverSingle('${f.id}')" ${canRecover ? '' : 'disabled title="Bu dosyanın verisi diskten temizlenmiş"'}>Kurtar</button>
             </td>
           </tr>
@@ -1126,6 +1260,127 @@
       if (activeHexFile) {
         recoverSingle(activeHexFile);
         document.getElementById('hexModal').classList.remove('open');
+      }
+    };
+
+    // Details Modal
+    let activeDetailsFile = null;
+
+    window.showDetailsModal = (fileId) => {
+      const f = allFiles.find(item => item.id === fileId);
+      if (!f) return;
+      activeDetailsFile = f;
+      activeHexFile = fileId;
+
+      document.getElementById('detailsModalTitle').innerHTML = `
+        <span class="type-pill type-${(f.type || 'bin').toLowerCase()}">${(f.type || 'BIN').toUpperCase()}</span>
+        <span>${escapeHtml(f.name)} - Dosya Özellikleri</span>
+      `;
+
+      let srcLabel = f.detectionSource || (f.isMftDeleted ? 'NTFS MFT (Kalıcı Olarak Silinmiş - Shift+Delete)' : (f.isRecycleBin ? 'Geri Dönüşüm Kutusu ($I/$R Metaverisi)' : 'Derin Sektör Taraması (Raw Carver)'));
+
+      let storageType = f.isResident ? 'Resident (Doğrudan MFT Kaydında Saklı)' : 'Non-Resident (Disk Kümeleri / Run-list)';
+      if (f.isRecycleBin) storageType = 'Geri Dönüşüm Kutusu ($R Veri Dosyası)';
+
+      let html = `
+        <div class="prop-grid">
+          <div class="prop-card" style="grid-column: 1 / -1;">
+            <div class="prop-label">Orijinal Dosya Adı (Silinmeden Önceki İsim)</div>
+            <div class="prop-value" style="font-size: 15px; color: #ffffff;">${escapeHtml(f.name)}</div>
+          </div>
+
+          <div class="prop-card" style="grid-column: 1 / -1;">
+            <div class="prop-label">Orijinal Konum (Dizin Yolu)</div>
+            <div class="prop-value prop-value-blue">${escapeHtml(f.originalPath || 'Bilinmiyor / Ham Sektör')}</div>
+          </div>
+
+          <div class="prop-card">
+            <div class="prop-label">Dosya Boyutu</div>
+            <div class="prop-value">${f.sizeHuman || formatBytes(f.sizeBytes)} <span style="font-size:11px; color:var(--text-dim); font-weight:normal;">(${f.sizeBytes.toLocaleString()} bayt)</span></div>
+          </div>
+
+          <div class="prop-card">
+            <div class="prop-label">Dosya Türü / Kategori</div>
+            <div class="prop-value" style="text-transform: capitalize;">${(f.type || 'Bilinmiyor').toUpperCase()} • ${f.category || 'Belge'}</div>
+          </div>
+
+          <div class="prop-card">
+            <div class="prop-label">Oluşturulma Tarihi</div>
+            <div class="prop-value">${escapeHtml(f.createdTime || '-')}</div>
+          </div>
+
+          <div class="prop-card">
+            <div class="prop-label">Değiştirilme / Silinme Tarihi</div>
+            <div class="prop-value">${escapeHtml(f.modifiedTime || '-')}</div>
+          </div>
+
+          <div class="prop-card">
+            <div class="prop-label">Son Erişim Tarihi</div>
+            <div class="prop-value">${escapeHtml(f.accessedTime || '-')}</div>
+          </div>
+
+          <div class="prop-card">
+            <div class="prop-label">Dosya Öznitelikleri (Attributes)</div>
+            <div class="prop-value">${escapeHtml(f.attributes || 'Normal (Arşiv)')}</div>
+          </div>
+
+          <div class="prop-card">
+            <div class="prop-label">Tespit & Silinme Kaynağı</div>
+            <div class="prop-value prop-value-accent">${escapeHtml(srcLabel)}</div>
+          </div>
+
+          <div class="prop-card">
+            <div class="prop-label">Veri Depolama Durumu</div>
+            <div class="prop-value">${escapeHtml(storageType)}</div>
+          </div>
+
+          <div class="prop-card">
+            <div class="prop-label">MFT Kayıt / Sektör Ofseti</div>
+            <div class="prop-value" style="font-family: var(--font-mono); font-size:12px;">${f.mftRecordNumber ? ('MFT Record #' + f.mftRecordNumber) : f.hexOffset}</div>
+          </div>
+
+          <div class="prop-card">
+            <div class="prop-label">Kurtarılabilirlik Derecesi</div>
+            <div class="prop-value ${f.confidence >= 90 ? 'prop-value-accent' : ''}">%${f.confidence || 0} ${f.statusLabel || ''}</div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('detailsModalBody').innerHTML = html;
+      document.getElementById('detailsModal').classList.add('open');
+
+      document.getElementById('btnDetailsRecover').onclick = () => {
+        closeDetailsModal();
+        recoverSingle(f.id);
+      };
+    };
+
+    window.closeDetailsModal = () => {
+      document.getElementById('detailsModal').classList.remove('open');
+    };
+
+    window.switchDetailsToHex = () => {
+      closeDetailsModal();
+      if (activeHexFile) {
+        showHexModal(activeHexFile);
+      }
+    };
+
+    window.restartElevated = async () => {
+      if (confirm('ByteRescue yönetici yetkisi ile yeniden başlatılacak. Windows Kullanıcı Hesabı Denetimi (UAC) penceresinde "Evet" butonuna basınız. Devam edilsin mi?')) {
+        showToast('Yönetici olarak yeniden başlatılıyor...', 'info');
+        try {
+          const res = await fetch('/api/restart-elevated', { method: 'POST' });
+          const data = await res.json();
+          if (data.success) {
+            document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#38bdf8;font-size:16px;">ByteRescue yönetici yetkisi ile açılıyor, lütfen bekleyin...</div>';
+            setTimeout(() => { location.reload(); }, 2500);
+          } else {
+            showToast('Hata: ' + (data.error || 'Yönetici yetkisi alınamadı'), 'error');
+          }
+        } catch (err) {
+          showToast('İstek hatası: ' + err.message, 'error');
+        }
       }
     };
 

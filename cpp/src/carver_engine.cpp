@@ -1,5 +1,6 @@
 // cpp/src/carver_engine.cpp
 #include "carver_engine.hpp"
+#include "ntfs_scanner.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -205,7 +206,7 @@ void CarverEngine::run_scan_worker(ScanOptions options) {
     try {
         fs::path p(options.source_path);
 
-        // 1. Identify drives to check for Recycle Bin deleted files
+        // 1. Identify drives to check for deleted files
         std::vector<std::string> drives_to_check;
         std::string root = p.root_name().string();
         if (root.empty() && options.source_path.size() >= 2 && options.source_path[1] == ':') {
@@ -218,6 +219,65 @@ void CarverEngine::run_scan_worker(ScanOptions options) {
             drives_to_check.push_back("D:");
         }
 
+        // 1.1 Scan permanently deleted files directly from NTFS MFT if volume is accessible
+        for (const auto& d : drives_to_check) {
+            if (should_stop_.load()) break;
+            if (NtfsScanner::is_volume_accessible(d)) {
+                {
+                    std::lock_guard<std::mutex> lock(stats_mutex_);
+                    stats_.current_location = d + " [NTFS MFT] Kalıcı Silinen Dosyalar Taranıyor...";
+                }
+                auto ntfs_items = NtfsScanner::scan_deleted_files(d, options.source_path, should_stop_,
+                    [this, &d](uint64_t scanned, uint64_t found) {
+                        std::lock_guard<std::mutex> lock(stats_mutex_);
+                        stats_.current_location = d + " MFT: " + std::to_string(scanned) + " kayıt (" + std::to_string(found) + " silinen bulundu)";
+                    });
+
+                std::lock_guard<std::mutex> flock(files_mutex_);
+                for (const auto& nf : ntfs_items) {
+                    FoundFile item;
+                    item.id = "mft_" + std::to_string(nf.record_number);
+                    item.name = nf.filename;
+                    item.display_name = nf.filename;
+                    item.type = nf.extension;
+                    item.category = nf.category;
+                    item.size_bytes = nf.file_size;
+                    item.size_human = format_size(nf.file_size);
+                    item.offset = 0;
+                    item.hex_offset = "MFT #" + std::to_string(nf.record_number);
+                    item.confidence = nf.is_resident ? 100 : 95;
+                    item.is_recycle_bin = false;
+                    item.is_mft_deleted = true;
+                    item.is_recoverable = true;
+                    item.status_label = nf.is_resident ? "%100 Kurtarılabilir (MFT)" : "%95 Kurtarılabilir (MFT)";
+                    item.original_path = nf.original_path;
+                    item.created_time_str = nf.created_time_str;
+                    item.modified_time_str = nf.modified_time_str;
+                    item.accessed_time_str = nf.accessed_time_str;
+                    item.attributes_str = nf.attributes_str;
+                    item.detection_source = "NTFS MFT (Kalıcı Silinmiş - Shift+Delete)";
+                    item.mft_record_number = nf.record_number;
+                    item.is_resident = nf.is_resident;
+                    item.resident_data = nf.resident_data;
+                    item.drive_letter = d;
+                    item.preview_snippet = "Kalıcı Silinen Dosya (MFT): " + nf.original_path;
+                    item.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+                    bool exists_already = false;
+                    for (const auto& ex : found_files_) {
+                        if (ex.id == item.id || (ex.name == item.name && ex.original_path == item.original_path)) {
+                            exists_already = true;
+                            break;
+                        }
+                    }
+                    if (!exists_already) {
+                        found_files_.push_back(item);
+                    }
+                }
+            }
+        }
+
+        // 1.2 Check Recycle Bin for deleted items
         for (const auto& d : drives_to_check) {
             std::string rec_path = d + "\\$Recycle.Bin";
             std::error_code ec;
@@ -511,6 +571,37 @@ void CarverEngine::parse_recycle_bin_item(const std::string& i_file_path, const 
         item.preview_snippet = "Orijinal Konum: " + orig_path;
         item.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
+        uint64_t del_time = (buf.size() >= 24) ? *reinterpret_cast<uint64_t*>(&buf[16]) : 0;
+        item.detection_source = "Geri Dönüşüm Kutusu ($I/$R)";
+        item.created_time_str = "-";
+        item.modified_time_str = NtfsScanner::format_filetime(del_time);
+        item.accessed_time_str = "-";
+        item.attributes_str = "Gizli, Sistem, Arşiv";
+
+#ifdef _WIN32
+        if (has_data_file) {
+            HANDLE hQuery = CreateFileA(r_str.c_str(), GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+            if (hQuery != INVALID_HANDLE_VALUE) {
+                FILETIME ftCreate, ftAccess, ftWrite;
+                if (GetFileTime(hQuery, &ftCreate, &ftAccess, &ftWrite)) {
+                    uint64_t c_val = (static_cast<uint64_t>(ftCreate.dwHighDateTime) << 32) | ftCreate.dwLowDateTime;
+                    uint64_t a_val = (static_cast<uint64_t>(ftAccess.dwHighDateTime) << 32) | ftAccess.dwLowDateTime;
+                    uint64_t w_val = (static_cast<uint64_t>(ftWrite.dwHighDateTime) << 32) | ftWrite.dwLowDateTime;
+                    item.created_time_str = NtfsScanner::format_filetime(c_val);
+                    if (del_time == 0) item.modified_time_str = NtfsScanner::format_filetime(w_val);
+                    item.accessed_time_str = NtfsScanner::format_filetime(a_val);
+                }
+                DWORD fattr = GetFileAttributesA(r_str.c_str());
+                if (fattr != INVALID_FILE_ATTRIBUTES) {
+                    item.attributes_str = NtfsScanner::format_dos_attributes(fattr);
+                }
+                CloseHandle(hQuery);
+            }
+        }
+#endif
+
         if (has_data_file) {
             item.confidence = 100;
             item.is_recoverable = true;
@@ -643,10 +734,15 @@ std::string CarverEngine::get_hex_dump(const std::string& file_id, size_t length
         }
     }
     if (!found) return "Dosya bulunamadı.";
-    if (target.source_path.empty()) return "Veri üzerine yazılmış (Yalnızca metaveri mevcut).";
-
     std::vector<uint8_t> buf(length);
     size_t bytes_read = 0;
+
+    if (target.is_resident && !target.resident_data.empty()) {
+        size_t to_copy = std::min(length, target.resident_data.size());
+        buf.assign(target.resident_data.begin(), target.resident_data.begin() + to_copy);
+        bytes_read = to_copy;
+    } else {
+        if (target.source_path.empty()) return "Veri üzerine yazılmış (Yalnızca metaveri mevcut).";
 
 #ifdef _WIN32
     HANDLE hFile = CreateFileA(target.source_path.c_str(), GENERIC_READ,
@@ -671,6 +767,7 @@ std::string CarverEngine::get_hex_dump(const std::string& file_id, size_t length
         bytes_read = file.gcount();
     }
 #endif
+    }
 
     if (bytes_read == 0) return "Kaynak dosya okunamadı: " + target.source_path;
 
@@ -752,45 +849,57 @@ PreviewData CarverEngine::get_file_preview(const std::string& file_id) {
     }
 
     prev.hex = get_hex_dump(file_id, 256);
-    if (target.source_path.empty()) {
-        prev.type = "text";
-        prev.data = "Bu dosyanın asıl içeriği üzerine yazılmış veya temizlenmiş. Yalnızca metaveri kaydı kurtarıldı.";
-        return prev;
-    }
 
-    std::string ext = target.type;
-    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-    size_t preview_len = static_cast<size_t>(std::min<uint64_t>(target.size_bytes, 4 * 1024 * 1024));
-    if (preview_len == 0) preview_len = 64 * 1024;
-    std::vector<uint8_t> buf(preview_len);
+    std::vector<uint8_t> buf;
     size_t bytes_read = 0;
 
-#ifdef _WIN32
-    HANDLE hFile = CreateFileA(target.source_path.c_str(), GENERIC_READ,
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, NULL);
-    if (hFile != INVALID_HANDLE_VALUE) {
-        if (target.offset > 0) {
-            LARGE_INTEGER li;
-            li.QuadPart = target.offset;
-            SetFilePointerEx(hFile, li, NULL, FILE_BEGIN);
+    if (target.is_resident && !target.resident_data.empty()) {
+        buf = target.resident_data;
+        bytes_read = buf.size();
+    } else {
+        if (target.source_path.empty()) {
+            prev.type = "text";
+            prev.data = "Bu dosyanın asıl içeriği üzerine yazılmış veya temizlenmiş. Yalnızca metaveri kaydı kurtarıldı.";
+            return prev;
         }
-        DWORD read_dw = 0;
-        ReadFile(hFile, buf.data(), static_cast<DWORD>(preview_len), &read_dw, NULL);
-        bytes_read = read_dw;
-        CloseHandle(hFile);
-    }
+
+        size_t preview_len = static_cast<size_t>(std::min<uint64_t>(target.size_bytes, 4 * 1024 * 1024));
+        if (preview_len == 0) preview_len = 64 * 1024;
+        buf.resize(preview_len);
+
+#ifdef _WIN32
+        HANDLE hFile = CreateFileA(target.source_path.c_str(), GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+        if (hFile != INVALID_HANDLE_VALUE) {
+            if (target.offset > 0) {
+                LARGE_INTEGER li;
+                li.QuadPart = target.offset;
+                SetFilePointerEx(hFile, li, NULL, FILE_BEGIN);
+            }
+            DWORD read_dw = 0;
+            ReadFile(hFile, buf.data(), static_cast<DWORD>(preview_len), &read_dw, NULL);
+            bytes_read = read_dw;
+            CloseHandle(hFile);
+        }
 #else
-    std::ifstream file(target.source_path, std::ios::binary);
-    if (file.is_open()) {
-        file.seekg(target.offset);
-        file.read(reinterpret_cast<char*>(buf.data()), preview_len);
-        bytes_read = file.gcount();
-    }
+        std::ifstream file(target.source_path, std::ios::binary);
+        if (file.is_open()) {
+            file.seekg(target.offset);
+            file.read(reinterpret_cast<char*>(buf.data()), preview_len);
+            bytes_read = file.gcount();
+        }
 #endif
+    }
 
     buf.resize(bytes_read);
+
+    std::string ext = target.type;
+    for (char& c : ext) c = static_cast<char>(tolower(c));
+    if (ext.empty() && target.name.find('.') != std::string::npos) {
+        ext = target.name.substr(target.name.rfind('.') + 1);
+        for (char& c : ext) c = static_cast<char>(tolower(c));
+    }
 
     if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" || ext == "webp") {
         prev.type = "image";
@@ -839,12 +948,6 @@ RecoveryResult CarverEngine::recover_files(const std::vector<std::string>& file_
         std::cout << "[CarverEngine::recover_files] to_recover eleman sayisi: " << to_recover.size() << "\n";
 
         for (const auto& item : to_recover) {
-            if (item.source_path.empty() || !item.is_recoverable) {
-                std::cout << "[-] Dosya atlandi (veri yok): " << item.name << "\n";
-                res.failed_count++;
-                continue;
-            }
-
             fs::path out_path = dest / item.name;
             int counter = 1;
             std::error_code ec_out;
@@ -855,6 +958,39 @@ RecoveryResult CarverEngine::recover_files(const std::vector<std::string>& file_
             }
 
             bool write_ok = false;
+
+            if (item.is_mft_deleted) {
+                if (item.is_resident && !item.resident_data.empty()) {
+                    std::ofstream out(out_path, std::ios::binary);
+                    if (out.is_open()) {
+                        out.write(reinterpret_cast<const char*>(item.resident_data.data()), item.resident_data.size());
+                        write_ok = true;
+                    }
+                } else {
+                    NtfsDeletedFile ndf;
+                    ndf.filename = item.name;
+                    ndf.file_size = item.size_bytes;
+                    ndf.drive_letter = item.drive_letter.empty() ? "C:" : item.drive_letter;
+                    ndf.is_resident = false;
+                    write_ok = NtfsScanner::recover_deleted_file(ndf, out_path.string());
+                }
+
+                if (write_ok) {
+                    std::cout << "[+] MFT Dosyasi Kurtarildi: " << out_path.string() << "\n";
+                    res.recovered_count++;
+                    res.saved_files.push_back(out_path.string());
+                } else {
+                    std::cout << "[-] MFT Dosyasi Kurtarma Basarisiz: " << item.name << "\n";
+                    res.failed_count++;
+                }
+                continue;
+            }
+
+            if (item.source_path.empty() || !item.is_recoverable) {
+                std::cout << "[-] Dosya atlandi (veri yok): " << item.name << "\n";
+                res.failed_count++;
+                continue;
+            }
 #ifdef _WIN32
             HANDLE hIn = CreateFileA(item.source_path.c_str(), GENERIC_READ,
                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,

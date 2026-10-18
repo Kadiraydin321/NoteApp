@@ -296,9 +296,17 @@ void HttpServer::handle_client(uintptr_t client_socket) {
             ss << "    \"sourcePath\": \"" << json_escape(f.source_path) << "\",\n";
             ss << "    \"originalPath\": \"" << json_escape(f.original_path) << "\",\n";
             ss << "    \"isRecycleBin\": " << (f.is_recycle_bin ? "true" : "false") << ",\n";
+            ss << "    \"isMftDeleted\": " << (f.is_mft_deleted ? "true" : "false") << ",\n";
             ss << "    \"isRecoverable\": " << (f.is_recoverable ? "true" : "false") << ",\n";
             ss << "    \"statusLabel\": \"" << json_escape(f.status_label) << "\",\n";
-            ss << "    \"previewSnippet\": \"" << json_escape(f.preview_snippet) << "\"\n";
+            ss << "    \"previewSnippet\": \"" << json_escape(f.preview_snippet) << "\",\n";
+            ss << "    \"createdTime\": \"" << json_escape(f.created_time_str) << "\",\n";
+            ss << "    \"modifiedTime\": \"" << json_escape(f.modified_time_str) << "\",\n";
+            ss << "    \"accessedTime\": \"" << json_escape(f.accessed_time_str) << "\",\n";
+            ss << "    \"attributes\": \"" << json_escape(f.attributes_str) << "\",\n";
+            ss << "    \"detectionSource\": \"" << json_escape(f.detection_source) << "\",\n";
+            ss << "    \"mftRecordNumber\": " << f.mft_record_number << ",\n";
+            ss << "    \"isResident\": " << (f.is_resident ? "true" : "false") << "\n";
             ss << "  }" << (i + 1 < files.size() ? "," : "") << "\n";
         }
         ss << "]\n";
@@ -324,6 +332,7 @@ void HttpServer::handle_client(uintptr_t client_socket) {
         // Extract destination dir and fileIds
         std::string dest_dir = DiskDetector::get_default_destination();
         size_t dd = body.find("\"destDir\"");
+        if (dd == std::string::npos) dd = body.find("\"destination\"");
         if (dd != std::string::npos) {
             size_t colon = body.find(':', dd);
             size_t q1 = body.find('"', colon);
@@ -346,6 +355,7 @@ void HttpServer::handle_client(uintptr_t client_socket) {
 
         std::vector<std::string> file_ids;
         size_t fi = body.find("\"fileIds\"");
+        if (fi == std::string::npos) fi = body.find("\"file_ids\"");
         if (fi != std::string::npos) {
             size_t b1 = body.find('[', fi);
             size_t b2 = body.find(']', b1);
@@ -416,6 +426,66 @@ void HttpServer::handle_client(uintptr_t client_socket) {
             this->stop();
             exit(0);
         }).detach();
+    } else if (path == "/api/restart-elevated" && method == "POST") {
+#ifdef _WIN32
+        char exePath[MAX_PATH] = { 0 };
+        GetModuleFileNameA(NULL, exePath, MAX_PATH);
+        HINSTANCE hInst = ShellExecuteA(NULL, "runas", exePath, NULL, NULL, SW_SHOWNORMAL);
+        if (reinterpret_cast<uintptr_t>(hInst) > 32) {
+            resp_body = "{\"success\":true,\"message\":\"Yönetici olarak yeniden başlatılıyor...\"}";
+            std::thread([this]() {
+                std::this_thread::sleep_for(std::chrono::milliseconds(800));
+                this->stop();
+                exit(0);
+            }).detach();
+        } else {
+            resp_body = "{\"success\":false,\"error\":\"Yönetici izni verilmedi veya iptal edildi.\"}";
+        }
+#else
+        resp_body = "{\"success\":false,\"error\":\"Yalnızca Windows ortamında desteklenir.\"}";
+#endif
+    } else if (path == "/api/file-details") {
+        std::string file_id;
+        size_t id_pos = query.find("id=");
+        if (id_pos != std::string::npos) {
+            file_id = query.substr(id_pos + 3);
+            size_t amp = file_id.find('&');
+            if (amp != std::string::npos) file_id = file_id.substr(0, amp);
+        }
+        auto files = engine_.get_files(1000, 0);
+        const FoundFile* found_ptr = nullptr;
+        for (const auto& f : files) {
+            if (f.id == file_id) { found_ptr = &f; break; }
+        }
+        if (found_ptr) {
+            const auto& f = *found_ptr;
+            std::ostringstream ss;
+            ss << "{\n";
+            ss << "  \"id\": \"" << f.id << "\",\n";
+            ss << "  \"name\": \"" << json_escape(f.name) << "\",\n";
+            ss << "  \"originalPath\": \"" << json_escape(f.original_path) << "\",\n";
+            ss << "  \"type\": \"" << f.type << "\",\n";
+            ss << "  \"category\": \"" << f.category << "\",\n";
+            ss << "  \"sizeBytes\": " << f.size_bytes << ",\n";
+            ss << "  \"sizeHuman\": \"" << f.size_human << "\",\n";
+            ss << "  \"createdTime\": \"" << json_escape(f.created_time_str) << "\",\n";
+            ss << "  \"modifiedTime\": \"" << json_escape(f.modified_time_str) << "\",\n";
+            ss << "  \"accessedTime\": \"" << json_escape(f.accessed_time_str) << "\",\n";
+            ss << "  \"attributes\": \"" << json_escape(f.attributes_str) << "\",\n";
+            ss << "  \"detectionSource\": \"" << json_escape(f.detection_source) << "\",\n";
+            ss << "  \"confidence\": " << f.confidence << ",\n";
+            ss << "  \"statusLabel\": \"" << json_escape(f.status_label) << "\",\n";
+            ss << "  \"isRecoverable\": " << (f.is_recoverable ? "true" : "false") << ",\n";
+            ss << "  \"isMftDeleted\": " << (f.is_mft_deleted ? "true" : "false") << ",\n";
+            ss << "  \"mftRecordNumber\": " << f.mft_record_number << ",\n";
+            ss << "  \"isResident\": " << (f.is_resident ? "true" : "false") << ",\n";
+            ss << "  \"hexOffset\": \"" << f.hex_offset << "\"\n";
+            ss << "}";
+            resp_body = ss.str();
+        } else {
+            status_code = 404;
+            resp_body = "{\"error\":\"Dosya bulunamadı\"}";
+        }
     } else {
         status_code = 404;
         resp_body = "{\"error\":\"Not Found\"}";

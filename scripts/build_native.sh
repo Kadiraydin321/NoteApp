@@ -41,6 +41,7 @@ echo "[2/4] C++ kaynak kodları derleniyor (ByteRescue.exe)..."
     cpp/src/main.cpp \
     cpp/src/http_server.cpp \
     cpp/src/carver_engine.cpp \
+    cpp/src/ntfs_scanner.cpp \
     cpp/src/disk_detector.cpp \
     cpp/src/folder_dialog.cpp \
     cpp/src/app.rc \

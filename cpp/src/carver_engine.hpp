@@ -38,10 +38,23 @@ struct FoundFile {
     std::string source_path;
     std::string original_path;
     bool is_recycle_bin = false;
+    bool is_mft_deleted = false;
     bool is_recoverable = true;
     std::string status_label = "Kurtarılabilir";
     std::string preview_snippet;
     uint64_t timestamp = 0;
+
+    // Detailed file attributes & timestamps
+    std::string created_time_str;
+    std::string modified_time_str;
+    std::string accessed_time_str;
+    std::string attributes_str;
+    std::string detection_source; // "NTFS MFT (Kalıcı Silinmiş)", "Geri Dönüşüm Kutusu", "Derin Sektör Taraması"
+    uint64_t mft_record_number = 0;
+    bool is_resident = false;
+    std::vector<uint8_t> resident_data;
+    std::string internal_metadata;
+    std::string drive_letter;
 };
 
 struct ScanStats {
