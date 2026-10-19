@@ -8,6 +8,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -41,9 +42,16 @@ fun DesignStudioScreen(
     onQuickActionLocationChange: (QuickActionLocation) -> Unit,
     onSearchBarShapeChange: (SearchBarShape) -> Unit,
     onColorPaletteChange: (AppColorPalette) -> Unit,
-    onLayoutModeChange: (NotesLayoutMode) -> Unit
+    onLayoutModeChange: (NotesLayoutMode) -> Unit,
+    onWidgetDesignPresetChange: (WidgetDesignPreset) -> Unit = {},
+    onWidgetFabBehaviorChange: (WidgetFabBehavior) -> Unit = {},
+    onWidgetCornerRadiusChange: (WidgetCornerRadius) -> Unit = {},
+    onWidgetFilterModeChange: (WidgetFilterMode) -> Unit = {},
+    onWidgetShowContentChange: (Boolean) -> Unit = {},
+    onWidgetShowLockedChange: (Boolean) -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
+    var selectedStudioTab by remember { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -78,10 +86,44 @@ fun DesignStudioScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // İki Ana Sekme: Uygulama Tasarımı vs Widget Tasarımı
+            TabRow(
+                selectedTabIndex = selectedStudioTab,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary,
+                divider = { HorizontalDivider() }
+            ) {
+                Tab(
+                    selected = selectedStudioTab == 0,
+                    onClick = { selectedStudioTab = 0 },
+                    text = {
+                        Text(
+                            "📱 Uygulama Arayüzü",
+                            fontWeight = if (selectedStudioTab == 0) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedStudioTab == 1,
+                    onClick = { selectedStudioTab = 1 },
+                    text = {
+                        Text(
+                            "🧩 Widget Stüdyosu",
+                            fontWeight = if (selectedStudioTab == 1) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                if (selectedStudioTab == 0) {
             // ==========================================
             // CANLI MİNİ ÖNİZLEME PENCERESİ (MOCKUP)
             // ==========================================
@@ -474,7 +516,340 @@ fun DesignStudioScreen(
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(24.dp))
+                } else {
+                    // ==========================================
+                    // CANLI WİDGET MOCKUP SİMÜLATÖRÜ
+                    // ==========================================
+                    LiveWidgetMockupCard(settings = settings)
+
+                    // ==========================================
+                    // 1. HAZIR WİDGET TASARIM ŞABLONLARI (6 ŞABLON)
+                    // ==========================================
+                    Text(
+                        text = "✨ Widget Tasarım Şablonları",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Ana ekranınızın havasını değiştirecek 6 özel widget tasarımı:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        WidgetDesignPreset.entries.forEach { preset ->
+                            val isSelected = settings.widgetDesignPreset == preset
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                                else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onWidgetDesignPresetChange(preset) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = preset.iconEmoji,
+                                        fontSize = 28.sp,
+                                        modifier = Modifier.padding(end = 12.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = preset.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = preset.subtitle,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.primary
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = "Seçili",
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(20.dp).padding(2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    // ==========================================
+                    // 2. '+' (YENİ NOT) BUTONU DAVRANIŞI
+                    // ==========================================
+                    Text(
+                        text = "⚡ '+' (Yeni Not) Butonu Davranışı",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Widget üzerindeki '+' butonuna dokunulduğunda çalışacak eylem:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        WidgetFabBehavior.entries.forEach { behavior ->
+                            val isSelected = settings.widgetFabBehavior == behavior
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                                else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onWidgetFabBehaviorChange(behavior) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (behavior == WidgetFabBehavior.DIRECT_NEW_NOTE) Icons.Default.Bolt else Icons.Default.Menu,
+                                        contentDescription = null,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp).padding(end = 4.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = behavior.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = behavior.description,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.primary
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = "Seçili",
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(20.dp).padding(2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Bilgilendirici İpucu Kartı
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "İpucu: '+' butonunun her basışta takılmadan, doğrudan ilk seferde anında not açması için 'Doğrudan Yeni Not' modu tavsiye edilir.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    // ==========================================
+                    // 3. WİDGET KÖŞE STİLİ
+                    // ==========================================
+                    Text(
+                        text = "📐 Widget Köşe Kavis Stili",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        WidgetCornerRadius.entries.forEach { corner ->
+                            val isSelected = settings.widgetCornerRadius == corner
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                                else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { onWidgetCornerRadiusChange(corner) }
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(10.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(width = 46.dp, height = 34.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.primary.copy(alpha = if (isSelected) 0.85f else 0.4f),
+                                                RoundedCornerShape(corner.radiusDp.dp / 2)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                                RoundedCornerShape(corner.radiusDp.dp / 2)
+                                            )
+                                    )
+                                    Text(
+                                        text = corner.title,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        text = "${corner.radiusDp} dp",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    // ==========================================
+                    // 4. NOT FİLTRESİ VE İÇERİK SEÇENEKLERİ
+                    // ==========================================
+                    Text(
+                        text = "⚙️ Widget İçerik & Not Filtresi",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (settings.widgetFilterMode == WidgetFilterMode.ALL) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = if (settings.widgetFilterMode == WidgetFilterMode.ALL) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                            else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier.weight(1f).clickable { onWidgetFilterModeChange(WidgetFilterMode.ALL) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Tüm Notlar", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (settings.widgetFilterMode == WidgetFilterMode.FAVORITES) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = if (settings.widgetFilterMode == WidgetFilterMode.FAVORITES) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                            else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier.weight(1f).clickable { onWidgetFilterModeChange(WidgetFilterMode.FAVORITES) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFFFFB300))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Sadece Favoriler", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    // İçerik Özeti Switch
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Not İçerik Önizlemesi", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                Text("Not kartlarında ilk 2 satır metin özeti gösterilsin", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = settings.widgetShowContent,
+                                onCheckedChange = onWidgetShowContentChange
+                            )
+                        }
+                    }
+
+                    // Kilitli Notlar Switch
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Kilitli Notları Listele", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                Text("Kapalıyken şifreli notlar widgetta hiç görünmez", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = settings.widgetShowLockedNotes,
+                                onCheckedChange = onWidgetShowLockedChange
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
+            }
         }
     }
 }
@@ -806,6 +1181,305 @@ private fun MiniTopBarIllustration(hasActionsInTopBar: Boolean) {
                     .height(14.dp)
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(6.dp))
             )
+        }
+    }
+}
+
+/**
+ * Canlı Widget Mockup Kartı: Ana ekran üzerinde widget'ın seçilen tema,
+ * renkler, buton stili ve köşe kavislerine göre canlı olarak nasıl durduğunu simüle eder.
+ */
+@Composable
+private fun LiveWidgetMockupCard(settings: AppSettings) {
+    val preset = settings.widgetDesignPreset
+    val isDark = when (settings.themeMode) {
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
+
+    val widgetBgColor = when (preset) {
+        WidgetDesignPreset.MODERN_RED -> if (isDark) Color(0xFF17181D) else Color(0xFFFFFFFF)
+        WidgetDesignPreset.FROSTED_GLASS -> if (isDark) Color(0xFF1B2333).copy(alpha = 0.92f) else Color(0xFFEFF4F9).copy(alpha = 0.92f)
+        WidgetDesignPreset.PURE_BLACK -> Color(0xFF000000)
+        WidgetDesignPreset.VINTAGE_WARM -> if (isDark) Color(0xFF221A12) else Color(0xFFFFFDF8)
+        WidgetDesignPreset.NEON_OBSIDIAN -> Color(0xFF0B101D)
+        WidgetDesignPreset.MINIMAL_TRANSPARENT -> Color(0x38000000)
+    }
+
+    val widgetBorderColor = when (preset) {
+        WidgetDesignPreset.MODERN_RED -> Color(0xFFE53935).copy(alpha = 0.4f)
+        WidgetDesignPreset.FROSTED_GLASS -> Color(0xFF60A5FA).copy(alpha = 0.45f)
+        WidgetDesignPreset.PURE_BLACK -> Color(0xFF2A2A2A)
+        WidgetDesignPreset.VINTAGE_WARM -> Color(0xFFB06520).copy(alpha = 0.4f)
+        WidgetDesignPreset.NEON_OBSIDIAN -> Color(0xFF00E5FF).copy(alpha = 0.7f)
+        WidgetDesignPreset.MINIMAL_TRANSPARENT -> Color.White.copy(alpha = 0.25f)
+    }
+
+    val fabColor = when (preset) {
+        WidgetDesignPreset.MODERN_RED -> Color(0xFFE53935)
+        WidgetDesignPreset.FROSTED_GLASS -> Color(0xFF3B82F6)
+        WidgetDesignPreset.PURE_BLACK -> Color(0xFF242424)
+        WidgetDesignPreset.VINTAGE_WARM -> Color(0xFFB06520)
+        WidgetDesignPreset.NEON_OBSIDIAN -> Color(0xFF00E5FF)
+        WidgetDesignPreset.MINIMAL_TRANSPARENT -> Color.White.copy(alpha = 0.35f)
+    }
+
+    val headerTextColor = Color(if (isDark) preset.headerTextColorDark else preset.headerTextColorLight)
+    val accentColor = Color(if (isDark) preset.accentColorDark else preset.accentColorLight)
+    val cardBgColor = Color(if (isDark) preset.itemBgColorDark else preset.itemBgColorLight)
+    val itemTitleColor = Color(if (isDark) preset.itemTitleColorDark else preset.itemTitleColorLight)
+    val itemContentColor = Color(if (isDark) preset.itemContentColorDark else preset.itemContentColorLight)
+    val cornerRadiusDp = settings.widgetCornerRadius.radiusDp.dp
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(accentColor, CircleShape)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "CANLI WİDGET SİMÜLATÖRÜ",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        text = preset.title,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            // Simüle Edilmiş Android Ana Ekranı (Duvar Kâğıdı Arka Planı)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF0F172A))
+                        )
+                    )
+                    .padding(12.dp)
+            ) {
+                // Widget Container
+                Surface(
+                    shape = RoundedCornerShape(cornerRadiusDp),
+                    color = widgetBgColor,
+                    border = BorderStroke(1.2.dp, widgetBorderColor),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Widget Üst Başlık ve Butonlar
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Notlarım",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = headerTextColor
+                                )
+                                Text(
+                                    text = if (settings.widgetFilterMode == WidgetFilterMode.FAVORITES) "★ Favoriler" else "Tüm Notlar",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = accentColor
+                                )
+                            }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Ayarlar Simgesi
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Settings,
+                                        contentDescription = null,
+                                        tint = accentColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                // Yenile Simgesi
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        tint = accentColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                // FAB '+' Butonu
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .background(fabColor, RoundedCornerShape(14.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Simüle Not Kartı 1
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = cardBgColor,
+                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.2f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(28.dp)
+                                        .background(accentColor, RoundedCornerShape(2.dp))
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "Proje Tasarımı & Hedefler",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = itemTitleColor,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Icon(
+                                            Icons.Default.PushPin,
+                                            contentDescription = null,
+                                            tint = accentColor,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                    }
+                                    if (settings.widgetShowContent) {
+                                        Text(
+                                            text = "Yeni arayüz ve widget ayarları tamamlandı...",
+                                            fontSize = 10.sp,
+                                            color = itemContentColor,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Simüle Not Kartı 2
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = cardBgColor,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(28.dp)
+                                        .background(Color(0xFF4CAF50), RoundedCornerShape(2.dp))
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Haftalık Alışveriş Listesi",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = itemTitleColor
+                                    )
+                                    if (settings.widgetShowContent) {
+                                        Text(
+                                            text = "☑ Taze kahve çekirdeği  ☐ Defter kalemi",
+                                            fontSize = 10.sp,
+                                            color = itemContentColor,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // '+' Butonu Açıklama Rozeti
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE) Color(0xFF1B5E20).copy(alpha = 0.15f)
+                else MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE) Icons.Default.Bolt else Icons.Default.Menu,
+                        contentDescription = null,
+                        tint = if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE)
+                            "⚡ '+' Butonu: Tek Dokunuşta Doğrudan Yeni Not Açar"
+                        else
+                            "📋 '+' Butonu: Keep Tarzı Seçenek Menüsü Gösterir",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }

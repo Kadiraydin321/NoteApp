@@ -109,6 +109,21 @@ class SettingsViewModel @Inject constructor(
         NotesWidgetProvider.updateAllWidgets(app)
     }
 
+    fun setWidgetDesignPreset(preset: com.example.noteapp.data.settings.WidgetDesignPreset) {
+        settingsManager.setWidgetDesignPreset(preset)
+        NotesWidgetProvider.updateAllWidgets(app)
+    }
+
+    fun setWidgetFabBehavior(behavior: com.example.noteapp.data.settings.WidgetFabBehavior) {
+        settingsManager.setWidgetFabBehavior(behavior)
+        NotesWidgetProvider.updateAllWidgets(app)
+    }
+
+    fun setWidgetCornerRadius(radius: com.example.noteapp.data.settings.WidgetCornerRadius) {
+        settingsManager.setWidgetCornerRadius(radius)
+        NotesWidgetProvider.updateAllWidgets(app)
+    }
+
     fun setDefaultNoteColor(color: Int) {
         settingsManager.setDefaultNoteColor(color)
     }

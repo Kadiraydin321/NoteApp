@@ -15,6 +15,145 @@ enum class WidgetFilterMode {
     FAVORITES
 }
 
+enum class WidgetDesignPreset(
+    val title: String,
+    val subtitle: String,
+    val iconEmoji: String,
+    val darkBgDrawable: Int,
+    val lightBgDrawable: Int,
+    val fabDrawable: Int,
+    val headerTextColorDark: Long,
+    val headerTextColorLight: Long,
+    val accentColorDark: Long,
+    val accentColorLight: Long,
+    val itemBgColorDark: Long,
+    val itemBgColorLight: Long,
+    val itemTitleColorDark: Long,
+    val itemTitleColorLight: Long,
+    val itemContentColorDark: Long,
+    val itemContentColorLight: Long
+) {
+    MODERN_RED(
+        title = "Modern Kırmızı",
+        subtitle = "Tutkulu kırmızı detaylar & koyu mat zemin",
+        iconEmoji = "🔴",
+        darkBgDrawable = com.example.noteapp.R.drawable.widget_bg_modern_red_dark,
+        lightBgDrawable = com.example.noteapp.R.drawable.widget_bg_modern_red_light,
+        fabDrawable = com.example.noteapp.R.drawable.widget_fab_modern_red,
+        headerTextColorDark = 0xFFFFFFFF,
+        headerTextColorLight = 0xFF1C1B1F,
+        accentColorDark = 0xFFE53935,
+        accentColorLight = 0xFFD32F2F,
+        itemBgColorDark = 0xFF202128,
+        itemBgColorLight = 0xFFFFFFFF,
+        itemTitleColorDark = 0xFFFFFFFF,
+        itemTitleColorLight = 0xFF1C1B1F,
+        itemContentColorDark = 0xFFC5C6D0,
+        itemContentColorLight = 0xFF49454F
+    ),
+    FROSTED_GLASS(
+        title = "Buzlu Cam",
+        subtitle = "Yarı saydam akrilik & estetik cam dokusu",
+        iconEmoji = "❄️",
+        darkBgDrawable = com.example.noteapp.R.drawable.widget_bg_glass_dark,
+        lightBgDrawable = com.example.noteapp.R.drawable.widget_bg_glass_light,
+        fabDrawable = com.example.noteapp.R.drawable.widget_fab_glass,
+        headerTextColorDark = 0xFFFFFFFF,
+        headerTextColorLight = 0xFF0D1B2A,
+        accentColorDark = 0xFF60A5FA,
+        accentColorLight = 0xFF2563EB,
+        itemBgColorDark = 0xFF222B3A,
+        itemBgColorLight = 0xFFF1F5F9,
+        itemTitleColorDark = 0xFFFFFFFF,
+        itemTitleColorLight = 0xFF0F172A,
+        itemContentColorDark = 0xFFCBD5E1,
+        itemContentColorLight = 0xFF475569
+    ),
+    PURE_BLACK(
+        title = "Saf Siyah (AMOLED)",
+        subtitle = "Sıfır pil tüketimi, derin siyah & net çizgiler",
+        iconEmoji = "🖤",
+        darkBgDrawable = com.example.noteapp.R.drawable.widget_bg_pure_black,
+        lightBgDrawable = com.example.noteapp.R.drawable.widget_bg_pure_black,
+        fabDrawable = com.example.noteapp.R.drawable.widget_fab_pure_black,
+        headerTextColorDark = 0xFFFFFFFF,
+        headerTextColorLight = 0xFFFFFFFF,
+        accentColorDark = 0xFFE0E0E0,
+        accentColorLight = 0xFFE0E0E0,
+        itemBgColorDark = 0xFF121212,
+        itemBgColorLight = 0xFF121212,
+        itemTitleColorDark = 0xFFFFFFFF,
+        itemTitleColorLight = 0xFFFFFFFF,
+        itemContentColorDark = 0xFFA0A0A0,
+        itemContentColorLight = 0xFFA0A0A0
+    ),
+    VINTAGE_WARM(
+        title = "Vintage Defter",
+        subtitle = "Sıcak parşömen kâğıdı & klasik kahve tonları",
+        iconEmoji = "📜",
+        darkBgDrawable = com.example.noteapp.R.drawable.widget_bg_vintage_dark,
+        lightBgDrawable = com.example.noteapp.R.drawable.widget_bg_vintage_light,
+        fabDrawable = com.example.noteapp.R.drawable.widget_fab_vintage,
+        headerTextColorDark = 0xFFFBE9D0,
+        headerTextColorLight = 0xFF3D2614,
+        accentColorDark = 0xFFDDA15E,
+        accentColorLight = 0xFFB06520,
+        itemBgColorDark = 0xFF2A2016,
+        itemBgColorLight = 0xFFFFF9EE,
+        itemTitleColorDark = 0xFFFBE9D0,
+        itemTitleColorLight = 0xFF3D2614,
+        itemContentColorDark = 0xFFD6C5B4,
+        itemContentColorLight = 0xFF695444
+    ),
+    NEON_OBSIDIAN(
+        title = "Neon Siberpunk",
+        subtitle = "Karanlık obsidyen & parlak neon mavi elektrik",
+        iconEmoji = "⚡",
+        darkBgDrawable = com.example.noteapp.R.drawable.widget_bg_neon_dark,
+        lightBgDrawable = com.example.noteapp.R.drawable.widget_bg_neon_dark,
+        fabDrawable = com.example.noteapp.R.drawable.widget_fab_neon,
+        headerTextColorDark = 0xFFE0F7FA,
+        headerTextColorLight = 0xFFE0F7FA,
+        accentColorDark = 0xFF00E5FF,
+        accentColorLight = 0xFF00E5FF,
+        itemBgColorDark = 0xFF0E1726,
+        itemBgColorLight = 0xFF0E1726,
+        itemTitleColorDark = 0xFFE0F7FA,
+        itemTitleColorLight = 0xFFE0F7FA,
+        itemContentColorDark = 0xFF80DEEA,
+        itemContentColorLight = 0xFF80DEEA
+    ),
+    MINIMAL_TRANSPARENT(
+        title = "Şeffaf Minimalist",
+        subtitle = "Duvar kâğıdını gösteren saydam cam zemin",
+        iconEmoji = "🪟",
+        darkBgDrawable = com.example.noteapp.R.drawable.widget_bg_transparent,
+        lightBgDrawable = com.example.noteapp.R.drawable.widget_bg_transparent,
+        fabDrawable = com.example.noteapp.R.drawable.widget_fab_transparent,
+        headerTextColorDark = 0xFFFFFFFF,
+        headerTextColorLight = 0xFFFFFFFF,
+        accentColorDark = 0xFFFFFFFF,
+        accentColorLight = 0xFFFFFFFF,
+        itemBgColorDark = 0x4D000000,
+        itemBgColorLight = 0x4D000000,
+        itemTitleColorDark = 0xFFFFFFFF,
+        itemTitleColorLight = 0xFFFFFFFF,
+        itemContentColorDark = 0xFFE0E0E0,
+        itemContentColorLight = 0xFFE0E0E0
+    )
+}
+
+enum class WidgetFabBehavior(val title: String, val description: String) {
+    DIRECT_NEW_NOTE("Doğrudan Yeni Not (Önerilen)", "Dokunur dokunmaz anında yeni not ekranını açar (tek dokunuş, sıfır gecikme)"),
+    POPUP_MENU("Genişleyen Seçenek Menüsü", "Keep tarzı açılır menü: Metin, Yapılacaklar, Ses, Resim, Çizim")
+}
+
+enum class WidgetCornerRadius(val title: String, val radiusDp: Int) {
+    LARGE("Modern Oval", 24),
+    MEDIUM("Standart", 16),
+    SHARP("Keskin Hatlar", 8)
+}
+
 enum class ThemeMode {
     SYSTEM,
     LIGHT,
@@ -73,6 +212,9 @@ data class AppSettings(
     val widgetFilterMode: WidgetFilterMode = WidgetFilterMode.ALL,
     val widgetShowLockedNotes: Boolean = false,
     val widgetShowContent: Boolean = true,
+    val widgetDesignPreset: WidgetDesignPreset = WidgetDesignPreset.MODERN_RED,
+    val widgetFabBehavior: WidgetFabBehavior = WidgetFabBehavior.DIRECT_NEW_NOTE,
+    val widgetCornerRadius: WidgetCornerRadius = WidgetCornerRadius.LARGE,
     val defaultNoteColor: Int = 0,
     val dynamicColor: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -178,10 +320,22 @@ class AppSettingsManager @Inject constructor(
         val designPresetStr = prefs.getString(KEY_DESIGN_PRESET, DesignPreset.MODERN_MATERIAL.name) ?: DesignPreset.MODERN_MATERIAL.name
         val designPreset = try { DesignPreset.valueOf(designPresetStr) } catch (_: Exception) { DesignPreset.MODERN_MATERIAL }
 
+        val widgetDesignPresetStr = prefs.getString(KEY_WIDGET_DESIGN_PRESET, WidgetDesignPreset.MODERN_RED.name) ?: WidgetDesignPreset.MODERN_RED.name
+        val widgetDesignPreset = try { WidgetDesignPreset.valueOf(widgetDesignPresetStr) } catch (_: Exception) { WidgetDesignPreset.MODERN_RED }
+
+        val widgetFabBehaviorStr = prefs.getString(KEY_WIDGET_FAB_BEHAVIOR, WidgetFabBehavior.DIRECT_NEW_NOTE.name) ?: WidgetFabBehavior.DIRECT_NEW_NOTE.name
+        val widgetFabBehavior = try { WidgetFabBehavior.valueOf(widgetFabBehaviorStr) } catch (_: Exception) { WidgetFabBehavior.DIRECT_NEW_NOTE }
+
+        val widgetCornerRadiusStr = prefs.getString(KEY_WIDGET_CORNER_RADIUS, WidgetCornerRadius.LARGE.name) ?: WidgetCornerRadius.LARGE.name
+        val widgetCornerRadius = try { WidgetCornerRadius.valueOf(widgetCornerRadiusStr) } catch (_: Exception) { WidgetCornerRadius.LARGE }
+
         return AppSettings(
             widgetFilterMode = filterMode,
             widgetShowLockedNotes = showLocked,
             widgetShowContent = widgetShowContent,
+            widgetDesignPreset = widgetDesignPreset,
+            widgetFabBehavior = widgetFabBehavior,
+            widgetCornerRadius = widgetCornerRadius,
             defaultNoteColor = defaultColor,
             dynamicColor = dynamicColor,
             themeMode = themeMode,
@@ -392,10 +546,28 @@ class AppSettingsManager @Inject constructor(
         _settings.value = _settings.value.copy(dynamicColor = enabled)
     }
 
+    fun setWidgetDesignPreset(preset: WidgetDesignPreset) {
+        prefs.edit().putString(KEY_WIDGET_DESIGN_PRESET, preset.name).apply()
+        _settings.value = _settings.value.copy(widgetDesignPreset = preset)
+    }
+
+    fun setWidgetFabBehavior(behavior: WidgetFabBehavior) {
+        prefs.edit().putString(KEY_WIDGET_FAB_BEHAVIOR, behavior.name).apply()
+        _settings.value = _settings.value.copy(widgetFabBehavior = behavior)
+    }
+
+    fun setWidgetCornerRadius(radius: WidgetCornerRadius) {
+        prefs.edit().putString(KEY_WIDGET_CORNER_RADIUS, radius.name).apply()
+        _settings.value = _settings.value.copy(widgetCornerRadius = radius)
+    }
+
     companion object {
         private const val KEY_WIDGET_FILTER_MODE = "widget_filter_mode"
         private const val KEY_WIDGET_SHOW_LOCKED = "widget_show_locked"
         private const val KEY_WIDGET_SHOW_CONTENT = "widget_show_content"
+        private const val KEY_WIDGET_DESIGN_PRESET = "widget_design_preset"
+        private const val KEY_WIDGET_FAB_BEHAVIOR = "widget_fab_behavior"
+        private const val KEY_WIDGET_CORNER_RADIUS = "widget_corner_radius"
         private const val KEY_DEFAULT_COLOR = "default_note_color"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_THEME_MODE = "theme_mode"
@@ -430,6 +602,24 @@ class AppSettingsManager @Inject constructor(
         fun getWidgetShowContent(context: Context): Boolean {
             val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
             return prefs.getBoolean(KEY_WIDGET_SHOW_CONTENT, true)
+        }
+
+        fun getWidgetDesignPreset(context: Context): WidgetDesignPreset {
+            val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+            val str = prefs.getString(KEY_WIDGET_DESIGN_PRESET, WidgetDesignPreset.MODERN_RED.name) ?: WidgetDesignPreset.MODERN_RED.name
+            return try { WidgetDesignPreset.valueOf(str) } catch (_: Exception) { WidgetDesignPreset.MODERN_RED }
+        }
+
+        fun getWidgetFabBehavior(context: Context): WidgetFabBehavior {
+            val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+            val str = prefs.getString(KEY_WIDGET_FAB_BEHAVIOR, WidgetFabBehavior.DIRECT_NEW_NOTE.name) ?: WidgetFabBehavior.DIRECT_NEW_NOTE.name
+            return try { WidgetFabBehavior.valueOf(str) } catch (_: Exception) { WidgetFabBehavior.DIRECT_NEW_NOTE }
+        }
+
+        fun getWidgetCornerRadius(context: Context): WidgetCornerRadius {
+            val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+            val str = prefs.getString(KEY_WIDGET_CORNER_RADIUS, WidgetCornerRadius.LARGE.name) ?: WidgetCornerRadius.LARGE.name
+            return try { WidgetCornerRadius.valueOf(str) } catch (_: Exception) { WidgetCornerRadius.LARGE }
         }
 
         fun getThemeMode(context: Context): ThemeMode {

@@ -137,20 +137,15 @@ class NotesRemoteViewsFactory(
             if (note.isPinned) View.VISIBLE else View.GONE
         )
 
-        // Yuvarlak Köşeli Arka Plan Renklendirmesi (Radius 20dp asla bozulmaz)
-        val cardColor = if (isDark) 0xFF24252B.toInt() else 0xFFFAFAFC.toInt()
-        val accentColor = if (note.color != 0) note.color else if (isDark) 0xFFD0BCFF.toInt() else 0xFF6750A4.toInt()
+        // Seçili Widget Şablonuna Göre Kart ve Metin Renklendirmesi
+        val preset = AppSettingsManager.getWidgetDesignPreset(context)
+        val cardColor = if (isDark) preset.itemBgColorDark.toInt() else preset.itemBgColorLight.toInt()
+        val accentColor = if (note.color != 0) note.color else if (isDark) preset.accentColorDark.toInt() else preset.accentColorLight.toInt()
         views.setInt(R.id.widget_item_bg_image, "setColorFilter", cardColor)
         views.setInt(R.id.widget_item_accent, "setColorFilter", accentColor)
 
-        // Metin rengini arka plan parlaklığına (luminance) göre zıt yap
-        val r = android.graphics.Color.red(cardColor) / 255.0
-        val g = android.graphics.Color.green(cardColor) / 255.0
-        val b = android.graphics.Color.blue(cardColor) / 255.0
-        val luminance = 0.299 * r + 0.587 * g + 0.114 * b
-
-        val titleColor = if (luminance < 0.45) 0xFFF8F9FA.toInt() else 0xFF1D1B20.toInt()
-        val contentColor = if (luminance < 0.45) 0xFFD0D4D9.toInt() else 0xFF49454F.toInt()
+        val titleColor = if (isDark) preset.itemTitleColorDark.toInt() else preset.itemTitleColorLight.toInt()
+        val contentColor = if (isDark) preset.itemContentColorDark.toInt() else preset.itemContentColorLight.toInt()
 
         views.setTextColor(R.id.widget_item_title, titleColor)
         views.setTextColor(R.id.widget_item_content, contentColor)

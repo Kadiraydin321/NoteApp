@@ -661,7 +661,13 @@ class MainActivity : FragmentActivity() {
                             onQuickActionLocationChange = viewModel::setQuickActionLocation,
                             onSearchBarShapeChange = viewModel::setSearchBarShape,
                             onColorPaletteChange = viewModel::setColorPalette,
-                            onLayoutModeChange = viewModel::setLayoutMode
+                            onLayoutModeChange = viewModel::setLayoutMode,
+                            onWidgetDesignPresetChange = viewModel::setWidgetDesignPreset,
+                            onWidgetFabBehaviorChange = viewModel::setWidgetFabBehavior,
+                            onWidgetCornerRadiusChange = viewModel::setWidgetCornerRadius,
+                            onWidgetFilterModeChange = viewModel::setWidgetFilterMode,
+                            onWidgetShowContentChange = viewModel::setWidgetShowContent,
+                            onWidgetShowLockedChange = viewModel::setWidgetShowLocked
                         )
                     }
                 }
