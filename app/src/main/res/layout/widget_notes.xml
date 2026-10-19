@@ -86,6 +86,102 @@
             </FrameLayout>
         </LinearLayout>
 
+        <!-- Hızlı Araç Çubuğu (Sabit Hızlı Kısayollar: Metin, Liste, Ses, Görsel, Çizim) -->
+        <LinearLayout
+            android:id="@+id/widget_quick_dock"
+            android:layout_width="match_parent"
+            android:layout_height="34dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="2dp"
+            android:layout_marginBottom="6dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/widget_dock_btn_text"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:background="@drawable/widget_action_bg"
+                android:layout_marginEnd="4dp"
+                android:contentDescription="Yeni Metin Notu">
+                <ImageView
+                    android:id="@+id/widget_dock_icon_text"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_widget_text"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_dock_btn_todo"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:background="@drawable/widget_action_bg"
+                android:layout_marginEnd="4dp"
+                android:contentDescription="Yapılacaklar Listesi">
+                <ImageView
+                    android:id="@+id/widget_dock_icon_todo"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_widget_check"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_dock_btn_voice"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:background="@drawable/widget_action_bg"
+                android:layout_marginEnd="4dp"
+                android:contentDescription="Sesli Not">
+                <ImageView
+                    android:id="@+id/widget_dock_icon_voice"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_widget_mic"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_dock_btn_image"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:background="@drawable/widget_action_bg"
+                android:layout_marginEnd="4dp"
+                android:contentDescription="Fotoğraflı Not">
+                <ImageView
+                    android:id="@+id/widget_dock_icon_image"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_widget_image"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_dock_btn_draw"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:background="@drawable/widget_action_bg"
+                android:contentDescription="Çizim Notu">
+                <ImageView
+                    android:id="@+id/widget_dock_icon_draw"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_widget_draw"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- Notlar Listesi Alanı -->
         <FrameLayout
             android:layout_width="match_parent"

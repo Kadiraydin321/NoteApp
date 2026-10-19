@@ -161,9 +161,54 @@ enum class WidgetDesignPreset(
     )
 }
 
-enum class WidgetFabBehavior(val title: String, val description: String) {
-    DIRECT_NEW_NOTE("Doğrudan Yeni Not (Önerilen)", "Dokunur dokunmaz anında yeni not ekranını açar (tek dokunuş, sıfır gecikme)"),
-    POPUP_MENU("Genişleyen Seçenek Menüsü", "Keep tarzı açılır menü: Metin, Yapılacaklar, Ses, Resim, Çizim")
+enum class WidgetFabBehavior(
+    val title: String,
+    val description: String,
+    val iconEmoji: String,
+    val badgeText: String
+) {
+    DOCK_TOOLBAR(
+        title = "Sabit Hızlı Araç Çubuğu (Önerilen)",
+        description = "Aç-kapa beklemeden her an tıklanabilir 5 buton: Metin, Liste, Ses, Görsel ve Çizim doğrudan widget üzerinde!",
+        iconEmoji = "⚡",
+        badgeText = "Hızlı Araç Çubuğu (5 Buton)"
+    ),
+    DIRECT_NEW_NOTE(
+        title = "Doğrudan Standart Metin Notu",
+        description = "Tek dokunuşta doğrudan standart metin editörünü açar (0 gecikme)",
+        iconEmoji = "📝",
+        badgeText = "Tek Dokunuş: Metin Notu"
+    ),
+    DIRECT_TODO(
+        title = "Doğrudan Yapılacaklar / Görev Listesi",
+        description = "Tek dokunuşta doğrudan kontrol listesi (checklist) modunu açar",
+        iconEmoji = "📋",
+        badgeText = "Tek Dokunuş: Yapılacaklar Listesi"
+    ),
+    DIRECT_VOICE(
+        title = "Doğrudan Sesli Not Kaydı",
+        description = "Tek dokunuşta doğrudan ses kayıt modunu başlatır",
+        iconEmoji = "🎙️",
+        badgeText = "Tek Dokunuş: Sesli Not"
+    ),
+    DIRECT_IMAGE(
+        title = "Doğrudan Fotoğraf / Galeri Notu",
+        description = "Tek dokunuşta doğrudan fotoğraf çekme veya galeri seçimini açar",
+        iconEmoji = "📷",
+        badgeText = "Tek Dokunuş: Fotoğraf Notu"
+    ),
+    DIRECT_DRAW(
+        title = "Doğrudan Çizim / Karalama Tuvali",
+        description = "Tek dokunuşta doğrudan serbest çizim ve not tuvalini açar",
+        iconEmoji = "🎨",
+        badgeText = "Tek Dokunuş: Çizim Notu"
+    ),
+    POPUP_MENU(
+        title = "Açılır Seçenek Menüsü (Klasik)",
+        description = "+ butonuna basıldığında açılan mini Keep tarzı seçenek menüsü",
+        iconEmoji = "🗂️",
+        badgeText = "Açılır Mini Menü"
+    )
 }
 
 enum class WidgetCornerRadius(val title: String, val radiusDp: Int) {
@@ -341,8 +386,8 @@ class AppSettingsManager @Inject constructor(
         val widgetDesignPresetStr = prefs.getString(KEY_WIDGET_DESIGN_PRESET, WidgetDesignPreset.MODERN_RED.name) ?: WidgetDesignPreset.MODERN_RED.name
         val widgetDesignPreset = try { WidgetDesignPreset.valueOf(widgetDesignPresetStr) } catch (_: Exception) { WidgetDesignPreset.MODERN_RED }
 
-        val widgetFabBehaviorStr = prefs.getString(KEY_WIDGET_FAB_BEHAVIOR, WidgetFabBehavior.DIRECT_NEW_NOTE.name) ?: WidgetFabBehavior.DIRECT_NEW_NOTE.name
-        val widgetFabBehavior = try { WidgetFabBehavior.valueOf(widgetFabBehaviorStr) } catch (_: Exception) { WidgetFabBehavior.DIRECT_NEW_NOTE }
+        val widgetFabBehaviorStr = prefs.getString(KEY_WIDGET_FAB_BEHAVIOR, WidgetFabBehavior.DOCK_TOOLBAR.name) ?: WidgetFabBehavior.DOCK_TOOLBAR.name
+        val widgetFabBehavior = try { WidgetFabBehavior.valueOf(widgetFabBehaviorStr) } catch (_: Exception) { WidgetFabBehavior.DOCK_TOOLBAR }
 
         val widgetCornerRadiusStr = prefs.getString(KEY_WIDGET_CORNER_RADIUS, WidgetCornerRadius.LARGE.name) ?: WidgetCornerRadius.LARGE.name
         val widgetCornerRadius = try { WidgetCornerRadius.valueOf(widgetCornerRadiusStr) } catch (_: Exception) { WidgetCornerRadius.LARGE }
@@ -630,8 +675,8 @@ class AppSettingsManager @Inject constructor(
 
         fun getWidgetFabBehavior(context: Context): WidgetFabBehavior {
             val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-            val str = prefs.getString(KEY_WIDGET_FAB_BEHAVIOR, WidgetFabBehavior.DIRECT_NEW_NOTE.name) ?: WidgetFabBehavior.DIRECT_NEW_NOTE.name
-            return try { WidgetFabBehavior.valueOf(str) } catch (_: Exception) { WidgetFabBehavior.DIRECT_NEW_NOTE }
+            val str = prefs.getString(KEY_WIDGET_FAB_BEHAVIOR, WidgetFabBehavior.DOCK_TOOLBAR.name) ?: WidgetFabBehavior.DOCK_TOOLBAR.name
+            return try { WidgetFabBehavior.valueOf(str) } catch (_: Exception) { WidgetFabBehavior.DOCK_TOOLBAR }
         }
 
         fun getWidgetCornerRadius(context: Context): WidgetCornerRadius {

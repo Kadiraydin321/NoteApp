@@ -626,13 +626,12 @@ fun DesignStudioScreen(
                                     modifier = Modifier.padding(14.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = if (behavior == WidgetFabBehavior.DIRECT_NEW_NOTE) Icons.Default.Bolt else Icons.Default.Menu,
-                                        contentDescription = null,
-                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(24.dp).padding(end = 4.dp)
+                                    Text(
+                                        text = behavior.iconEmoji,
+                                        fontSize = 26.sp,
+                                        modifier = Modifier.padding(end = 8.dp)
                                     )
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(Modifier.width(4.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = behavior.title,
@@ -1354,19 +1353,59 @@ private fun LiveWidgetMockupCard(settings: AppSettings) {
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
-                                // FAB '+' Butonu
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .background(fabColor, RoundedCornerShape(14.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.Add,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                                // FAB '+' Butonu (DOCK_TOOLBAR modunda gizlenir, araç çubuğu gösterilir)
+                                if (settings.widgetFabBehavior != WidgetFabBehavior.DOCK_TOOLBAR) {
+                                    val fabIcon = when (settings.widgetFabBehavior) {
+                                        WidgetFabBehavior.DIRECT_TODO -> Icons.Default.Checklist
+                                        WidgetFabBehavior.DIRECT_VOICE -> Icons.Default.Mic
+                                        WidgetFabBehavior.DIRECT_IMAGE -> Icons.Default.PhotoCamera
+                                        WidgetFabBehavior.DIRECT_DRAW -> Icons.Default.Draw
+                                        WidgetFabBehavior.POPUP_MENU -> Icons.Default.Menu
+                                        else -> Icons.Default.Add
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(fabColor, RoundedCornerShape(14.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            fabIcon,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Sabit Hızlı Araç Çubuğu Mockup Görünümü (DOCK_TOOLBAR seçiliyse)
+                        if (settings.widgetFabBehavior == WidgetFabBehavior.DOCK_TOOLBAR) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val dockButtons = listOf(
+                                    Icons.Default.Edit to "Metin",
+                                    Icons.Default.Checklist to "Liste",
+                                    Icons.Default.Mic to "Ses",
+                                    Icons.Default.PhotoCamera to "Görsel",
+                                    Icons.Default.Draw to "Çizim"
+                                )
+                                dockButtons.forEach { (icon, name) ->
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = accentColor.copy(alpha = 0.14f),
+                                        border = BorderStroke(0.8.dp, accentColor.copy(alpha = 0.35f)),
+                                        modifier = Modifier.weight(1f).height(28.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(icon, contentDescription = name, tint = accentColor, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1459,28 +1498,22 @@ private fun LiveWidgetMockupCard(settings: AppSettings) {
             // '+' Butonu Açıklama Rozeti
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE) Color(0xFF1B5E20).copy(alpha = 0.15f)
-                else MaterialTheme.colorScheme.surfaceVariant
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE) Icons.Default.Bolt else Icons.Default.Menu,
-                        contentDescription = null,
-                        tint = if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
+                    Text(
+                        text = settings.widgetFabBehavior.iconEmoji,
+                        fontSize = 16.sp
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE)
-                            "⚡ '+' Butonu: Tek Dokunuşta Doğrudan Yeni Not Açar"
-                        else
-                            "📋 '+' Butonu: Keep Tarzı Seçenek Menüsü Gösterir",
+                        text = "Widget Eylemi: ${settings.widgetFabBehavior.badgeText}",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }

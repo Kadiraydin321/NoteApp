@@ -874,7 +874,7 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = "Tema: ${settings.widgetDesignPreset.title} · '+' Butonu: ${if (settings.widgetFabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE) "Anında Açılış" else "Keep Menüsü"}",
+                                    text = "Tema: ${settings.widgetDesignPreset.title} · Eylem: ${settings.widgetFabBehavior.badgeText}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

@@ -95,15 +95,18 @@ class NotesWidgetProvider : AppWidgetProvider() {
         }
 
         fun closeAllPopups(context: Context) {
+            try {
+                context.getSharedPreferences(WIDGET_POPUP_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .clear()
+                    .apply()
+            } catch (_: Exception) {}
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val compNotes = ComponentName(context, NotesWidgetProvider::class.java)
             val notesIds = appWidgetManager.getAppWidgetIds(compNotes)
             if (notesIds != null && notesIds.isNotEmpty()) {
                 notesIds.forEach { id ->
-                    if (isPopupOpen(context, id)) {
-                        setPopupOpen(context, id, false)
-                        updateAppWidget(context, appWidgetManager, id)
-                    }
+                    updateAppWidget(context, appWidgetManager, id)
                 }
             }
         }
@@ -146,20 +149,34 @@ class NotesWidgetProvider : AppWidgetProvider() {
         internal fun build1x1Views(context: Context, isDark: Boolean, appWidgetId: Int): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_1x1_quick)
             val preset = AppSettingsManager.getWidgetDesignPreset(context)
+            val fabBehavior = AppSettingsManager.getWidgetFabBehavior(context)
+
             val bgRes = if (isDark) preset.darkBgDrawable else preset.lightBgDrawable
             views.setInt(R.id.widget_1x1_root, "setBackgroundResource", bgRes)
             views.setInt(R.id.widget_1x1_btn, "setBackgroundResource", preset.fabDrawable)
             val labelColor = if (isDark) preset.headerTextColorDark.toInt() else preset.headerTextColorLight.toInt()
             views.setTextColor(R.id.widget_1x1_label, labelColor)
 
-            val textIntent = Intent(context, MainActivity::class.java).apply {
-                putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_TEXT)
+            val (actionType, iconRes, labelText) = when (fabBehavior) {
+                WidgetFabBehavior.DIRECT_TODO -> Triple(ACTION_TYPE_CHECKLIST, R.drawable.ic_widget_check, "Liste")
+                WidgetFabBehavior.DIRECT_VOICE -> Triple(ACTION_TYPE_VOICE, R.drawable.ic_widget_mic, "Ses")
+                WidgetFabBehavior.DIRECT_IMAGE -> Triple(ACTION_TYPE_IMAGE, R.drawable.ic_widget_image, "Görsel")
+                WidgetFabBehavior.DIRECT_DRAW -> Triple(ACTION_TYPE_DRAW, R.drawable.ic_widget_draw, "Çizim")
+                else -> Triple(ACTION_TYPE_TEXT, R.drawable.ic_widget_add, "Not")
+            }
+            views.setImageViewResource(R.id.widget_1x1_icon, iconRes)
+            views.setTextViewText(R.id.widget_1x1_label, labelText)
+
+            val clickIntent = Intent(context, MainActivity::class.java).apply {
+                action = actionType
+                putExtra(EXTRA_ACTION_TYPE, actionType)
+                data = Uri.parse("noteapp://widget/1x1/${appWidgetId}_$actionType")
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             val pendingIntent = PendingIntent.getActivity(
                 context,
                 1000 + appWidgetId,
-                textIntent,
+                clickIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widget_1x1_btn, pendingIntent)
@@ -231,77 +248,119 @@ class NotesWidgetProvider : AppWidgetProvider() {
             views.setInt(R.id.widget_fab_main, "setBackgroundResource", preset.fabDrawable)
 
             // FAB Davranışı ve Menü Durumu
-            if (fabBehavior == WidgetFabBehavior.DIRECT_NEW_NOTE) {
-                // DOĞRUDAN NOT OLUŞTURMA: Tek dokunuşla %100 kesin anında açılış (0 gecikme, 0 bug)
-                views.setViewVisibility(R.id.widget_popup_container, View.GONE)
-                views.setViewVisibility(R.id.widget_scrim, View.GONE)
-                views.setImageViewResource(R.id.widget_fab_icon, R.drawable.ic_widget_add_white)
-
-                val newNoteIntent = Intent(context, MainActivity::class.java).apply {
-                    action = ACTION_TYPE_TEXT
-                    putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_TEXT)
-                    data = Uri.parse("noteapp://widget/direct_new_note/$appWidgetId")
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                }
-                val directPendingIntent = PendingIntent.getActivity(
-                    context,
-                    6000 + appWidgetId,
-                    newNoteIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_fab_main, directPendingIntent)
-            } else {
-                // GENİŞLEYEN POPUP MENÜ
-                val isPopupOpen = isPopupOpen(context, appWidgetId)
-                if (isPopupOpen) {
-                    views.setViewVisibility(R.id.widget_popup_container, View.VISIBLE)
-                    views.setViewVisibility(R.id.widget_scrim, View.VISIBLE)
-                    views.setImageViewResource(R.id.widget_fab_icon, R.drawable.ic_widget_close)
-                } else {
+            when (fabBehavior) {
+                WidgetFabBehavior.DOCK_TOOLBAR -> {
+                    // SABİT HIZLI ARAÇ ÇUBUĞU: 5 buton doğrudan widget üzerinde her an hazır (0 bekleme, 0 bug, aç-kapa yok)
+                    views.setViewVisibility(R.id.widget_quick_dock, View.VISIBLE)
+                    views.setViewVisibility(R.id.widget_fab_main, View.GONE)
                     views.setViewVisibility(R.id.widget_popup_container, View.GONE)
                     views.setViewVisibility(R.id.widget_scrim, View.GONE)
-                    views.setImageViewResource(R.id.widget_fab_icon, R.drawable.ic_widget_add_white)
-                }
 
-                // Dışına tıklandığında menüyü kapat
-                val scrimIntent = Intent(context, NotesWidgetProvider::class.java).apply {
-                    action = ACTION_CLOSE_POPUP
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                    data = Uri.parse("noteapp://widget/scrim_close/$appWidgetId")
-                }
-                val scrimPendingIntent = PendingIntent.getBroadcast(
-                    context,
-                    7000 + appWidgetId,
-                    scrimIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_scrim, scrimPendingIntent)
+                    val dockBtnBg = if (isDark) R.drawable.widget_action_bg_dark else R.drawable.widget_action_bg
+                    val dockBtns = listOf(
+                        R.id.widget_dock_btn_text to R.id.widget_dock_icon_text,
+                        R.id.widget_dock_btn_todo to R.id.widget_dock_icon_todo,
+                        R.id.widget_dock_btn_voice to R.id.widget_dock_icon_voice,
+                        R.id.widget_dock_btn_image to R.id.widget_dock_icon_image,
+                        R.id.widget_dock_btn_draw to R.id.widget_dock_icon_draw
+                    )
+                    dockBtns.forEach { (btnId, iconId) ->
+                        views.setInt(btnId, "setBackgroundResource", dockBtnBg)
+                        views.setInt(iconId, "setColorFilter", accentColor)
+                    }
 
-                // FAB Tıklaması -> Popup Menüsünü Aç / Kapat
-                val popupIntent = Intent(context, NotesWidgetProvider::class.java).apply {
-                    action = if (isPopupOpen) ACTION_CLOSE_POPUP else ACTION_OPEN_POPUP
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                    data = Uri.parse("noteapp://widget/toggle/${appWidgetId}_${if (isPopupOpen) "close" else "open"}")
+                    wireDockButtons(context, views, appWidgetId)
                 }
-                val popupPendingIntent = PendingIntent.getBroadcast(
-                    context,
-                    5000 + appWidgetId,
-                    popupIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_fab_main, popupPendingIntent)
+                WidgetFabBehavior.DIRECT_NEW_NOTE,
+                WidgetFabBehavior.DIRECT_TODO,
+                WidgetFabBehavior.DIRECT_VOICE,
+                WidgetFabBehavior.DIRECT_IMAGE,
+                WidgetFabBehavior.DIRECT_DRAW -> {
+                    // TEK DOKUNUŞTA DOĞRUDAN BELİRLİ NOT TÜRÜNÜ AÇMA (%100 anında, tek dokunuş)
+                    views.setViewVisibility(R.id.widget_quick_dock, View.GONE)
+                    views.setViewVisibility(R.id.widget_fab_main, View.VISIBLE)
+                    views.setViewVisibility(R.id.widget_popup_container, View.GONE)
+                    views.setViewVisibility(R.id.widget_scrim, View.GONE)
 
-                // Popup Menü Seçeneklerini Bağla
-                wireActionButtons(
-                    context = context,
-                    views = views,
-                    appWidgetId = appWidgetId,
-                    btnTextId = R.id.widget_popup_item_text,
-                    btnTodoId = R.id.widget_popup_item_todo,
-                    btnImageId = R.id.widget_popup_item_image,
-                    btnVoiceId = R.id.widget_popup_item_voice,
-                    btnDrawId = R.id.widget_popup_item_draw
-                )
+                    val (directAction, directIcon) = when (fabBehavior) {
+                        WidgetFabBehavior.DIRECT_TODO -> ACTION_TYPE_CHECKLIST to R.drawable.ic_widget_check
+                        WidgetFabBehavior.DIRECT_VOICE -> ACTION_TYPE_VOICE to R.drawable.ic_widget_mic
+                        WidgetFabBehavior.DIRECT_IMAGE -> ACTION_TYPE_IMAGE to R.drawable.ic_widget_image
+                        WidgetFabBehavior.DIRECT_DRAW -> ACTION_TYPE_DRAW to R.drawable.ic_widget_draw
+                        else -> ACTION_TYPE_TEXT to R.drawable.ic_widget_add_white
+                    }
+                    views.setImageViewResource(R.id.widget_fab_icon, directIcon)
+
+                    val directIntent = Intent(context, MainActivity::class.java).apply {
+                        action = directAction
+                        putExtra(EXTRA_ACTION_TYPE, directAction)
+                        data = Uri.parse("noteapp://widget/direct/${appWidgetId}_$directAction")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    }
+                    val directPendingIntent = PendingIntent.getActivity(
+                        context,
+                        6000 + appWidgetId,
+                        directIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    views.setOnClickPendingIntent(R.id.widget_fab_main, directPendingIntent)
+                }
+                WidgetFabBehavior.POPUP_MENU -> {
+                    // GENİŞLEYEN POPUP MENÜ
+                    views.setViewVisibility(R.id.widget_quick_dock, View.GONE)
+                    views.setViewVisibility(R.id.widget_fab_main, View.VISIBLE)
+
+                    val isPopupOpen = isPopupOpen(context, appWidgetId)
+                    if (isPopupOpen) {
+                        views.setViewVisibility(R.id.widget_popup_container, View.VISIBLE)
+                        views.setViewVisibility(R.id.widget_scrim, View.VISIBLE)
+                        views.setImageViewResource(R.id.widget_fab_icon, R.drawable.ic_widget_close)
+                    } else {
+                        views.setViewVisibility(R.id.widget_popup_container, View.GONE)
+                        views.setViewVisibility(R.id.widget_scrim, View.GONE)
+                        views.setImageViewResource(R.id.widget_fab_icon, R.drawable.ic_widget_add_white)
+                    }
+
+                    // Dışına tıklandığında menüyü kapat
+                    val scrimIntent = Intent(context, NotesWidgetProvider::class.java).apply {
+                        action = ACTION_CLOSE_POPUP
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                        data = Uri.parse("noteapp://widget/scrim_close/$appWidgetId")
+                    }
+                    val scrimPendingIntent = PendingIntent.getBroadcast(
+                        context,
+                        7000 + appWidgetId,
+                        scrimIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    views.setOnClickPendingIntent(R.id.widget_scrim, scrimPendingIntent)
+
+                    // FAB Tıklaması -> Popup Menüsünü Aç / Kapat
+                    val popupIntent = Intent(context, NotesWidgetProvider::class.java).apply {
+                        action = if (isPopupOpen) ACTION_CLOSE_POPUP else ACTION_OPEN_POPUP
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                        data = Uri.parse("noteapp://widget/toggle/${appWidgetId}_${if (isPopupOpen) "close" else "open"}")
+                    }
+                    val popupPendingIntent = PendingIntent.getBroadcast(
+                        context,
+                        5000 + appWidgetId,
+                        popupIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    views.setOnClickPendingIntent(R.id.widget_fab_main, popupPendingIntent)
+
+                    // Popup Menü Seçeneklerini Bağla
+                    wireActionButtons(
+                        context = context,
+                        views = views,
+                        appWidgetId = appWidgetId,
+                        btnTextId = R.id.widget_popup_item_text,
+                        btnTodoId = R.id.widget_popup_item_todo,
+                        btnImageId = R.id.widget_popup_item_image,
+                        btnVoiceId = R.id.widget_popup_item_voice,
+                        btnDrawId = R.id.widget_popup_item_draw
+                    )
+                }
             }
 
             val filterMode = AppSettingsManager.getWidgetFilterMode(context)
@@ -366,6 +425,35 @@ class NotesWidgetProvider : AppWidgetProvider() {
             return views
         }
 
+        private fun wireDockButtons(
+            context: Context,
+            views: RemoteViews,
+            appWidgetId: Int
+        ) {
+            val items = listOf(
+                R.id.widget_dock_btn_text to ACTION_TYPE_TEXT,
+                R.id.widget_dock_btn_todo to ACTION_TYPE_CHECKLIST,
+                R.id.widget_dock_btn_voice to ACTION_TYPE_VOICE,
+                R.id.widget_dock_btn_image to ACTION_TYPE_IMAGE,
+                R.id.widget_dock_btn_draw to ACTION_TYPE_DRAW
+            )
+            items.forEachIndexed { index, (btnId, actionType) ->
+                val intent = Intent(context, MainActivity::class.java).apply {
+                    action = actionType
+                    putExtra(EXTRA_ACTION_TYPE, actionType)
+                    data = Uri.parse("noteapp://widget/dock/${appWidgetId}_$actionType")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                val pi = PendingIntent.getActivity(
+                    context,
+                    8000 + appWidgetId * 10 + index,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                views.setOnClickPendingIntent(btnId, pi)
+            }
+        }
+
         private fun wireActionButtons(
             context: Context,
             views: RemoteViews,
@@ -379,7 +467,9 @@ class NotesWidgetProvider : AppWidgetProvider() {
             val baseReq = 100 + appWidgetId * 10
 
             val textIntent = Intent(context, MainActivity::class.java).apply {
+                action = ACTION_TYPE_TEXT
                 putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_TEXT)
+                data = Uri.parse("noteapp://widget/action/${appWidgetId}_$ACTION_TYPE_TEXT")
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             views.setOnClickPendingIntent(
@@ -388,18 +478,22 @@ class NotesWidgetProvider : AppWidgetProvider() {
             )
 
             if (btnTodoId != null) {
-            val todoIntent = Intent(context, MainActivity::class.java).apply {
-                putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_CHECKLIST)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            views.setOnClickPendingIntent(
-                btnTodoId,
-                PendingIntent.getActivity(context, baseReq + 2, todoIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            )
+                val todoIntent = Intent(context, MainActivity::class.java).apply {
+                    action = ACTION_TYPE_CHECKLIST
+                    putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_CHECKLIST)
+                    data = Uri.parse("noteapp://widget/action/${appWidgetId}_$ACTION_TYPE_CHECKLIST")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                views.setOnClickPendingIntent(
+                    btnTodoId,
+                    PendingIntent.getActivity(context, baseReq + 2, todoIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                )
             }
 
             val imageIntent = Intent(context, MainActivity::class.java).apply {
+                action = ACTION_TYPE_IMAGE
                 putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_IMAGE)
+                data = Uri.parse("noteapp://widget/action/${appWidgetId}_$ACTION_TYPE_IMAGE")
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             views.setOnClickPendingIntent(
@@ -408,7 +502,9 @@ class NotesWidgetProvider : AppWidgetProvider() {
             )
 
             val voiceIntent = Intent(context, MainActivity::class.java).apply {
+                action = ACTION_TYPE_VOICE
                 putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_VOICE)
+                data = Uri.parse("noteapp://widget/action/${appWidgetId}_$ACTION_TYPE_VOICE")
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             views.setOnClickPendingIntent(
@@ -417,14 +513,16 @@ class NotesWidgetProvider : AppWidgetProvider() {
             )
 
             if (btnDrawId != null) {
-            val drawIntent = Intent(context, MainActivity::class.java).apply {
-                putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_DRAW)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            views.setOnClickPendingIntent(
-                btnDrawId,
-                PendingIntent.getActivity(context, baseReq + 5, drawIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            )
+                val drawIntent = Intent(context, MainActivity::class.java).apply {
+                    action = ACTION_TYPE_DRAW
+                    putExtra(EXTRA_ACTION_TYPE, ACTION_TYPE_DRAW)
+                    data = Uri.parse("noteapp://widget/action/${appWidgetId}_$ACTION_TYPE_DRAW")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                views.setOnClickPendingIntent(
+                    btnDrawId,
+                    PendingIntent.getActivity(context, baseReq + 5, drawIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                )
             }
         }
 
