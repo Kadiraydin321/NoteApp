@@ -306,6 +306,65 @@ private val SlateMinimalLightScheme = lightColorScheme(
     outlineVariant = Color(0xFFC5C7CE)
 )
 
+// =========================================================================
+// 6) BUZ & CAM MAVİSİ (GLACIAL ICE) - Kristal Cam, Şeffaflık & Ferah Buzul Tonları
+// =========================================================================
+private val GlacialIceDarkScheme = darkColorScheme(
+    primary = Color(0xFF38BDF8),          // Parlak Işıltılı Buz Mavisi (Sky-400)
+    onPrimary = Color(0xFF003549),
+    primaryContainer = Color(0xFF004D68),
+    onPrimaryContainer = Color(0xFFC2E8FF),
+
+    secondary = Color(0xFF7DD3FC),        // Yarı Saydam Buz Akriliği
+    onSecondary = Color(0xFF003548),
+    secondaryContainer = Color(0xFF163C4E),
+    onSecondaryContainer = Color(0xFFBCE7FD),
+
+    tertiary = Color(0xFF99F6E4),         // Akuamarin Cam Parıltısı
+    onTertiary = Color(0xFF003731),
+    tertiaryContainer = Color(0xFF0B4D45),
+    onTertiaryContainer = Color(0xFFB5F4E9),
+
+    background = Color(0xFF0B131B),       // Çok Koyu Arktik Gece Camı
+    onBackground = Color(0xFFE2F1F8),
+    surface = Color(0xFF101B24),          // Derin Buzul Yüzeyi
+    onSurface = Color(0xFFE2F1F8),
+    surfaceVariant = Color(0xFF182A3A),   // Yarı Saydam Hissiyatlı Cam Kart
+    onSurfaceVariant = Color(0xFFB8CBD6),
+    surfaceContainerHighest = Color(0xFF22374A),
+
+    outline = Color(0xFF38BDF8),          // Cam Çerçeve Işıltısı
+    outlineVariant = Color(0xFF1F384A)
+)
+
+private val GlacialIceLightScheme = lightColorScheme(
+    primary = Color(0xFF0284C7),          // Canlı Cam Mavisi (Sky-600)
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFE0F2FE), // Çok Ferah Açık Buz Kristali
+    onPrimaryContainer = Color(0xFF034A6E),
+
+    secondary = Color(0xFF0EA5E9),        // Berrak Gökyüzü / Cam
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFE0F7FA),
+    onSecondaryContainer = Color(0xFF004D5A),
+
+    tertiary = Color(0xFF0D9488),         // Zümrüt Buzul Mavisi
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFCCFBF1),
+    onTertiaryContainer = Color(0xFF004D40),
+
+    background = Color(0xFFF0F9FF),       // Çok Ferah Açık Arktik Zemin
+    onBackground = Color(0xFF082F49),
+    surface = Color(0xFFF0F9FF),
+    onSurface = Color(0xFF082F49),
+    surfaceVariant = Color(0xFFE0F2FE),   // Yarı Saydam Temiz Cam Efekti
+    onSurfaceVariant = Color(0xFF334E68),
+    surfaceContainerHighest = Color(0xFFBAE6FD),
+
+    outline = Color(0xFF38BDF8),
+    outlineVariant = Color(0xFF7DD3FC)
+)
+
 @Immutable
 data class NoteColorSpec(
     val backgroundColor: Color,
@@ -362,6 +421,7 @@ fun NoteAppTheme(
             AppColorPalette.FOREST_EMERALD -> if (darkTheme) ForestEmeraldDarkScheme else ForestEmeraldLightScheme
             AppColorPalette.DEEP_OCEAN -> if (darkTheme) DeepOceanDarkScheme else DeepOceanLightScheme
             AppColorPalette.SLATE_MINIMAL -> if (darkTheme) SlateMinimalDarkScheme else SlateMinimalLightScheme
+            AppColorPalette.GLACIAL_ICE -> if (darkTheme) GlacialIceDarkScheme else GlacialIceLightScheme
         }
     }
 

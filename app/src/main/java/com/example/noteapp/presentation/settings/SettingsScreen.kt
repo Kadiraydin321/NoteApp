@@ -1268,6 +1268,7 @@ fun SettingsScreen(
                                 AppColorPalette.FOREST_EMERALD -> listOf(Color(0xFF81D89D), Color(0xFFA2CED9), Color(0xFF202A22))
                                 AppColorPalette.DEEP_OCEAN -> listOf(Color(0xFF97CCF8), Color(0xFFB9C8DA), Color(0xFF202731))
                                 AppColorPalette.SLATE_MINIMAL -> listOf(Color(0xFFD0D3D9), Color(0xFFC4C7CC), Color(0xFF26292E))
+                                AppColorPalette.GLACIAL_ICE -> listOf(Color(0xFF38BDF8), Color(0xFF7DD3FC), Color(0xFF0B131B))
                             }
 
                             Surface(

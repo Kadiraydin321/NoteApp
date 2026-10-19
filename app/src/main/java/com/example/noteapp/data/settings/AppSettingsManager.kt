@@ -140,6 +140,24 @@ enum class WidgetDesignPreset(
         itemTitleColorLight = 0xFFFFFFFF,
         itemContentColorDark = 0xFFE0E0E0,
         itemContentColorLight = 0xFFE0E0E0
+    ),
+    ICE_GLACIAL(
+        title = "Buz Mavisi & Cam",
+        subtitle = "Yarı saydam arktik cam & ışıltılı gök mavisi",
+        iconEmoji = "🧊",
+        darkBgDrawable = com.example.noteapp.R.drawable.widget_bg_ice_glass_dark,
+        lightBgDrawable = com.example.noteapp.R.drawable.widget_bg_ice_glass_light,
+        fabDrawable = com.example.noteapp.R.drawable.widget_fab_ice_glass,
+        headerTextColorDark = 0xFFF0F9FF,
+        headerTextColorLight = 0xFF082F49,
+        accentColorDark = 0xFF38BDF8,
+        accentColorLight = 0xFF0284C7,
+        itemBgColorDark = 0x99102436,
+        itemBgColorLight = 0xB8FFFFFF,
+        itemTitleColorDark = 0xFFF0F9FF,
+        itemTitleColorLight = 0xFF082F49,
+        itemContentColorDark = 0xFFBAE6FD,
+        itemContentColorLight = 0xFF334E68
     )
 }
 

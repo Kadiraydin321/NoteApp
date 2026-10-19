@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- %70 yarı saydam derin arktik gece camı -->
+    <solid android:color="#B309141F" />
+    <corners android:radius="24dp" />
+    <!-- 1.3dp ışıltılı buz mavisi cam çerçevesi -->
+    <stroke android:width="1.3dp" android:color="#8038BDF8" />
+</shape>

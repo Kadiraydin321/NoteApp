@@ -471,6 +471,7 @@ fun DesignStudioScreen(
                         AppColorPalette.FOREST_EMERALD -> listOf(Color(0xFF81D89D), Color(0xFFA2CED9), Color(0xFF202A22))
                         AppColorPalette.DEEP_OCEAN -> listOf(Color(0xFF97CCF8), Color(0xFFB9C8DA), Color(0xFF202731))
                         AppColorPalette.SLATE_MINIMAL -> listOf(Color(0xFFD0D3D9), Color(0xFFC4C7CC), Color(0xFF26292E))
+                        AppColorPalette.GLACIAL_ICE -> listOf(Color(0xFF38BDF8), Color(0xFF7DD3FC), Color(0xFF0B131B))
                     }
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -1205,6 +1206,7 @@ private fun LiveWidgetMockupCard(settings: AppSettings) {
         WidgetDesignPreset.VINTAGE_WARM -> if (isDark) Color(0xFF221A12) else Color(0xFFFFFDF8)
         WidgetDesignPreset.NEON_OBSIDIAN -> Color(0xFF0B101D)
         WidgetDesignPreset.MINIMAL_TRANSPARENT -> Color(0x38000000)
+        WidgetDesignPreset.ICE_GLACIAL -> if (isDark) Color(0xFF09141F).copy(alpha = 0.70f) else Color(0xFFF0F9FF).copy(alpha = 0.85f)
     }
 
     val widgetBorderColor = when (preset) {
@@ -1214,6 +1216,7 @@ private fun LiveWidgetMockupCard(settings: AppSettings) {
         WidgetDesignPreset.VINTAGE_WARM -> Color(0xFFB06520).copy(alpha = 0.4f)
         WidgetDesignPreset.NEON_OBSIDIAN -> Color(0xFF00E5FF).copy(alpha = 0.7f)
         WidgetDesignPreset.MINIMAL_TRANSPARENT -> Color.White.copy(alpha = 0.25f)
+        WidgetDesignPreset.ICE_GLACIAL -> Color(0xFF38BDF8).copy(alpha = 0.65f)
     }
 
     val fabColor = when (preset) {
@@ -1223,6 +1226,7 @@ private fun LiveWidgetMockupCard(settings: AppSettings) {
         WidgetDesignPreset.VINTAGE_WARM -> Color(0xFFB06520)
         WidgetDesignPreset.NEON_OBSIDIAN -> Color(0xFF00E5FF)
         WidgetDesignPreset.MINIMAL_TRANSPARENT -> Color.White.copy(alpha = 0.35f)
+        WidgetDesignPreset.ICE_GLACIAL -> Color(0xFF0284C7)
     }
 
     val headerTextColor = Color(if (isDark) preset.headerTextColorDark else preset.headerTextColorLight)
