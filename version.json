@@ -1,7 +1,7 @@
 {
-  "versionCode": 13,
-  "versionName": "1.1.2",
-  "buildTime": 1792440000000,
+  "versionCode": 14,
+  "versionName": "1.1.3",
+  "buildTime": 1792440300000,
   "releaseDate": "19.10.2026",
-  "changeLog": "Tasarım Stüdyosu'na Widget Kişiselleştirme bölümü eklendi: 6 farklı widget teması (Modern Kırmızı, Buzlu Cam, Saf Siyah AMOLED, Vintage Defter, Neon Siberpunk, Şeffaf Minimalist) ve canlı widget simülatörü. Widget üzerindeki '+' (yeni not) butonunun çift basma/takılma sorunu tamamen giderildi; doğrudan anında yeni not oluşturma desteği eklendi."
+  "changeLog": "Hem uygulama geneline hem de ana ekran widget'ına yeni 'Buz & Cam Mavisi' (Glacial Ice) teması eklendi. Yarı saydam kristal cam zemin ve ışıltılı buzul mavisi detaylar ile hem koyu hem açık temayla kusursuz uyum sağlandı. Tasarım Stüdyosu canlı simülatörü ve renk paletleri güncellendi."
 }
