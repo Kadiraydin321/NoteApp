@@ -1,7 +1,7 @@
 {
-  "versionCode": 12,
-  "versionName": "1.1.1",
-  "buildTime": 1792349000000,
-  "releaseDate": "18.10.2026",
-  "changeLog": "Güncelleme yöneticisi singleton arka plan kapsamına taşındı: İndirme sırasında Ayarlar ekranından çıkıldığında indirme kesilmez, arka planda sorunsuz devam eder. Tekrar girildiğinde tekrar eden popup döngüsü engellendi; indirme ilerleme çubuğu ve 'Şimdi Yükle' hazır paketi eklendi."
+  "versionCode": 13,
+  "versionName": "1.1.2",
+  "buildTime": 1792440000000,
+  "releaseDate": "19.10.2026",
+  "changeLog": "Tasarım Stüdyosu'na Widget Kişiselleştirme bölümü eklendi: 6 farklı widget teması (Modern Kırmızı, Buzlu Cam, Saf Siyah AMOLED, Vintage Defter, Neon Siberpunk, Şeffaf Minimalist) ve canlı widget simülatörü. Widget üzerindeki '+' (yeni not) butonunun çift basma/takılma sorunu tamamen giderildi; doğrudan anında yeni not oluşturma desteği eklendi."
 }
