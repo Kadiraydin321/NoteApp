@@ -68,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.toArgb
 import coil.compose.AsyncImage
 import com.example.noteapp.data.settings.NotesLayoutMode
 import com.example.noteapp.domain.model.Category
@@ -104,6 +105,7 @@ fun NotesScreen(
     onClearSelection: () -> Unit = {},
     onDeleteSelectedNotes: () -> Unit = {},
     onUpdateCategoryForSelected: (Long?) -> Unit = {},
+    onUpdateColorForSelected: (Int) -> Unit = {},
     onTogglePinForSelected: () -> Unit = {},
     onDuplicateNote: (Note) -> Unit = {},
     onFilterTypeChange: (NoteTypeFilter) -> Unit = {},
@@ -191,6 +193,7 @@ fun NotesScreen(
     var showManageCategoriesDialog by remember { mutableStateOf(false) }
     var categoryToDelete by remember { mutableStateOf<Category?>(null) }
     var showBatchCategoryDialog by remember { mutableStateOf(false) }
+    var showBatchColorDialog by remember { mutableStateOf(false) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
     var showSelectionActionsMenu by remember { mutableStateOf(false) }
     var showEmptyTrashConfirm by remember { mutableStateOf(false) }
@@ -729,6 +732,10 @@ fun NotesScreen(
                                 IconButton(onClick = onTogglePinForSelected) {
                                     Icon(Icons.Default.PushPin, contentDescription = "Sabitle")
                                 }
+                                // Rengi Değiştir (Toplu)
+                                IconButton(onClick = { showBatchColorDialog = true }) {
+                                    Icon(Icons.Default.Palette, contentDescription = "Renk Değiştir")
+                                }
                             }
                             Box {
                                 IconButton(onClick = { showSelectionActionsMenu = true }) {
@@ -745,6 +752,40 @@ fun NotesScreen(
                                             onClick = {
                                                 selectedNotes.singleOrNull()?.let(onShareNote)
                                                 showSelectionActionsMenu = false
+                                                onClearSelection()
+                                            }
+                                        )
+                                    }
+                                    if (state.selectedNoteIds.isNotEmpty()) {
+                                        DropdownMenuItem(
+                                            text = { Text("Seçili Notları Tek PDF Olarak Paylaş") },
+                                            leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                            onClick = {
+                                                showSelectionActionsMenu = false
+                                                val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                                                val tagRegex = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
+                                                val exportItems = selectedNotes.map { n ->
+                                                    val catName = state.categories.find { it.id == n.categoryId }?.name
+                                                    val dateStr = sdf.format(Date(if (n.updatedAt > 0) n.updatedAt else n.timestamp))
+                                                    val noteTags = tagRegex.findAll("${n.title} ${n.content}").map { it.groupValues[1] }.distinct().toList()
+                                                    com.example.noteapp.util.BatchNoteExportItem(
+                                                        title = n.title,
+                                                        content = n.content,
+                                                        categoryName = catName,
+                                                        dateFormatted = dateStr,
+                                                        tags = noteTags
+                                                    )
+                                                }
+                                                try {
+                                                    val batchPdf = com.example.noteapp.util.NoteExporter.exportMultipleToPdf(
+                                                        context = context,
+                                                        notes = exportItems,
+                                                        documentTitle = "Toplu_Notlar_${selectedNotes.size}_Adet"
+                                                    )
+                                                    com.example.noteapp.util.NoteExporter.shareFile(context, batchPdf, "application/pdf", "Seçili Notları Paylaş")
+                                                } catch (e: Exception) {
+                                                    android.widget.Toast.makeText(context, "PDF oluşturulamadı: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
                                                 onClearSelection()
                                             }
                                         )
@@ -1563,7 +1604,67 @@ fun NotesScreen(
         )
     }
 
-    // 5. Toplu Silme Onay Dialogu
+    // 5. Toplu Renk Değiştirme Dialogu
+    if (showBatchColorDialog) {
+        AlertDialog(
+            onDismissRequest = { showBatchColorDialog = false },
+            icon = { Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Seçili Notların Rengini Değiştir") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "${state.selectedNoteIds.size} adet notun kart rengi güncellenecektir.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        items(com.example.noteapp.presentation.detail.NoteColors) { color ->
+                            val argb = color.toArgb()
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(if (color == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant else color)
+                                    .border(
+                                        width = 1.2.dp,
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                        shape = CircleShape
+                                    )
+                                    .clickable {
+                                        onUpdateColorForSelected(argb)
+                                        showBatchColorDialog = false
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (color == Color.Transparent) {
+                                    Icon(
+                                        imageVector = Icons.Default.FormatColorReset,
+                                        contentDescription = "Sıfırla",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showBatchColorDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    // 6. Toplu Silme Onay Dialogu
     if (showBatchDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showBatchDeleteConfirm = false },

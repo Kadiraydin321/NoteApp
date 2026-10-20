@@ -81,9 +81,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **İstatistik Test Doğrulaması:** `StatisticsCalculatorTest` ile `todayWords` hesaplaması doğrulandı.
 
 ### Aşama 9: Toplu Seçim Modunda Renk Değiştirme & Gelişmiş Etiket Yönetimi
-- [ ] **Toplu Renk Değiştirme (Bulk Color Change):** Ana ekranda çoklu seçim modunda seçilen tüm notların rengini tek dokunuşla paletten değiştirme.
-- [ ] **Toplu Kategori Atama (Bulk Category Move):** Çoklu seçim modunda seçilen notları tek seferde istenen kategoriye taşıma.
-- [ ] **Toplu PDF Birleştirme (Batch Export):** Seçilen notları tek bir şık ve derli toplu PDF belgesinde birleştirip dışa aktarabilme.
+- [x] **Toplu Renk Değiştirme (Bulk Color Change):** Çoklu seçim eylem çubuğuna doğrudan `Palette` ikonu eklendi; `showBatchColorDialog` ile 12 palet rengi ve sıfırlama seçeneği sunularak tüm seçilen notlar tek seferde güncellenir (`updateColorForSelected`).
+- [x] **Toplu Kategori Atama (Bulk Category Move):** Seçili notlar `showBatchCategoryDialog` ile tek dokunuşla kategorilendirilir veya kategorisiz duruma getirilir.
+- [x] **Toplu PDF Birleştirme (Batch Export):** `NoteExporter.exportMultipleToPdf` motoru ile seçilen tüm notlar (başlık, tarih, kategori, etiketler ve formatlı içerik) tek bir dokümanda alt alta estetik biçimde birleştirilip PDF olarak dışa aktarılır ve paylaşılır.
+
+### Aşama 10: Ses Kaydı Oynatıcı Kontrolleri (+5s/-5s Sarma & 1.0x-2.0x Hızlandırma)
+- [ ] **Ses Sarma Butonları:** Not içi ses oynatıcıya 5 saniye ileri (+5s) ve 5 saniye geri (-5s) sarma kontrolleri.
+- [ ] **Oynatma Hızı Çarpanı:** Ses notları için 1.0x, 1.25x, 1.5x ve 2.0x değişken oynatma hızları.
+- [ ] **Son Doğrulama & Sürüm Bütünlüğü:** Tüm modüllerin kapsamlı derleme testi ve APK paketleme doğrulaması.
 
 ---
 
@@ -93,4 +98,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 6 Tamamlandı]** Etkileşimli filtre çipleri, not kartı kontrol ilerleme çubukları, stilize PDF motoru, Downloads klasörüne kaydetme ve renge göre sıralama özellikleri tamamlanıp test edildi.
 * **[Aşama 7 Tamamlandı]** Çok kademeli bildirim erteleme eylemleri (15 dk & 1 saat), SQLite WAL checkpoint & VACUUM optimizasyon motoru ve Ayarlar bakım paneli devreye alındı.
 * **[Aşama 8 Tamamlandı]** Günlük kelime hedefi takip kartı, not detay hızlı kilit ikonu, not çoğaltma ve birim testleri tamamlandı.
-* **[Aşama 9 Sırada]** Toplu renk değiştirme, toplu kategori atama ve seçili notları tek PDF'te birleştirme.
+* **[Aşama 9 Tamamlandı]** Çoklu seçimde toplu renk değiştirme diyaloğu, toplu notları tek PDF dokümanında birleştirme motoru ve kategori atamaları tamamlandı.
+* **[Aşama 10 Sırada]** Ses oynatıcı kontrolleri (+5s/-5s sarma, değişken hız çarpanları) ve sürüm kapanış doğrulaması.

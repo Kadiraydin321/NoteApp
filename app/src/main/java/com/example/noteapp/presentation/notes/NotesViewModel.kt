@@ -401,6 +401,20 @@ class NotesViewModel @Inject constructor(
         }
     }
 
+    fun updateColorForSelected(color: Int) {
+        val ids = _state.value.selectedNoteIds
+        val selectedNotes = _state.value.notes.filter { it.id in ids }
+        if (selectedNotes.isEmpty()) return
+        val now = System.currentTimeMillis()
+        viewModelScope.launch {
+            selectedNotes.forEach { note ->
+                repository.updateNote(note.copy(color = color, updatedAt = now))
+            }
+            _state.value = _state.value.copy(selectedNoteIds = emptySet())
+            NotesWidgetProvider.updateAllWidgets(app)
+        }
+    }
+
     fun togglePinForSelected() {
         val ids = _state.value.selectedNoteIds
         val selectedNotes = _state.value.notes.filter { it.id in ids }

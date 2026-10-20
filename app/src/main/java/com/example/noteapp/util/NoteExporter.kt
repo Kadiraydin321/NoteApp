@@ -17,6 +17,14 @@ import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
 
+data class BatchNoteExportItem(
+    val title: String,
+    val content: String,
+    val categoryName: String? = null,
+    val dateFormatted: String? = null,
+    val tags: List<String> = emptyList()
+)
+
 object NoteExporter {
 
     private const val PAGE_WIDTH = 595 // Standard A4 width in points
@@ -385,6 +393,127 @@ object NoteExporter {
         val exportDir = File(context.cacheDir, "exports").apply { mkdirs() }
         cleanOldExports(exportDir)
         val sanitizedTitle = displayTitle.replace("[^a-zA-Z0-9çÇğĞıİöÖşŞüÜ_\\-]".toRegex(), "_").take(30)
+        val file = File(exportDir, "${sanitizedTitle}_${System.currentTimeMillis()}.pdf")
+
+        FileOutputStream(file).use { out ->
+            pdfDocument.writeTo(out)
+        }
+        pdfDocument.close()
+
+        return file
+    }
+
+    /**
+     * Birden çok notu tek bir şık ve derli toplu PDF belgesinde birleştirir.
+     */
+    fun exportMultipleToPdf(
+        context: Context,
+        notes: List<BatchNoteExportItem>,
+        documentTitle: String = "Toplu_Notlar"
+    ): File {
+        val pdfDocument = PdfDocument()
+        val usableWidth = PAGE_WIDTH - (MARGIN_X * 2)
+
+        val docHeaderPaint = Paint().apply {
+            color = Color.rgb(15, 23, 42)
+            textSize = 22f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val noteTitlePaint = Paint().apply {
+            color = Color.rgb(30, 41, 59)
+            textSize = 16f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val metaPaint = Paint().apply {
+            color = Color.rgb(100, 116, 139)
+            textSize = 9.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            isAntiAlias = true
+        }
+
+        val bodyPaint = Paint().apply {
+            color = Color.rgb(30, 41, 59)
+            textSize = 11f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            isAntiAlias = true
+        }
+
+        val dividerPaint = Paint().apply {
+            color = Color.rgb(203, 213, 225)
+            strokeWidth = 1f
+            isAntiAlias = true
+        }
+
+        var pageNumber = 1
+        var pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create()
+        var page = pdfDocument.startPage(pageInfo)
+        var canvas = page.canvas
+        var currentY = MARGIN_TOP
+
+        fun ensureSpace(neededHeight: Float) {
+            if (currentY + neededHeight > PAGE_HEIGHT - MARGIN_BOTTOM) {
+                drawFooter(canvas, pageNumber)
+                pdfDocument.finishPage(page)
+
+                pageNumber++
+                pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create()
+                page = pdfDocument.startPage(pageInfo)
+                canvas = page.canvas
+                currentY = MARGIN_TOP
+            }
+        }
+
+        // Ana Başlık
+        ensureSpace(40f)
+        canvas.drawText("Not Defterim • Toplu Dışa Aktarım", MARGIN_X, currentY + 18f, docHeaderPaint)
+        currentY += 26f
+        canvas.drawText("${notes.size} Not • ${java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}", MARGIN_X, currentY + 10f, metaPaint)
+        currentY += 18f
+        canvas.drawLine(MARGIN_X, currentY, PAGE_WIDTH - MARGIN_X, currentY, dividerPaint)
+        currentY += 20f
+
+        notes.forEachIndexed { index, noteItem ->
+            ensureSpace(50f)
+            val displayTitle = "${index + 1}. ${noteItem.title.ifBlank { "İsimsiz Not" }}"
+            canvas.drawText(displayTitle, MARGIN_X, currentY + 14f, noteTitlePaint)
+            currentY += 20f
+
+            val metaParts = mutableListOf<String>()
+            if (!noteItem.dateFormatted.isNullOrBlank()) metaParts.add(noteItem.dateFormatted)
+            if (!noteItem.categoryName.isNullOrBlank()) metaParts.add("Kategori: ${noteItem.categoryName}")
+            if (noteItem.tags.isNotEmpty()) metaParts.add(noteItem.tags.joinToString(" ") { if (it.startsWith("#")) it else "#$it" })
+            if (metaParts.isNotEmpty()) {
+                canvas.drawText(metaParts.joinToString(" • "), MARGIN_X, currentY + 10f, metaPaint)
+                currentY += 16f
+            }
+
+            // Not İçeriği
+            for (line in noteItem.content.lines()) {
+                val wrapped = if (line.isBlank()) listOf("") else wrapText(line, bodyPaint, usableWidth)
+                for (subLine in wrapped) {
+                    ensureSpace(bodyPaint.textSize + 4f)
+                    currentY += bodyPaint.textSize
+                    canvas.drawText(subLine, MARGIN_X, currentY, bodyPaint)
+                    currentY += 3f
+                }
+            }
+
+            currentY += 14f
+            ensureSpace(14f)
+            canvas.drawLine(MARGIN_X + 40f, currentY, PAGE_WIDTH - MARGIN_X - 40f, currentY, dividerPaint)
+            currentY += 16f
+        }
+
+        drawFooter(canvas, pageNumber)
+        pdfDocument.finishPage(page)
+
+        val exportDir = File(context.cacheDir, "exports").apply { mkdirs() }
+        cleanOldExports(exportDir)
+        val sanitizedTitle = documentTitle.replace("[^a-zA-Z0-9çÇğĞıİöÖşŞüÜ_\\-]".toRegex(), "_").take(30)
         val file = File(exportDir, "${sanitizedTitle}_${System.currentTimeMillis()}.pdf")
 
         FileOutputStream(file).use { out ->

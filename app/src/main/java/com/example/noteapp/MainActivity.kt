@@ -352,6 +352,7 @@ class MainActivity : FragmentActivity() {
                             onClearSelection = viewModel::clearSelection,
                             onDeleteSelectedNotes = viewModel::deleteSelectedNotes,
                             onUpdateCategoryForSelected = viewModel::updateCategoryForSelected,
+                            onUpdateColorForSelected = viewModel::updateColorForSelected,
                             onTogglePinForSelected = viewModel::togglePinForSelected,
                             onDuplicateNote = viewModel::onDuplicateNote,
                             onFilterTypeChange = viewModel::setFilterType,
