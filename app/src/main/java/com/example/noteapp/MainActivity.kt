@@ -719,10 +719,13 @@ class MainActivity : FragmentActivity() {
                         val statsViewModel = hiltViewModel<com.example.noteapp.presentation.statistics.StatisticsViewModel>()
                         val stats by statsViewModel.statistics.collectAsState()
                         val isLoading by statsViewModel.isLoading.collectAsState()
+                        val statsSettings by statsViewModel.settings.collectAsState()
 
                         com.example.noteapp.presentation.statistics.StatisticsScreen(
                             stats = stats,
                             isLoading = isLoading,
+                            dailyWordGoal = statsSettings.dailyWordGoal,
+                            onSetDailyWordGoal = statsViewModel::setDailyWordGoal,
                             onBackClick = { navController.popBackStack() }
                         )
                     }

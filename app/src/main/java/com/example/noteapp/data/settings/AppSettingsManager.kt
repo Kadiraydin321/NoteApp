@@ -295,7 +295,8 @@ data class AppSettings(
     val cardElevationStyle: CardElevationStyle = CardElevationStyle.BORDERED,
     val quickActionLocation: QuickActionLocation = QuickActionLocation.DRAWER_HEADER,
     val searchBarShape: SearchBarShape = SearchBarShape.PILL,
-    val designPreset: DesignPreset = DesignPreset.MODERN_MATERIAL
+    val designPreset: DesignPreset = DesignPreset.MODERN_MATERIAL,
+    val dailyWordGoal: Int = 300
 )
 
 @Singleton
@@ -416,7 +417,8 @@ class AppSettingsManager @Inject constructor(
             cardElevationStyle = cardElevationStyle,
             quickActionLocation = quickActionLocation,
             searchBarShape = searchBarShape,
-            designPreset = designPreset
+            designPreset = designPreset,
+            dailyWordGoal = prefs.getInt(KEY_DAILY_WORD_GOAL, 300)
         )
     }
 
@@ -624,6 +626,11 @@ class AppSettingsManager @Inject constructor(
         _settings.value = _settings.value.copy(widgetCornerRadius = radius)
     }
 
+    fun setDailyWordGoal(goal: Int) {
+        prefs.edit().putInt(KEY_DAILY_WORD_GOAL, goal).apply()
+        _settings.value = _settings.value.copy(dailyWordGoal = goal)
+    }
+
     companion object {
         private const val KEY_WIDGET_FILTER_MODE = "widget_filter_mode"
         private const val KEY_WIDGET_SHOW_LOCKED = "widget_show_locked"
@@ -649,6 +656,7 @@ class AppSettingsManager @Inject constructor(
         private const val KEY_QUICK_ACTION_LOCATION = "quick_action_location"
         private const val KEY_SEARCH_BAR_SHAPE = "search_bar_shape"
         private const val KEY_DESIGN_PRESET = "design_preset"
+        private const val KEY_DAILY_WORD_GOAL = "daily_word_goal"
 
         // Helper for Widget Service to access synchronously without injection
         fun getWidgetFilterMode(context: Context): WidgetFilterMode {

@@ -1031,6 +1031,15 @@ fun NoteDetailScreen(
                             Icon(Icons.Default.Search, contentDescription = "Notta Ara", tint = topBarIconColor)
                         }
 
+                        // Hızlı Kilit Butonu
+                        IconButton(onClick = onToggleLock) {
+                            Icon(
+                                imageVector = if (state.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                contentDescription = if (state.isLocked) "Not Kilitli" else "Not Kilitsiz",
+                                tint = if (state.isLocked) MaterialTheme.colorScheme.primary else topBarIconColor.copy(alpha = 0.75f)
+                            )
+                        }
+
                         // Üç Nokta Menüsü
                         Box {
                             IconButton(onClick = { showMoreMenu = true }) {

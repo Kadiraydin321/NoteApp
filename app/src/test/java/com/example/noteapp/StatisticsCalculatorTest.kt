@@ -95,6 +95,9 @@ class StatisticsCalculatorTest {
         // Streak Kontrolü (Bugün not yazıldığı için aktif streak >= 1 olmalı)
         assertTrue(stats.streakInfo.currentStreak >= 1)
         assertTrue(stats.streakInfo.isStreakActiveToday)
+
+        // Bugün Yazılan Kelimeler
+        assertTrue(stats.todayWords > 0)
     }
 
     @Test

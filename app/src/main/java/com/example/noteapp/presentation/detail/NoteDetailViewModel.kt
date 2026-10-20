@@ -329,6 +329,10 @@ class NoteDetailViewModel @Inject constructor(
         saveNoteQuietly()
     }
 
+    fun duplicateNote(onComplete: (Long) -> Unit) {
+        duplicateCurrentNote(onComplete)
+    }
+
     fun onSetReminder(timeInMillis: Long?) {
         _state.value = _state.value.copy(reminderTime = timeInMillis)
         saveNoteQuietly()

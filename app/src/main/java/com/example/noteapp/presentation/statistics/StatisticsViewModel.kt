@@ -2,6 +2,8 @@ package com.example.noteapp.presentation.statistics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.noteapp.data.settings.AppSettings
+import com.example.noteapp.data.settings.AppSettingsManager
 import com.example.noteapp.domain.model.AppStatistics
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.domain.util.StatisticsCalculator
@@ -12,8 +14,11 @@ import javax.inject.Inject
 
 @HiltViewModel
 class StatisticsViewModel @Inject constructor(
-    private val repository: NoteRepository
+    private val repository: NoteRepository,
+    private val settingsManager: AppSettingsManager
 ) : ViewModel() {
+
+    val settings: StateFlow<AppSettings> = settingsManager.settings
 
     private val _statistics = MutableStateFlow(AppStatistics())
     val statistics: StateFlow<AppStatistics> = _statistics.asStateFlow()
@@ -23,6 +28,10 @@ class StatisticsViewModel @Inject constructor(
 
     init {
         loadStatistics()
+    }
+
+    fun setDailyWordGoal(goal: Int) {
+        settingsManager.setDailyWordGoal(goal)
     }
 
     fun loadStatistics() {

@@ -29,6 +29,8 @@ import com.example.noteapp.domain.model.TagFrequency
 fun StatisticsScreen(
     stats: AppStatistics,
     isLoading: Boolean,
+    dailyWordGoal: Int = 300,
+    onSetDailyWordGoal: (Int) -> Unit = {},
     onBackClick: () -> Unit
 ) {
     Scaffold(
@@ -75,12 +77,21 @@ fun StatisticsScreen(
                     StreakHeroCard(stats = stats)
                 }
 
-                // 2. 2x2 Temel Metrikler Grid
+                // 2. Günlük Kelime Hedefi Takip Kartı
+                item {
+                    DailyWordGoalCard(
+                        todayWords = stats.todayWords,
+                        dailyGoal = dailyWordGoal,
+                        onSetDailyGoal = onSetDailyWordGoal
+                    )
+                }
+
+                // 3. 2x2 Temel Metrikler Grid
                 item {
                     MetricsGrid(stats = stats)
                 }
 
-                // 3. Haftalık Aktivite Çubuk Grafiği
+                // 4. Haftalık Aktivite Çubuk Grafiği
                 item {
                     WeeklyActivityCard(stats = stats)
                 }
@@ -193,6 +204,157 @@ private fun StreakHeroCard(stats: AppStatistics) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DailyWordGoalCard(
+    todayWords: Int,
+    dailyGoal: Int,
+    onSetDailyGoal: (Int) -> Unit
+) {
+    var showGoalPicker by remember { mutableStateOf(false) }
+    val progress = if (dailyGoal > 0) (todayWords.toFloat() / dailyGoal.toFloat()).coerceIn(0f, 1f) else 0f
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 800),
+        label = "goal_progress"
+    )
+    val isCompleted = todayWords >= dailyGoal && dailyGoal > 0
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCompleted) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            }
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isCompleted) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                else MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(if (isCompleted) "🎉" else "🎯", fontSize = 18.sp)
+                    }
+                    Column {
+                        Text(
+                            text = "Günlük Kelime Hedefi",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (isCompleted) "Tebrikler! Günlük hedefin tamamlandı!" else "Bugün $todayWords / $dailyGoal kelime yazıldı",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = { showGoalPicker = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Hedefi Değiştir",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                LinearProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    color = if (isCompleted) Color(0xFF22C55E) else MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "%${(progress * 100).toInt()} Tamamlandı",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isCompleted) Color(0xFF22C55E) else MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = if (isCompleted) "Hedef aşıldı! (+${todayWords - dailyGoal})" else "${(dailyGoal - todayWords).coerceAtLeast(0)} kelime kaldı",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+
+    if (showGoalPicker) {
+        val presetGoals = listOf(100, 250, 500, 750, 1000)
+        AlertDialog(
+            onDismissRequest = { showGoalPicker = false },
+            title = { Text("Günlük Kelime Hedefi") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Her gün yazmak istediğin hedef kelime miktarını seç:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    presetGoals.forEach { goal ->
+                        FilledTonalButton(
+                            onClick = {
+                                onSetDailyGoal(goal)
+                                showGoalPicker = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = if (goal == dailyGoal) {
+                                ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                            } else {
+                                ButtonDefaults.filledTonalButtonColors()
+                            }
+                        ) {
+                            Text(
+                                text = "$goal Kelime / Gün",
+                                fontWeight = if (goal == dailyGoal) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showGoalPicker = false }) {
+                    Text("Kapat")
+                }
+            }
+        )
     }
 }
 

@@ -78,6 +78,14 @@ object StatisticsCalculator {
         // Haftalık Aktivite
         val (weeklyActivity, dayNames) = calculateWeeklyActivity(allNotes)
 
+        // Bugün Yazılan Kelimeler
+        val todaySdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val todayStr = todaySdf.format(Date())
+        val todayWords = allNotes.filter {
+            val ts = if (it.updatedAt != 0L) it.updatedAt else it.timestamp
+            todaySdf.format(Date(ts)) == todayStr
+        }.sumOf { countWords(it.title) + countWords(it.content) }
+
         return AppStatistics(
             totalActiveNotes = activeNotes.size,
             totalArchivedNotes = archivedNotes.size,
@@ -97,7 +105,8 @@ object StatisticsCalculator {
                 totalDrawings = drawingCount
             ),
             weeklyActivity = weeklyActivity,
-            dayNames = dayNames
+            dayNames = dayNames,
+            todayWords = todayWords
         )
     }
 

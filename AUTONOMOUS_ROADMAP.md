@@ -75,9 +75,15 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Ayarlar Ekranında Bakım Paneli (`SettingsScreen`):** Canlı veritabanı boyutu, önbellek boyutu göstergesi ve tek dokunuşla optimizasyon tetikleyici.
 
 ### Aşama 8: Not Çoğaltma (Duplicate Note) & Günlük Yazma Hedefi (Daily Word Goal)
-- [ ] **Not Çoğaltma (Duplicate Note):** Not detay ekranındaki açılır menüden ve ana listeden tek dokunuşla notun başlık, içerik, kategori ve etiketleriyle birlikte birebir kopyasını oluşturma.
-- [ ] **Günlük Kelime Hedefi Takibi (Daily Writing Target):** `AppSettings` üzerinde günlük kelime hedefi (örn. 500 kelime) belirleme ve `StatisticsScreen` üzerinde dairesel hedef tamamlanma halkası.
-- [ ] **Not Detay Hızlı Kilit Kısayolu:** Not düzenleme ekranında üst çubukta anında kilit açma/kapama ikonu.
+- [x] **Not Çoğaltma (Duplicate Note):** `duplicateCurrentNote` motoru ile notun başlık ("(Kopya)"), formatlı içerik, medya ekleri ve kategorisi korunarak anında yeni kopya üretimi.
+- [x] **Günlük Kelime Hedefi Takibi (Daily Writing Target):** `AppSettingsManager` üzerinden özelleştirilebilir hedef (100 - 1000 kelime), `StatisticsScreen` üzerinde motivasyonel rozet ve canlı animasyonlu ilerleme çubuğu (`DailyWordGoalCard`).
+- [x] **Not Detay Hızlı Kilit Kısayolu:** `NoteDetailScreen` TopAppBar üzerinde anında kilit açma/kapama ikonu ve güvenlik durumu göstergesi.
+- [x] **İstatistik Test Doğrulaması:** `StatisticsCalculatorTest` ile `todayWords` hesaplaması doğrulandı.
+
+### Aşama 9: Toplu Seçim Modunda Renk Değiştirme & Gelişmiş Etiket Yönetimi
+- [ ] **Toplu Renk Değiştirme (Bulk Color Change):** Ana ekranda çoklu seçim modunda seçilen tüm notların rengini tek dokunuşla paletten değiştirme.
+- [ ] **Toplu Kategori Atama (Bulk Category Move):** Çoklu seçim modunda seçilen notları tek seferde istenen kategoriye taşıma.
+- [ ] **Toplu PDF Birleştirme (Batch Export):** Seçilen notları tek bir şık ve derli toplu PDF belgesinde birleştirip dışa aktarabilme.
 
 ---
 
@@ -86,4 +92,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 1-5 Tamamlandı]** Şablonlar, versiyon geçmişi geri yükleme, yazma istatistikleri ve analitik ekranı, Zen odaklanma modu ve sentetik ses motoru, Room v5 migrasyonu ve birim testler başarıyla entegre edildi.
 * **[Aşama 6 Tamamlandı]** Etkileşimli filtre çipleri, not kartı kontrol ilerleme çubukları, stilize PDF motoru, Downloads klasörüne kaydetme ve renge göre sıralama özellikleri tamamlanıp test edildi.
 * **[Aşama 7 Tamamlandı]** Çok kademeli bildirim erteleme eylemleri (15 dk & 1 saat), SQLite WAL checkpoint & VACUUM optimizasyon motoru ve Ayarlar bakım paneli devreye alındı.
-* **[Aşama 8 Sırada]** Not çoğaltma, günlük kelime hedefi takip halkası ve hızlı kilit kısayolu.
+* **[Aşama 8 Tamamlandı]** Günlük kelime hedefi takip kartı, not detay hızlı kilit ikonu, not çoğaltma ve birim testleri tamamlandı.
+* **[Aşama 9 Sırada]** Toplu renk değiştirme, toplu kategori atama ve seçili notları tek PDF'te birleştirme.

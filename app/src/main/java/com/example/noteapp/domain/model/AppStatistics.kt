@@ -40,5 +40,6 @@ data class AppStatistics(
     val categoryDistribution: List<CategoryStat> = emptyList(),
     val mediaInventory: MediaInventory = MediaInventory(),
     val weeklyActivity: List<Int> = List(7) { 0 }, // Son 7 gün (Bugünden geriye doğru)
-    val dayNames: List<String> = emptyList() // Gün isimleri (Pzt, Sal, Çar vb.)
+    val dayNames: List<String> = emptyList(), // Gün isimleri (Pzt, Sal, Çar vb.)
+    val todayWords: Int = 0
 )
