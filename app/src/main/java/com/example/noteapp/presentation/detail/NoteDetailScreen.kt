@@ -433,6 +433,8 @@ fun NoteDetailScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     var isPreviewMode by remember { mutableStateOf(false) }
+    var isPresentationMode by remember { mutableStateOf(false) }
+    var presentationFontSize by remember(state.noteFontSize) { mutableFloatStateOf(state.noteFontSize + 2f) }
     var hideMarkdownTokens by remember { mutableStateOf(true) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
@@ -449,7 +451,13 @@ fun NoteDetailScreen(
 
     // Donanımsal veya jest ile geri tuşuna basıldığında
     BackHandler {
-        if (imageViewerPath != null) imageViewerPath = null else onBackClick()
+        if (imageViewerPath != null) {
+            imageViewerPath = null
+        } else if (isPresentationMode) {
+            isPresentationMode = false
+        } else {
+            onBackClick()
+        }
     }
 
     imageViewerPath?.let { path ->
@@ -879,7 +887,78 @@ fun NoteDetailScreen(
         containerColor = animatedBgColor,
         contentColor = contentColor,
         topBar = {
-            if (state.isZenMode) {
+            if (isPresentationMode) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = state.title.ifBlank { "Not Sunumu" },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = animatedBgColor,
+                        titleContentColor = contentColor,
+                        actionIconContentColor = topBarIconColor,
+                        navigationIconContentColor = topBarIconColor
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = { isPresentationMode = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "Sunum Modunu Kapat", tint = topBarIconColor)
+                        }
+                    },
+                    actions = {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.AccessTime,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = topBarIconColor
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = "~${maxOf(1, currentWordCount / 180)} dk",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = topBarIconColor
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = { if (presentationFontSize > 12f) presentationFontSize -= 2f }
+                        ) {
+                            Text(
+                                "A-",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = topBarIconColor
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { if (presentationFontSize < 36f) presentationFontSize += 2f }
+                        ) {
+                            Text(
+                                "A+",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = topBarIconColor
+                            )
+                        }
+                    }
+                )
+            } else if (state.isZenMode) {
                 // Odaklanma modunda üst çubuk gizlenir
             } else if (isSearchActive) {
                 TopAppBar(
@@ -1105,6 +1184,22 @@ fun NoteDetailScreen(
                                     },
                                     onClick = {
                                         isPreviewMode = !isPreviewMode
+                                        showMoreMenu = false
+                                    }
+                                )
+
+                                // Okuma / Sunum Modu (Presentation Mode)
+                                DropdownMenuItem(
+                                    text = { Text("📖 Okuma / Sunum Modu") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Slideshow,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        isPresentationMode = true
                                         showMoreMenu = false
                                     }
                                 )
@@ -1370,7 +1465,7 @@ fun NoteDetailScreen(
             }
         },
         bottomBar = {
-            if (!isPreviewMode && !state.isZenMode) {
+            if (!isPreviewMode && !state.isZenMode && !isPresentationMode) {
                 val isAppDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
                 val dockSurfaceColor = if (isAppDark) Color(0xFF22252A) else Color(0xFFFFFFFF)
                 val dockBorderColor = if (isAppDark) Color(0x30FFFFFF) else Color(0x18000000)
@@ -1931,7 +2026,7 @@ fun NoteDetailScreen(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
                 ) {
-                    if (!isPreviewMode) {
+                    if (!isPreviewMode && !isPresentationMode) {
                         try {
                             if (hasChecklistItems) {
                                 trailingFocusRequester.requestFocus()
@@ -1971,7 +2066,7 @@ fun NoteDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = if (isPresentationMode) 22.dp else 16.dp, vertical = 8.dp)
             ) {
                 // Notun Atandığı Kategori Etiketi (Varsa)
                 val currentCategory = categories.firstOrNull { it.id == state.categoryId }
@@ -2025,17 +2120,18 @@ fun NoteDetailScreen(
                 }
 
                 // Başlık Alanı
-                if (isPreviewMode) {
+                if (isPresentationMode || isPreviewMode) {
                     if (state.title.isNotBlank()) {
                         Text(
                             text = state.title,
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = contentColor
+                                color = contentColor,
+                                fontSize = if (isPresentationMode) (presentationFontSize + 8f).sp else MaterialTheme.typography.headlineMedium.fontSize
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp)
+                                .padding(vertical = if (isPresentationMode) 12.dp else 8.dp)
                         )
                     }
                 } else {
@@ -2070,20 +2166,38 @@ fun NoteDetailScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // İçerik Alanı: Önizleme veya Canlı Düzenleme
-                if (isPreviewMode) {
+                // İçerik Alanı: Sunum, Önizleme veya Canlı Düzenleme
+                if (isPresentationMode || isPreviewMode) {
                     MarkdownPreview(
                         content = state.contentValue.text,
                         onContentChange = { updated ->
-                            onContentValueChange(TextFieldValue(updated))
+                            if (!isPresentationMode) {
+                                onContentValueChange(TextFieldValue(updated))
+                            }
                         },
                         contentColor = contentColor,
                         onLinkClick = onLinkClick,
-                        fontSize = state.noteFontSize,
+                        fontSize = if (isPresentationMode) presentationFontSize else state.noteFontSize,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = 48.dp)
+                            .padding(top = 8.dp, bottom = if (isPresentationMode) 16.dp else 48.dp)
                     )
+
+                    if (isPresentationMode) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        OutlinedButton(
+                            onClick = { isPresentationMode = false },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Okuma / Sunum Modunu Kapat")
+                        }
+                        Spacer(modifier = Modifier.height(64.dp))
+                    }
                 } else {
                     val rawText = state.contentValue.text
                     val lines = rawText.lines()

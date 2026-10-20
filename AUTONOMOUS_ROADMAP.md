@@ -91,14 +91,20 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Son Doğrulama & Sürüm Bütünlüğü:** Tüm modüllerin kapsamlı derleme testi ve APK paketleme doğrulaması (`testDebugUnitTest` ve `assembleDebug` %100 başarılı).
 
 ### Aşama 11: Çöp Kutusu Otomatik Temizleme Politikası & Okuma / Sunum Modu (Trash Auto-Purge & Presentation Mode)
-- [ ] **Çöp Kutusu Saklama Politikası (Retention Policy):** `AppSettingsManager` üzerinden 7 gün, 14 gün, 30 gün veya Asla (Devre Dışı) seçenekleri.
-- [ ] **Otomatik Süresi Dolan Not Temizliği:** Uygulama açılışında veya Çöp Kutusu ekranına girildiğinde belirlenen süreden eski silinmiş notların arka planda sessizce kalıcı silinmesi.
-- [ ] **Çöp Kutusu Bilgi Başlığı (Info Banner):** `TrashScreen` üzerinde kullanıcının seçtiği otomatik temizleme süresini gösteren ve tek dokunuşla ayarlara yönlendiren bilgi kartı.
-- [ ] **Tam Ekran Okuma / Sunum Modu (Reader Presentation View):** Notu sadece görüntüleme amacıyla kazaen düzenlemeleri engelleyen, font boyutu ayarlanabilir, konforlu kenar boşlukları ve şık tipografi sunan sunum görünümü.
+- [x] **Çöp Kutusu Saklama Politikası (Retention Policy):** `AppSettingsManager` üzerinden 7 gün, 14 gün, 30 gün veya Asla (Devre Dışı) seçenekleri (`TrashRetentionPolicy`).
+- [x] **Otomatik Süresi Dolan Not Temizliği:** Uygulama açılışında veya Çöp Kutusu ekranına girildiğinde belirlenen süreden eski silinmiş notların arka planda sessizce kalıcı silinmesi (`cleanUpTrash`).
+- [x] **Çöp Kutusu Bilgi Başlığı (Info Banner):** `NotesScreen` üzerinde kullanıcının seçtiği otomatik temizleme süresini gösteren ve tek dokunuşla ayarlara yönlendiren bilgi kartı.
+- [x] **Ayarlar Ekranında Saklama Politikası Seçici:** `SettingsScreen` üzerinde 4'lü segmented seçim çipleri ve detaylı açıklama.
+- [x] **Tam Ekran Okuma / Sunum Modu (Reader Presentation View):** Notu sadece görüntüleme amacıyla kazara düzenlemeleri engelleyen, font boyutu (A-/A+) dinamik ayarlanabilir, okuma süresi rozetli ve konforlu kenar boşlukları sunan sunum görünümü (`isPresentationMode`).
+- [x] **Birim Testleri:** `TrashRetentionTest` ile tüm eşik değer ve retention gün hesaplamaları test edildi (%100 Başarılı).
 
 ### Aşama 12: Arama İçi Anahtar Kelime Vurgulama & Son Aramalar Geçmişi (Search Highlighting & History)
-- [ ] **Arama Geçmişi Saklama (Recent Search Queries):** Kullanıcının yaptığı son aramaların DataStore/SharedPreferences üzerinde saklanması ve arama çubuğu boşken öneri olarak sunulması.
+- [ ] **Arama Geçmişi Saklama (Recent Search Queries):** Kullanıcının yaptığı son aramaların DataStore/SharedPreferences üzerinde saklanması ve arama çubuğu boşken hızlı öneri çipleri olarak sunulması.
 - [ ] **Arama Sonuçlarında Kelime Vurgulama (Keyword Highlighting):** Not listesinde ve arama ekranında aranan kelimelerin metin içinde `AnnotatedString` ile sarı/vurgulu arka planla gösterilmesi.
+
+### Aşama 13: Güvenli Çevrimdışı Kasa / Biyometrik Kilit Geliştirmeleri & Not Birleştirme (Note Merge)
+- [ ] **İki veya Daha Fazla Notu Birleştirme (Merge Notes):** Çoklu seçim modunda seçilen notların tek bir notta birleştirilmesi (başlıklar H2 olarak eklenir, içerikler ayrılır ve medya ekleri korunur).
+- [ ] **Kilitli Notlar Güvenlik İyileştirmeleri:** Biyometrik prompt veya PIN doğrulamasının arka plana atıldığında otomatik güvenli sıfırlanması.
 
 ---
 
@@ -110,4 +116,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 8 Tamamlandı]** Günlük kelime hedefi takip kartı, not detay hızlı kilit ikonu, not çoğaltma ve birim testleri tamamlandı.
 * **[Aşama 9 Tamamlandı]** Çoklu seçimde toplu renk değiştirme diyaloğu, toplu notları tek PDF dokümanında birleştirme motoru ve kategori atamaları tamamlandı.
 * **[Aşama 10 Tamamlandı]** Ses oynatıcı kontrolleri (+5s/-5s sarma, 1.0x-2.0x değişken hız çarpanları) ve derleme doğrulaması tamamlandı.
-* **[Aşama 11 Sırada]** Çöp kutusu saklama/otomatik temizleme politikası ve not tam ekran okuma/sunum modu geliştirilecek.
+* **[Aşama 11 Tamamlandı]** Çöp kutusu saklama/otomatik temizleme politikası, ayarlar paneli ve not tam ekran okuma/sunum modu, birim testleriyle birlikte tamamlandı.
+* **[Aşama 12 Sırada]** Arama geçmişi yönetimi ve not listesinde arama anahtar kelimesi vurgulama motoru geliştirilecek.

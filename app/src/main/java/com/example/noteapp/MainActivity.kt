@@ -689,6 +689,7 @@ class MainActivity : FragmentActivity() {
                             },
                             onOptimizeDatabase = viewModel::optimizeDatabase,
                             onDismissMaintenanceMessage = viewModel::dismissMaintenanceMessage,
+                            onTrashRetentionPolicyChange = viewModel::setTrashRetentionPolicy,
                             onBackClick = {
                                 navController.popBackStack()
                             }

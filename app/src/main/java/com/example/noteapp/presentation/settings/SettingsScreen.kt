@@ -87,6 +87,7 @@ fun SettingsScreen(
     onNavigateToStatistics: () -> Unit = {},
     onOptimizeDatabase: () -> Unit = {},
     onDismissMaintenanceMessage: () -> Unit = {},
+    onTrashRetentionPolicyChange: (com.example.noteapp.data.settings.TrashRetentionPolicy) -> Unit = {},
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1507,6 +1508,77 @@ fun SettingsScreen(
                             )
                         }
                     }
+                }
+            }
+
+            // Çöp Kutusu Saklama Politikası Kartı
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteSweep,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                "Çöp Kutusu Otomatik Temizleme",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "Silinen notların cihazda tutulma süresi",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        com.example.noteapp.data.settings.TrashRetentionPolicy.values().forEach { policy ->
+                            val isSelected = settings.trashRetentionPolicy == policy
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { onTrashRetentionPolicyChange(policy) },
+                                label = {
+                                    Text(
+                                        when (policy) {
+                                            com.example.noteapp.data.settings.TrashRetentionPolicy.DAYS_30 -> "30 Gün"
+                                            com.example.noteapp.data.settings.TrashRetentionPolicy.DAYS_14 -> "14 Gün"
+                                            com.example.noteapp.data.settings.TrashRetentionPolicy.DAYS_7 -> "7 Gün"
+                                            com.example.noteapp.data.settings.TrashRetentionPolicy.NEVER -> "Asla"
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = settings.trashRetentionPolicy.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 

@@ -236,6 +236,13 @@ enum class DrawerCollapseMode(val title: String, val description: String) {
     EXPANDED_ALL("Tümünü Göster (Klasik)", "Hiçbir daraltma olmadan tüm liste doğrudan açık durur")
 }
 
+enum class TrashRetentionPolicy(val days: Int, val title: String, val description: String) {
+    DAYS_30(30, "30 Gün (Önerilen)", "30 günden eski silinmiş notlar otomatik temizlenir"),
+    DAYS_14(14, "14 Gün", "14 günden eski silinmiş notlar otomatik temizlenir"),
+    DAYS_7(7, "7 Gün", "7 günden eski silinmiş notlar otomatik temizlenir"),
+    NEVER(0, "Asla (Manuel)", "Silinen notlar sadece siz çöp kutusunu boşalttığınızda silinir")
+}
+
 enum class CardCornerStyle(val title: String, val radiusDp: Int) {
     ROUNDED("Modern Yuvarlak", 18),
     SHARP("Keskin & Minimal", 6),
@@ -296,7 +303,8 @@ data class AppSettings(
     val quickActionLocation: QuickActionLocation = QuickActionLocation.DRAWER_HEADER,
     val searchBarShape: SearchBarShape = SearchBarShape.PILL,
     val designPreset: DesignPreset = DesignPreset.MODERN_MATERIAL,
-    val dailyWordGoal: Int = 300
+    val dailyWordGoal: Int = 300,
+    val trashRetentionPolicy: TrashRetentionPolicy = TrashRetentionPolicy.DAYS_30
 )
 
 @Singleton
@@ -393,6 +401,9 @@ class AppSettingsManager @Inject constructor(
         val widgetCornerRadiusStr = prefs.getString(KEY_WIDGET_CORNER_RADIUS, WidgetCornerRadius.LARGE.name) ?: WidgetCornerRadius.LARGE.name
         val widgetCornerRadius = try { WidgetCornerRadius.valueOf(widgetCornerRadiusStr) } catch (_: Exception) { WidgetCornerRadius.LARGE }
 
+        val trashRetentionStr = prefs.getString(KEY_TRASH_RETENTION_POLICY, TrashRetentionPolicy.DAYS_30.name) ?: TrashRetentionPolicy.DAYS_30.name
+        val trashRetentionPolicy = try { TrashRetentionPolicy.valueOf(trashRetentionStr) } catch (_: Exception) { TrashRetentionPolicy.DAYS_30 }
+
         return AppSettings(
             widgetFilterMode = filterMode,
             widgetShowLockedNotes = showLocked,
@@ -418,7 +429,8 @@ class AppSettingsManager @Inject constructor(
             quickActionLocation = quickActionLocation,
             searchBarShape = searchBarShape,
             designPreset = designPreset,
-            dailyWordGoal = prefs.getInt(KEY_DAILY_WORD_GOAL, 300)
+            dailyWordGoal = prefs.getInt(KEY_DAILY_WORD_GOAL, 300),
+            trashRetentionPolicy = trashRetentionPolicy
         )
     }
 
@@ -631,6 +643,11 @@ class AppSettingsManager @Inject constructor(
         _settings.value = _settings.value.copy(dailyWordGoal = goal)
     }
 
+    fun setTrashRetentionPolicy(policy: TrashRetentionPolicy) {
+        prefs.edit().putString(KEY_TRASH_RETENTION_POLICY, policy.name).apply()
+        _settings.value = _settings.value.copy(trashRetentionPolicy = policy)
+    }
+
     companion object {
         private const val KEY_WIDGET_FILTER_MODE = "widget_filter_mode"
         private const val KEY_WIDGET_SHOW_LOCKED = "widget_show_locked"
@@ -657,6 +674,7 @@ class AppSettingsManager @Inject constructor(
         private const val KEY_SEARCH_BAR_SHAPE = "search_bar_shape"
         private const val KEY_DESIGN_PRESET = "design_preset"
         private const val KEY_DAILY_WORD_GOAL = "daily_word_goal"
+        private const val KEY_TRASH_RETENTION_POLICY = "trash_retention_policy"
 
         // Helper for Widget Service to access synchronously without injection
         fun getWidgetFilterMode(context: Context): WidgetFilterMode {

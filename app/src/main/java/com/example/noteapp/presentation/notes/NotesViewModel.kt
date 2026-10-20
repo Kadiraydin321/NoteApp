@@ -78,7 +78,8 @@ data class NotesState(
     val selectedNoteIds: Set<Long> = emptySet(),
     val filterType: NoteTypeFilter = NoteTypeFilter.ALL,
     val sortOrder: NoteSortOrder = NoteSortOrder.MODIFIED_DESC,
-    val selectedTag: String? = null
+    val selectedTag: String? = null,
+    val trashRetentionPolicy: com.example.noteapp.data.settings.TrashRetentionPolicy = com.example.noteapp.data.settings.TrashRetentionPolicy.DAYS_30
 )
 
 @HiltViewModel
@@ -113,16 +114,27 @@ class NotesViewModel @Inject constructor(
 
     private fun cleanUpTrash() {
         viewModelScope.launch {
-            val sevenDaysInMillis = 7L * 24L * 60L * 60L * 1000L
-            val threshold = System.currentTimeMillis() - sevenDaysInMillis
-            repository.cleanUpOldTrashNotes(threshold)
+            val policy = settingsManager.settings.value.trashRetentionPolicy
+            if (policy.days > 0) {
+                val retentionMillis = policy.days.toLong() * 24L * 60L * 60L * 1000L
+                val threshold = System.currentTimeMillis() - retentionMillis
+                repository.cleanUpOldTrashNotes(threshold)
+            }
         }
     }
 
     private fun observeSettings() {
         settingsManager.settings.onEach { settings ->
-            _state.value = _state.value.copy(layoutMode = settings.layoutMode)
+            _state.value = _state.value.copy(
+                layoutMode = settings.layoutMode,
+                trashRetentionPolicy = settings.trashRetentionPolicy
+            )
         }.launchIn(viewModelScope)
+    }
+
+    fun setTrashRetentionPolicy(policy: com.example.noteapp.data.settings.TrashRetentionPolicy) {
+        settingsManager.setTrashRetentionPolicy(policy)
+        cleanUpTrash()
     }
 
     fun setLayoutMode(mode: NotesLayoutMode) {
@@ -147,6 +159,9 @@ class NotesViewModel @Inject constructor(
     }
 
     fun setViewMode(mode: NotesViewMode) {
+        if (mode == NotesViewMode.TRASH) {
+            cleanUpTrash()
+        }
         _state.value = _state.value.copy(
             viewMode = mode,
             filterType = NoteTypeFilter.ALL,

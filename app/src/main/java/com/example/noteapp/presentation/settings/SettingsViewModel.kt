@@ -195,6 +195,10 @@ class SettingsViewModel @Inject constructor(
         settingsManager.setHighContrastNegative(enabled)
     }
 
+    fun setTrashRetentionPolicy(policy: com.example.noteapp.data.settings.TrashRetentionPolicy) {
+        settingsManager.setTrashRetentionPolicy(policy)
+    }
+
     fun refreshWidget() {
         NotesWidgetProvider.updateAllWidgets(app)
     }

@@ -1160,6 +1160,49 @@ fun NotesScreen(
                     }
                 }
 
+                // Çöp Kutusu Saklama Politikası Bilgilendirme Kartı
+                if (state.viewMode == NotesViewMode.TRASH) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = if (state.trashRetentionPolicy.days > 0)
+                                    "${state.trashRetentionPolicy.days} günden eski notlar otomatik temizlenir."
+                                else
+                                    "Otomatik temizleme kapalı. Notlar süresiz saklanır.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(
+                                onClick = onSettingsClick,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    "Değiştir",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
                 if (filteredNotes.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -1216,7 +1259,10 @@ fun NotesScreen(
                                 )
                             } else if (state.viewMode == NotesViewMode.TRASH) {
                                 Text(
-                                    "Sildiğin notlar burada 7 gün boyunca kalır.",
+                                    if (state.trashRetentionPolicy.days > 0)
+                                        "Sildiğin notlar burada ${state.trashRetentionPolicy.days} gün boyunca kalır."
+                                    else
+                                        "Sildiğin notlar sen kalıcı olarak temizleyene kadar burada kalır.",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
