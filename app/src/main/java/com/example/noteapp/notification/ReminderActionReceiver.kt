@@ -22,6 +22,12 @@ class ReminderActionReceiver : BroadcastReceiver() {
         val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1L)
         if (noteId == -1L) return
 
+        if (intent.action == ACTION_UNPIN_STICKY) {
+            NotificationHelper(context).cancelStickyNotification(noteId)
+            Toast.makeText(context, "📌 Bildirim sabitlemesi kaldırıldı", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(noteId.toInt())
 
@@ -60,6 +66,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_MARK_DONE = "com.example.noteapp.ACTION_REMINDER_MARK_DONE"
         const val ACTION_SNOOZE = "com.example.noteapp.ACTION_REMINDER_SNOOZE"
+        const val ACTION_UNPIN_STICKY = "com.example.noteapp.ACTION_UNPIN_STICKY"
         const val EXTRA_NOTE_ID = "extra_note_id"
         const val EXTRA_NOTE_TITLE = "extra_note_title"
         const val EXTRA_NOTE_CONTENT = "extra_note_content"

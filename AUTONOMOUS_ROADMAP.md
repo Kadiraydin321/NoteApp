@@ -122,14 +122,21 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `CategoryColorTest` ile palet tekilliği, varsayılan değerler ve renk güncelleme senaryoları %100 doğrulandı.
 
 ### Aşama 16: Notu Bildirim Çubuğuna Sabitleme (Sticky Note Notification) & Stilize HTML Dışa Aktarım
-- [ ] **Bildirime Sabitleme Motoru (Sticky Notification):** Not detay ekranından tek dokunuşla notun Android bildirim paneline kalıcı/sabit (ongoing) olarak iğnelenmesi (`NotificationHelper.showStickyNotification`).
-- [ ] **Bildirim Aksiyonları:** Bildirim üzerinden tek dokunuşla notu açma veya sabitlemeyi kaldırma ("📌 Kaldır" / `ACTION_UNPIN_STICKY`).
-- [ ] **Stilize HTML Web Dokümanı Dışa Aktarımı:** Notları responsive, modern koyu/açık tema destekli CSS içeren tekil `.html` dosyası olarak kaydedip tarayıcıda veya masaüstünde açabilme (`NoteExporter.exportToHtml`).
-- [ ] **Birim Testleri & Doğrulama:** Sticky bildirim ID ve HTML dışa aktarım testleri.
+- [x] **Bildirime Sabitleme Motoru (Sticky Notification):** Not detay ekranından tek dokunuşla notun Android bildirim paneline kalıcı/sabit (ongoing) olarak iğnelenmesi (`NotificationHelper.showStickyNotification`).
+- [x] **Bildirim Aksiyonları:** Bildirim üzerinden tek dokunuşla notu açma veya sabitlemeyi kaldırma ("📌 Kaldır" / `ACTION_UNPIN_STICKY` ve `cancelStickyNotification`).
+- [x] **Stilize HTML Web Dokümanı Dışa Aktarımı:** Notları responsive, modern koyu/açık tema destekli CSS, başlıklar, kontrol listeleri ve blok alıntılar içeren tekil `.html` dosyası olarak kaydedip tarayıcıda açabilme veya Cihaz İndirilenler klasörüne aktarabilme (`NoteExporter.exportToHtml`).
+- [x] **Birim Testleri & Doğrulama:** `HtmlExporterTest` ve `StickyNotificationTest` ile HTML markdown ayrıştırma, XSS koruması ve bildirim ID senaryoları %100 doğrulandı.
 
 ### Aşama 17: Kilitli Notlar Otomatik Zaman Aşımı Politikası (Auto-Relock Timeout Policy)
-- [ ] **Zaman Aşımı Ayarı:** `AppSettingsManager` üzerinden Anında, 1 Dakika, 5 Dakika, 15 Dakika kilit koruma süresi.
-- [ ] **Akıllı Yeniden Kilitleme:** Uygulama arka plana atıldığında süre dolana kadar kullanıcının biyometrik/PIN doğrulaması yapmadan notu düzenlemeye devam edebilmesi.
+- [ ] **Zaman Aşımı Modeli & Ayarı:** `AppSettingsManager` üzerinden Anında (Varsayılan), 1 Dakika, 5 Dakika, 15 Dakika kilit koruma süresi (`LockTimeoutPolicy`).
+- [ ] **Ayarlar Ekranı Seçici:** `SettingsScreen` üzerinde güvenlik kartına kilit zaman aşımı seçenekleri.
+- [ ] **Akıllı Yeniden Kilitleme:** Kullanıcı not detayından başka uygulamaya geçip belirlenen süre içinde geri döndüğünde tekrar şifre/biyometrik sormadan akıcı çalışabilmesi, süre dolunca otomatik kilitlenmesi.
+- [ ] **Birim Testleri:** Zaman aşımı eşik hesaplayıcı testleri.
+
+### Aşama 18: Not Detayında Bul ve Değiştir (In-Note Find & Replace Toolbar)
+- [ ] **Hızlı Bul & Değiştir Arayüzü:** Not detay ekranında açılabilir kompakt arama ve değiştirme araç çubuğu.
+- [ ] **Canlı Eşleşme Navigasyonu:** Toplam eşleşme sayısı (örn: `2/5`), ileri (`↓`) ve geri (`↑`) gezinme.
+- [ ] **Tekli ve Tümünü Değiştir (Replace / Replace All):** Seçilen veya tüm eşleşen kelimeleri tek dokunuşla yeni metinle değiştirme.
 
 ---
 
@@ -146,4 +153,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 13 Tamamlandı]** Çoklu not birleştirme motoru (Note Merge Engine), onay diyaloğu, orijinal not saklama/çöpe taşıma politikası ve birim testleri tamamlandı.
 * **[Aşama 14 Tamamlandı]** Hızlı H1/H2/H3 başlık ve ayraç araçları ile canlı okuma süresi tipografi HUD rozeti tamamlandı.
 * **[Aşama 15 Tamamlandı]** Kategori oluşturma ve düzenlemede 8 estetik palet rengi, dinamik renkli kategori rozetleri ve birim testleri tamamlandı.
-* **[Aşama 16 Sırada]** Notu bildirim çubuğuna sabitleme (Sticky Note) ve modern stilize HTML dışa aktarım motoru geliştirilecek.
+* **[Aşama 16 Tamamlandı]** Notu bildirim çubuğuna sabitleme (Sticky Note Notification) ve modern stilize HTML dışa aktarım motoru ve birim testleri tamamlandı.
+* **[Aşama 17 Sırada]** Kilitli notlar için otomatik zaman aşımı politikası (Auto-Relock Timeout Policy) geliştirilecek.

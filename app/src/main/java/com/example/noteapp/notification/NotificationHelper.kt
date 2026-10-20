@@ -14,6 +14,11 @@ class NotificationHelper(private val context: Context) {
     companion object {
         const val CHANNEL_ID = "note_reminder_channel"
         const val CHANNEL_NAME = "Not Hatırlatıcıları"
+
+        const val CHANNEL_STICKY_ID = "note_sticky_channel"
+        const val CHANNEL_STICKY_NAME = "Sabitlenmiş Notlar"
+
+        fun getStickyNotificationId(noteId: Long): Int = (noteId + 200_000L).toInt()
     }
 
     init {
@@ -22,7 +27,7 @@ class NotificationHelper(private val context: Context) {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val reminderChannel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_HIGH
@@ -30,8 +35,20 @@ class NotificationHelper(private val context: Context) {
                 description = "Planlanan not hatırlatıcı bildirimleri"
                 enableVibration(true)
             }
+
+            val stickyChannel = NotificationChannel(
+                CHANNEL_STICKY_ID,
+                CHANNEL_STICKY_NAME,
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Bildirim alanına sabitlenen kalıcı notlar"
+                setShowBadge(false)
+                enableVibration(false)
+            }
+
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
+            manager.createNotificationChannel(reminderChannel)
+            manager.createNotificationChannel(stickyChannel)
         }
     }
 
@@ -105,5 +122,68 @@ class NotificationHelper(private val context: Context) {
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(noteId.toInt(), notification)
+    }
+
+    /**
+     * Notu Android bildirim çekmecesine kalıcı/sabit (ongoing sticky note) olarak yerleştirir.
+     */
+    fun showStickyNotification(noteId: Long, title: String, content: String) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra("noteId", noteId)
+        }
+
+        val stickyId = getStickyNotificationId(noteId)
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            stickyId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val unpinIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+            action = ReminderActionReceiver.ACTION_UNPIN_STICKY
+            putExtra(ReminderActionReceiver.EXTRA_NOTE_ID, noteId)
+        }
+        val unpinPendingIntent = PendingIntent.getBroadcast(
+            context,
+            stickyId + 1,
+            unpinIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val displayTitle = if (title.isNotBlank()) title else "Sabitlenmiş Not"
+        val snippet = if (content.isNotBlank()) content.take(300) else "İçerik yok"
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_STICKY_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_agenda)
+            .setContentTitle("📌 $displayTitle")
+            .setContentText(snippet)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .addAction(android.R.drawable.ic_menu_view, "Aç", pendingIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Kaldır", unpinPendingIntent)
+            .build()
+
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(stickyId, notification)
+    }
+
+    fun cancelStickyNotification(noteId: Long) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.cancel(getStickyNotificationId(noteId))
+    }
+
+    fun isStickyNotificationActive(noteId: Long): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val stickyId = getStickyNotificationId(noteId)
+            manager.activeNotifications.any { it.id == stickyId }
+        } else {
+            false
+        }
     }
 }

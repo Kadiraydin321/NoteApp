@@ -80,6 +80,7 @@ import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.model.NoteTemplate
 import com.example.noteapp.media.FocusSoundType
+import com.example.noteapp.notification.NotificationHelper
 import com.example.noteapp.presentation.components.AttachmentList
 import com.example.noteapp.presentation.components.CategoryColorPicker
 import com.example.noteapp.presentation.components.FocusHudOverlay
@@ -1249,6 +1250,37 @@ fun NoteDetailScreen(
                                 )
 
                                 if ((state.currentNoteId ?: 0L) > 0L) {
+                                    val currentNoteId = state.currentNoteId ?: 0L
+                                    val isStickyActive = remember(showMoreMenu, currentNoteId) {
+                                        NotificationHelper(context).isStickyNotificationActive(currentNoteId)
+                                    }
+
+                                    DropdownMenuItem(
+                                        text = { Text(if (isStickyActive) "Bildirim Sabitlemesini Kaldır" else "Bildirime Sabitle (Kalıcı Not)") },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = if (isStickyActive) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                                                contentDescription = null,
+                                                tint = if (isStickyActive) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                            )
+                                        },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            val notificationHelper = NotificationHelper(context)
+                                            if (isStickyActive) {
+                                                notificationHelper.cancelStickyNotification(currentNoteId)
+                                                Toast.makeText(context, "📌 Bildirim sabitlemesi kaldırıldı", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                notificationHelper.showStickyNotification(
+                                                    noteId = currentNoteId,
+                                                    title = state.title,
+                                                    content = state.contentValue.text
+                                                )
+                                                Toast.makeText(context, "📌 Not bildirim çubuğuna sabitlendi", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    )
+
                                     DropdownMenuItem(
                                         text = { Text(if (state.isArchived) "Arşivden Çıkar" else "Arşivle") },
                                         leadingIcon = {
@@ -1338,6 +1370,59 @@ fun NoteDetailScreen(
                                             NoteExporter.shareFile(context, txtFile, "text/plain", "Metin Dosyasını Paylaş")
                                         } catch (e: Exception) {
                                             Toast.makeText(context, "Dosya oluşturulamadı: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                )
+
+                                // Web Sayfası (.html) Olarak Paylaş
+                                DropdownMenuItem(
+                                    text = { Text("Web Sayfası (.html) Olarak Paylaş") },
+                                    leadingIcon = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        try {
+                                            val categoryName = categories.find { it.id == state.categoryId }?.name
+                                            val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
+                                            val htmlFile = NoteExporter.exportToHtml(
+                                                context = context,
+                                                title = state.title,
+                                                content = state.contentValue.text,
+                                                categoryName = categoryName,
+                                                dateFormatted = dateStr,
+                                                tags = state.extractedTags
+                                            )
+                                            NoteExporter.shareFile(context, htmlFile, "text/html", "HTML Dokümanını Paylaş")
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "HTML oluşturulamadı: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                )
+
+                                // HTML'i İndirilenler Klasörüne Kaydet
+                                DropdownMenuItem(
+                                    text = { Text("HTML'i İndirilenler'e Kaydet") },
+                                    leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        try {
+                                            val categoryName = categories.find { it.id == state.categoryId }?.name
+                                            val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
+                                            val htmlFile = NoteExporter.exportToHtml(
+                                                context = context,
+                                                title = state.title,
+                                                content = state.contentValue.text,
+                                                categoryName = categoryName,
+                                                dateFormatted = dateStr,
+                                                tags = state.extractedTags
+                                            )
+                                            val savedUri = NoteExporter.saveToDownloads(context, htmlFile, "text/html")
+                                            if (savedUri != null) {
+                                                Toast.makeText(context, "HTML İndirilenler/NotDefterim klasörüne kaydedildi", Toast.LENGTH_LONG).show()
+                                            } else {
+                                                Toast.makeText(context, "Dosya kaydedilemedi", Toast.LENGTH_SHORT).show()
+                                            }
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Hata: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 )
