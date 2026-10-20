@@ -1686,9 +1686,35 @@ fun NoteDetailScreen(
                                                 IconButton(onClick = applyCodeBlockAction) {
                                                     Icon(Icons.Default.Code, contentDescription = "Kod Bloku")
                                                 }
-                                                // Başlık (H3)
-                                                IconButton(onClick = { applyPrefix("### ") }) {
-                                                    Icon(Icons.Default.Title, contentDescription = "Başlık")
+                                                // Başlık H1
+                                                FilledTonalButton(
+                                                    onClick = { applyPrefix("# ") },
+                                                    contentPadding = PaddingValues(horizontal = 6.dp),
+                                                    modifier = Modifier.height(30.dp)
+                                                ) {
+                                                    Text("H1", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                                                }
+                                                // Başlık H2
+                                                FilledTonalButton(
+                                                    onClick = { applyPrefix("## ") },
+                                                    contentPadding = PaddingValues(horizontal = 6.dp),
+                                                    modifier = Modifier.height(30.dp)
+                                                ) {
+                                                    Text("H2", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                                                }
+                                                // Başlık H3
+                                                FilledTonalButton(
+                                                    onClick = { applyPrefix("### ") },
+                                                    contentPadding = PaddingValues(horizontal = 6.dp),
+                                                    modifier = Modifier.height(30.dp)
+                                                ) {
+                                                    Text("H3", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                                                }
+                                                // Ayraç Çizgi (---)
+                                                IconButton(onClick = {
+                                                    insertTextAtCursor(state.contentValue, "\n---\n", onContentValueChange) { runCatching { focusRequester.requestFocus() } }
+                                                }) {
+                                                    Icon(Icons.Default.HorizontalRule, contentDescription = "Ayraç Çizgi (---)")
                                                 }
                                                 // Madde İşareti
                                                 IconButton(onClick = { applyPrefix("• ") }) {
@@ -2002,12 +2028,23 @@ fun NoteDetailScreen(
                                         color = if (isAppDark) Color(0x22FFFFFF) else Color(0x12000000),
                                         modifier = Modifier.clip(RoundedCornerShape(12.dp))
                                     ) {
-                                        Text(
-                                            text = "$wordCount kelime",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                                            color = dockIconColor.copy(alpha = 0.75f),
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
+                                        ) {
+                                            Icon(
+                                                Icons.Default.AccessTime,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(12.dp),
+                                                tint = dockIconColor.copy(alpha = 0.75f)
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                            Text(
+                                                text = "$wordCount kelime · ~${readingTime} dk",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                                color = dockIconColor.copy(alpha = 0.75f)
+                                            )
+                                        }
                                     }
                                 }
                             }

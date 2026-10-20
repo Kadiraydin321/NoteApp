@@ -111,12 +111,13 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `NoteMergerTest` ile kronolojik sıralama, içerik ayrımı, kategori korunumu ve medya tekilleştirmesi %100 doğrulandı.
 
 ### Aşama 14: Detay Ekranı Canlı Tipografi HUD & Hızlı H1/H2/H3 Başlık Formatlama
-- [ ] **Hızlı Markdown Başlık Butonları (H1, H2, H3, Alıntı, Çizgi):** Not düzenleme araç çubuğuna doğrudan `H1`, `H2`, `H3`, `>` (Blok Alıntı) ve `---` (Ayraç) hızlı biçimlendirme butonları ekleme.
-- [ ] **Canlı Tipografi HUD (Word & Reading Time Tracker):** Not detay düzenleme ekranında anlık kelime sayısı, karakter sayısı ve tahmini okuma süresini gösteren şık kompakt durum rozeti.
+- [x] **Hızlı Markdown Başlık Butonları (H1, H2, H3, Alıntı, Çizgi):** Not düzenleme araç çubuğuna doğrudan `H1`, `H2`, `H3`, `>` (Blok Alıntı) ve `---` (Ayraç Çizgi) hızlı biçimlendirme butonları eklendi (`NoteDetailScreen`).
+- [x] **Canlı Tipografi HUD (Word & Reading Time Tracker):** Not detay düzenleme ekranında anlık kelime sayısı, karakter sayısı ve tahmini okuma süresini gösteren şık kompakt durum rozeti (`$wordCount kelime · ~${readingTime} dk`).
+- [x] **Birim Testleri & Derleme Doğrulaması:** `MarkdownWrapTest` ve `assembleDebug` ile tüm markdown biçimlendirme senaryoları %100 doğrulandı.
 
-### Aşama 15: Kategoriye Özel Renk Paletleri & Gelişmiş Sıralama Tercihleri
-- [ ] **Kategori Renk Seçici:** Yeni kategori eklerken veya düzenlerken özel renk seçebilme.
-- [ ] **Akıllı Not Arama Filtresi:** Arama yaparken sadece başlıklarda veya sadece içeriklerde arama filtresi desteği.
+### Aşama 15: Kategoriye Özel Renk Paletleri & Renkli Kategori Çipleri (Colored Category Badges)
+- [ ] **Kategori Renk Seçici:** Yeni kategori oluştururken veya var olanı düzenlerken 8 estetik palet renginden seçim yapabilme (`Category.color`).
+- [ ] **Görsel Kategori Rozetleri:** Menü çekmecesinde, not detay çipinde ve not kartlarında kategorinin seçilen rengiyle yumuşak tonlu arka plan ve nokta ikonuyla şık gösterilmesi.
 
 ---
 
@@ -131,4 +132,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 11 Tamamlandı]** Çöp kutusu saklama/otomatik temizleme politikası, ayarlar paneli ve not tam ekran okuma/sunum modu, birim testleriyle birlikte tamamlandı.
 * **[Aşama 12 Tamamlandı]** Arama geçmişi yönetimi, son aramalar çip şeridi ve not kartlarında anlık arama kelimesi vurgulama motoru birim testleriyle tamamlandı.
 * **[Aşama 13 Tamamlandı]** Çoklu not birleştirme motoru (Note Merge Engine), onay diyaloğu, orijinal not saklama/çöpe taşıma politikası ve birim testleri tamamlandı.
-* **[Aşama 14 Sırada]** Hızlı H1/H2/H3 başlık ve alıntı araçları ile canlı tipografi HUD rozeti geliştirilecek.
+* **[Aşama 14 Tamamlandı]** Hızlı H1/H2/H3 başlık ve ayraç araçları ile canlı okuma süresi tipografi HUD rozeti tamamlandı.
+* **[Aşama 15 Sırada]** Kategori oluşturma ve düzenlemede renk paleti seçimi ve renkli kategori rozetleri geliştirilecek.
