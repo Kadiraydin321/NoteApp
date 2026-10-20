@@ -45,27 +45,55 @@ fun MarkdownTableView(
     // Hücre Düzenleme Diyaloğu
     cellToEdit?.let { (r, c, currentText) ->
         var editedText by remember { mutableStateOf(currentText) }
+        val initialAlign = if (c < table.alignments.size) table.alignments[c] else TableAlignment.LEFT
+        var selectedAlign by remember { mutableStateOf(initialAlign) }
+
         AlertDialog(
             onDismissRequest = { cellToEdit = null },
             title = {
                 Text(
-                    text = if (r == -1) "Sütun Başlığını Düzenle" else "Hücreyi Düzenle (Satır ${r + 1}, Sütun ${c + 1})",
+                    text = if (r == -1) "Sütun Başlığını ve Hizalamasını Düzenle" else "Hücreyi Düzenle (Satır ${r + 1}, Sütun ${c + 1})",
                     style = MaterialTheme.typography.titleMedium
                 )
             },
             text = {
-                OutlinedTextField(
-                    value = editedText,
-                    onValueChange = { editedText = it },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = editedText,
+                        onValueChange = { editedText = it },
+                        singleLine = true,
+                        label = { Text(if (r == -1) "Başlık" else "Hücre Değeri") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (r == -1) {
+                        Text("Metin Hizalaması:", style = MaterialTheme.typography.labelSmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilterChip(
+                                selected = selectedAlign == TableAlignment.LEFT,
+                                onClick = { selectedAlign = TableAlignment.LEFT },
+                                label = { Text("Sol (←)") }
+                            )
+                            FilterChip(
+                                selected = selectedAlign == TableAlignment.CENTER,
+                                onClick = { selectedAlign = TableAlignment.CENTER },
+                                label = { Text("Orta (↔)") }
+                            )
+                            FilterChip(
+                                selected = selectedAlign == TableAlignment.RIGHT,
+                                onClick = { selectedAlign = TableAlignment.RIGHT },
+                                label = { Text("Sağ (→)") }
+                            )
+                        }
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         val updatedTable = if (r == -1) {
-                            MarkdownTableParser.updateHeader(table, c, editedText)
+                            val t1 = MarkdownTableParser.updateHeader(table, c, editedText)
+                            MarkdownTableParser.setAlignment(t1, c, selectedAlign)
                         } else {
                             MarkdownTableParser.updateCell(table, r, c, editedText)
                         }
@@ -246,6 +274,20 @@ fun MarkdownTableView(
                             Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Satır Sil", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+
+                    if (table.headers.size > 1) {
+                        TextButton(
+                            onClick = {
+                                val updated = MarkdownTableParser.deleteColumn(table, table.headers.size - 1)
+                                onTableChange(updated)
+                            },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Sütun Sil", style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }

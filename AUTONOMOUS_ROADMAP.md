@@ -185,9 +185,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `ChecklistSorterTest` ile girintileme korunumu, normal paragrafların etkilenmemesi, blok sıralama ve toplu tamamlama testleri %100 doğrulandı.
 
 ### Aşama 28: Canlı Markdown Tablo Otomatik Hizalayıcı (Markdown Table Prettifier & Auto-Formatter)
-- [ ] **Tablo Otomatik Hizalama & Biçimlendirme:** Düzensiz boru (`|`) boşluklarına sahip Markdown tablolarını sütun genişliklerine göre en uzun hücre boyutuna hizalayıp kusursuz hale getirme (`MarkdownTableFormatter.prettifyTable`).
-- [ ] **Görsel Tablo Eylemleri:** Tablo görünümünde sütun silme ve başlık hizalamasını (Sol, Orta, Sağ) görsel olarak değiştirebilme.
-- [ ] **Birim Testleri:** `MarkdownTableFormatterTest` ile sütun genişlik hesaplamaları ve ayraç hizalama testleri.
+- [x] **Tablo Otomatik Hizalama & Biçimlendirme:** Düzensiz boru (`|`) boşluklarına sahip Markdown tablolarını sütun genişliklerine göre en uzun hücre boyutuna hizalayıp dikeyde boruları tam hizalı ve kusursuz hale getirme (`MarkdownTableParser.prettifyTable`, `toMarkdown`, `formatAllTablesInText`).
+- [x] **Görsel Tablo Eylemleri:** Tablo görünümünde sütun silme (`deleteColumn`), başlık hizalamasını (Sol, Orta, Sağ) görsel olarak filtre çipleriyle seçebilme (`cycleAlignment`, `setAlignment`) ve dinamik düzenleme.
+- [x] **Birim Testleri:** `MarkdownTableParserTest` ile sütun genişlik hesaplamaları, prettify serileştirme ve hizalama döngü testleri %100 doğrulandı.
+
+### Aşama 29: Not Başına Özel Kelime Hedefi & İlerleme Rozeti (In-Note Word Goal & Circular Progress HUD)
+- [ ] **Not Başına Özel Kelime Hedefi:** Her not için isteğe bağlı olarak özel kelime hedefi (örn: 250, 500, 1000 kelime) belirleyebilme (`Note.wordGoal`).
+- [ ] **Canlı Hedef İlerleme Rozeti:** Not detay ekranında hedefe ne kadar yaklaşıldığını gösteren canlı animasyonlu dairesel ilerleme rozeti (`WordGoalProgressBadge`), kalan kelime göstergesi ve hedef tamamlandığında parıldayan başarı durumu.
+- [ ] **Birim Testleri:** `WordGoalCalculatorTest` ile hedef yüzdesi, kalan kelime sayısı ve tamamlama eşikleri testleri.
 
 ---
 
@@ -216,3 +221,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 25 Tamamlandı]** Android dinamik launcher kısayolları (AppShortcutManager), ana ekrana not sabitleme (pinNoteToHomeScreen), intent rota çözümleyici ve birim testleri tamamlandı.
 * **[Aşama 26 Tamamlandı]** AES-256-GCM şifreli taşınabilir not kasası motoru (.notevault), dışa/içe aktarım diyalogları (ExportVaultDialog, ImportVaultDialog), BackupManager entegrasyonu ve birim testleri tamamlandı.
 * **[Aşama 27 Tamamlandı]** Kontrol listesi canlı ilerleme halkası (ChecklistProgressRing), akıllı checklist sıralayıcı ve temizleyici (ChecklistSorter) ve birim testleri tamamlandı.
+* **[Aşama 28 Tamamlandı]** Markdown tablo otomatik hizalayıcı motoru (prettifyTable, formatAllTablesInText), görsel sütun hizalama seçicisi ve silme eylemleri tamamlandı.

@@ -116,43 +116,141 @@ object MarkdownTableParser {
     }
 
     /**
-     * Tablo nesnesini temiz, hizalı Markdown tablosu metnine çevirir.
+     * Tablo nesnesini temiz, dikeyde boruları (|) hizalı,
+     * profesyonel Markdown tablosu metnine çevirir.
      */
     fun toMarkdown(table: MarkdownTable): String {
+        return prettifyTable(table)
+    }
+
+    /**
+     * Sütun genişliklerini hesaplar ve hücreleri hizalayarak
+     * estetik, boru (|) karakterleri dikeyde tam hizalı Markdown tablosu metni üretir.
+     */
+    fun prettifyTable(table: MarkdownTable): String {
         val columnCount = table.headers.size
         if (columnCount == 0) return ""
+
+        // Her sütun için en uzun içeriği hesapla (minimum 3 karakter)
+        val colWidths = (0 until columnCount).map { col ->
+            val headerLen = if (col < table.headers.size) table.headers[col].length else 0
+            val maxRowLen = table.rows.maxOfOrNull { row ->
+                if (col < row.size) row[col].length else 0
+            } ?: 0
+            maxOf(3, maxOf(headerLen, maxRowLen))
+        }
 
         val sb = StringBuilder()
 
         // 1. Başlık Satırı
-        sb.append("| ")
-        sb.append(table.headers.joinToString(" | "))
-        sb.append(" |\n")
+        sb.append("|")
+        for (i in 0 until columnCount) {
+            val header = if (i < table.headers.size) table.headers[i] else ""
+            val align = if (i < table.alignments.size) table.alignments[i] else TableAlignment.LEFT
+            val padded = padCell(header, colWidths[i], align)
+            sb.append(" ").append(padded).append(" |")
+        }
+        sb.append("\n")
 
         // 2. Ayraç Satırı
-        sb.append("| ")
-        val sepList = (0 until columnCount).map { i ->
+        sb.append("|")
+        for (i in 0 until columnCount) {
+            val width = colWidths[i]
             val align = if (i < table.alignments.size) table.alignments[i] else TableAlignment.LEFT
-            when (align) {
-                TableAlignment.LEFT -> ":---"
-                TableAlignment.CENTER -> ":---:"
-                TableAlignment.RIGHT -> "---:"
+            val sep = when (align) {
+                TableAlignment.LEFT -> ":" + "-".repeat((width - 1).coerceAtLeast(2))
+                TableAlignment.RIGHT -> "-".repeat((width - 1).coerceAtLeast(2)) + ":"
+                TableAlignment.CENTER -> ":" + "-".repeat((width - 2).coerceAtLeast(1)) + ":"
             }
+            sb.append(" ").append(sep).append(" |")
         }
-        sb.append(sepList.joinToString(" | "))
-        sb.append(" |\n")
+        sb.append("\n")
 
         // 3. Veri Satırları
         for (row in table.rows) {
-            sb.append("| ")
-            val cells = (0 until columnCount).map { i ->
-                if (i < row.size) row[i] else ""
+            sb.append("|")
+            for (i in 0 until columnCount) {
+                val cell = if (i < row.size) row[i] else ""
+                val align = if (i < table.alignments.size) table.alignments[i] else TableAlignment.LEFT
+                val padded = padCell(cell, colWidths[i], align)
+                sb.append(" ").append(padded).append(" |")
             }
-            sb.append(cells.joinToString(" | "))
-            sb.append(" |\n")
+            sb.append("\n")
         }
 
         return sb.toString().trimEnd()
+    }
+
+    private fun padCell(text: String, width: Int, align: TableAlignment): String {
+        val diff = width - text.length
+        if (diff <= 0) return text
+        return when (align) {
+            TableAlignment.LEFT -> text + " ".repeat(diff)
+            TableAlignment.RIGHT -> " ".repeat(diff) + text
+            TableAlignment.CENTER -> {
+                val leftSpaces = diff / 2
+                val rightSpaces = diff - leftSpaces
+                " ".repeat(leftSpaces) + text + " ".repeat(rightSpaces)
+            }
+        }
+    }
+
+    /**
+     * Verilen metindeki tüm Markdown tablolarını tespit edip hizalanmış ve estetik hale getirir.
+     */
+    fun formatAllTablesInText(text: String): String {
+        val lines = text.lines()
+        val result = mutableListOf<String>()
+        var index = 0
+
+        while (index < lines.size) {
+            if (isTableStart(lines, index)) {
+                val tableResult = parseTable(lines, index)
+                if (tableResult != null) {
+                    val (table, nextIndex) = tableResult
+                    val prettyMarkdown = prettifyTable(table)
+                    result.addAll(prettyMarkdown.lines())
+                    index = nextIndex
+                    continue
+                }
+            }
+            result.add(lines[index])
+            index++
+        }
+
+        return result.joinToString("\n")
+    }
+
+    /**
+     * Belirtilen sütunun hizalamasını döngüsel olarak değiştirir (LEFT -> CENTER -> RIGHT -> LEFT).
+     */
+    fun cycleAlignment(table: MarkdownTable, colIndex: Int): MarkdownTable {
+        if (colIndex !in table.headers.indices) return table
+        val current = if (colIndex < table.alignments.size) table.alignments[colIndex] else TableAlignment.LEFT
+        val next = when (current) {
+            TableAlignment.LEFT -> TableAlignment.CENTER
+            TableAlignment.CENTER -> TableAlignment.RIGHT
+            TableAlignment.RIGHT -> TableAlignment.LEFT
+        }
+        val updatedAlignments = table.alignments.toMutableList()
+        while (updatedAlignments.size <= colIndex) {
+            updatedAlignments.add(TableAlignment.LEFT)
+        }
+        updatedAlignments[colIndex] = next
+        return table.copy(alignments = updatedAlignments)
+    }
+
+    /**
+     * Belirtilen sütunun hizalamasını doğrudan atar.
+     */
+    fun setAlignment(table: MarkdownTable, colIndex: Int, alignment: TableAlignment): MarkdownTable {
+        if (colIndex !in table.headers.indices) return table
+        val updatedAlignments = table.alignments.toMutableList()
+        while (updatedAlignments.size <= colIndex) {
+            updatedAlignments.add(TableAlignment.LEFT)
+        }
+        updatedAlignments[colIndex] = alignment
+        return table.copy(alignments = updatedAlignments)
     }
 
     /**

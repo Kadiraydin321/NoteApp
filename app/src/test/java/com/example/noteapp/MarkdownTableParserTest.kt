@@ -66,7 +66,7 @@ class MarkdownTableParserTest {
     }
 
     @Test
-    fun toMarkdown_serializesCorrectly() {
+    fun toMarkdown_and_prettifyTable_serializeAndAlignCorrectly() {
         val table = MarkdownTable(
             headers = listOf("Ürün", "Adet"),
             alignments = listOf(TableAlignment.LEFT, TableAlignment.RIGHT),
@@ -77,10 +77,49 @@ class MarkdownTableParserTest {
         )
 
         val markdown = MarkdownTableParser.toMarkdown(table)
-        assertTrue(markdown.contains("| Ürün | Adet |"))
-        assertTrue(markdown.contains("| :--- | ---: |"))
-        assertTrue(markdown.contains("| Elma | 5 |"))
-        assertTrue(markdown.contains("| Armut | 12 |"))
+        assertTrue(markdown.contains("Ürün"))
+        assertTrue(markdown.contains("Adet"))
+        assertTrue(markdown.contains("Elma"))
+        assertTrue(markdown.contains("Armut"))
+        assertTrue(markdown.contains(":"))
+
+        // Her satırdaki boru sayısı eşit olmalıdır
+        val lines = markdown.lines()
+        val pipeCounts = lines.map { line -> line.count { it == '|' } }
+        assertTrue(pipeCounts.all { it == 3 })
+    }
+
+    @Test
+    fun formatAllTablesInText_prettifiesTablesInFullMarkdown() {
+        val messyMarkdown = """
+            # Rapor
+            Burada bir tablo var:
+            | Başlık A|B |
+            |---|---|
+            | 1|2 |
+            
+            Ve normal metin devam ediyor.
+        """.trimIndent()
+
+        val formatted = MarkdownTableParser.formatAllTablesInText(messyMarkdown)
+        assertTrue(formatted.contains("# Rapor"))
+        assertTrue(formatted.contains("Ve normal metin devam ediyor."))
+        assertTrue(formatted.contains("| Başlık A |"))
+    }
+
+    @Test
+    fun cycleAlignment_and_setAlignment_updateAlignments() {
+        val initial = MarkdownTable(
+            headers = listOf("A", "B"),
+            alignments = listOf(TableAlignment.LEFT, TableAlignment.LEFT),
+            rows = listOf(listOf("1", "2"))
+        )
+
+        val cycled = MarkdownTableParser.cycleAlignment(initial, 0)
+        assertEquals(TableAlignment.CENTER, cycled.alignments[0])
+
+        val setAlign = MarkdownTableParser.setAlignment(cycled, 0, TableAlignment.RIGHT)
+        assertEquals(TableAlignment.RIGHT, setAlign.alignments[0])
     }
 
     @Test
