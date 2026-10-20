@@ -80,6 +80,8 @@ import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.model.NoteTemplate
 import com.example.noteapp.domain.util.AppShortcutManager
+import com.example.noteapp.domain.util.ChecklistParser
+import com.example.noteapp.domain.util.ChecklistSorter
 import com.example.noteapp.domain.util.FindMatch
 import com.example.noteapp.domain.util.FindReplaceEngine
 import com.example.noteapp.domain.util.ReadingColumnSplitter
@@ -90,6 +92,7 @@ import com.example.noteapp.notification.NotificationHelper
 import com.example.noteapp.presentation.components.AttachmentList
 import com.example.noteapp.presentation.components.AudioRecordingVisualizerBar
 import com.example.noteapp.presentation.components.CategoryColorPicker
+import com.example.noteapp.presentation.components.ChecklistProgressRing
 import com.example.noteapp.presentation.components.ExportVaultDialog
 import com.example.noteapp.presentation.components.FindAndReplaceBar
 import com.example.noteapp.presentation.components.FocusHudOverlay
@@ -1550,6 +1553,8 @@ fun NoteDetailScreen(
                                             )
                                         },
                                         onClick = {
+                                            val sorted = ChecklistSorter.moveCheckedToBottom(state.contentValue.text)
+                                            onContentValueChange(TextFieldValue(sorted))
                                             moveCheckedToBottom = !moveCheckedToBottom
                                             showMoreMenu = false
                                         }
@@ -2171,6 +2176,29 @@ fun NoteDetailScreen(
                                         colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
                                     )
                                 } else {
+                                    val checklistStats = remember(state.contentValue.text) {
+                                        ChecklistParser.parse(state.contentValue.text)
+                                    }
+                                    if (checklistStats != null) {
+                                        ChecklistProgressRing(
+                                            stats = checklistStats,
+                                            contentColor = dockIconColor,
+                                            onMoveToBottom = {
+                                                val sorted = ChecklistSorter.moveCheckedToBottom(state.contentValue.text)
+                                                onContentValueChange(TextFieldValue(sorted))
+                                            },
+                                            onToggleAll = { checkAll ->
+                                                val updated = ChecklistSorter.toggleAllItems(state.contentValue.text, checkAll)
+                                                onContentValueChange(TextFieldValue(updated))
+                                            },
+                                            onRemoveCompleted = {
+                                                val cleaned = ChecklistSorter.removeCompletedItems(state.contentValue.text)
+                                                onContentValueChange(TextFieldValue(cleaned))
+                                            }
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                    }
+
                                     Surface(
                                         onClick = { showStatsDialog = true },
                                         shape = RoundedCornerShape(12.dp),

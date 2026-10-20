@@ -180,9 +180,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `VaultExportEngineTest` ile şifreleme/çözme, yanlış parola reddi, başlık doğrulaması ve bozuk dosya koruma testleri %100 doğrulandı.
 
 ### Aşama 27: Kontrol Listesi Canlı İlerleme Halkası & Akıllı Sıralayıcı (Checklist Progress Ring & Sorter)
-- [ ] **Not İçi Canlı Kontrol Listesi Özeti:** Not detay ekranında başlık yanında veya tipografi HUD'ında şık minyatür dairesel ilerleme halkası (`ChecklistProgressRing`: örn: %75 tamamlandı, 3/4).
-- [ ] **Tamamlananları Otomatik / Manuel Sıralama:** Not düzenleme ekranında tamamlanan checklist maddelerini (`- [x]`) tek dokunuşla en alta taşıma motoru (`ChecklistSorter.moveCheckedToBottom`).
-- [ ] **Birim Testleri:** `ChecklistSorterTest` ile girintileme korunumu, normal paragrafların etkilenmemesi ve tamamlananların en alta taşınması testleri.
+- [x] **Not İçi Canlı Kontrol Listesi Özeti:** Not detay ekranında başlık yanında veya tipografi HUD'ında şık minyatür dairesel ilerleme halkası (`ChecklistProgressRing`: örn: %75 tamamlandı, 3/4) ve tıklanabilir hızlı aksiyon menüsü.
+- [x] **Tamamlananları Otomatik / Manuel Sıralama:** Not düzenleme ekranında tamamlanan checklist maddelerini (`- [x]`) tek dokunuşla en alta taşıma motoru (`ChecklistSorter.moveCheckedToBottom`), toplu tamamlama (`toggleAllItems`) ve tamamlananları temizleme (`removeCompletedItems`).
+- [x] **Birim Testleri:** `ChecklistSorterTest` ile girintileme korunumu, normal paragrafların etkilenmemesi, blok sıralama ve toplu tamamlama testleri %100 doğrulandı.
+
+### Aşama 28: Canlı Markdown Tablo Otomatik Hizalayıcı (Markdown Table Prettifier & Auto-Formatter)
+- [ ] **Tablo Otomatik Hizalama & Biçimlendirme:** Düzensiz boru (`|`) boşluklarına sahip Markdown tablolarını sütun genişliklerine göre en uzun hücre boyutuna hizalayıp kusursuz hale getirme (`MarkdownTableFormatter.prettifyTable`).
+- [ ] **Görsel Tablo Eylemleri:** Tablo görünümünde sütun silme ve başlık hizalamasını (Sol, Orta, Sağ) görsel olarak değiştirebilme.
+- [ ] **Birim Testleri:** `MarkdownTableFormatterTest` ile sütun genişlik hesaplamaları ve ayraç hizalama testleri.
 
 ---
 
@@ -210,3 +215,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 24 Tamamlandı]** Not içi canlı ses kaydı görselleştirici barı (AudioRecordingVisualizerBar), dokunmatik dalga formu sarıcısı (AudioWaveformScrubber), WaveformHelper motoru ve birim testleri tamamlandı.
 * **[Aşama 25 Tamamlandı]** Android dinamik launcher kısayolları (AppShortcutManager), ana ekrana not sabitleme (pinNoteToHomeScreen), intent rota çözümleyici ve birim testleri tamamlandı.
 * **[Aşama 26 Tamamlandı]** AES-256-GCM şifreli taşınabilir not kasası motoru (.notevault), dışa/içe aktarım diyalogları (ExportVaultDialog, ImportVaultDialog), BackupManager entegrasyonu ve birim testleri tamamlandı.
+* **[Aşama 27 Tamamlandı]** Kontrol listesi canlı ilerleme halkası (ChecklistProgressRing), akıllı checklist sıralayıcı ve temizleyici (ChecklistSorter) ve birim testleri tamamlandı.
