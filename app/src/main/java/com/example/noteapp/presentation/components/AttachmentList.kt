@@ -1,11 +1,14 @@
 package com.example.noteapp.presentation.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
@@ -16,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -137,24 +141,31 @@ fun AttachmentList(
                     }
                 }
             } else {
-                // Görsel Kartı (Düzenleme için Tıklanabilir)
+                // Görsel veya Çizim Kartı (Düzenleme için Tıklanabilir)
+                val isDrawing = path.contains("drawing", ignoreCase = true)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(220.dp)
+                        .height(if (isDrawing) 240.dp else 220.dp)
                         .clip(RoundedCornerShape(12.dp))
+                        .then(
+                            if (isDrawing) Modifier
+                                .background(Color.White.copy(alpha = 0.96f))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                            else Modifier
+                        )
                         .clickable { onImageClick(path) }
                 ) {
                     AsyncImage(
                         model = File(path),
-                        contentDescription = "Not Görseli",
-                        contentScale = ContentScale.Crop,
+                        contentDescription = if (isDrawing) "El Çizimi" else "Not Görseli",
+                        contentScale = if (isDrawing) ContentScale.Fit else ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
 
                     // Düzenleme İpucu Rozeti
                     Surface(
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
                             .align(Alignment.BottomStart)
@@ -166,14 +177,14 @@ fun AttachmentList(
                         ) {
                             val isEdited = canRevertImage?.invoke(path) == true
                             Icon(
-                                imageVector = Icons.Default.Search,
+                                imageVector = if (isDrawing) Icons.Default.Brush else if (isEdited) Icons.Default.Edit else Icons.Default.Search,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isEdited) "Düzenlendi (Geri alınabilir)" else "Görüntülemek için dokun",
+                                text = if (isDrawing) "Çizim (Görüntüle / Düzenle)" else if (isEdited) "Düzenlendi (Geri alınabilir)" else "Görüntülemek için dokun",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )

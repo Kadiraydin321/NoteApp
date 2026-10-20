@@ -2302,8 +2302,9 @@ fun NoteCard(
             Column(
                 modifier = Modifier.padding(14.dp)
             ) {
-                // Görsel eki (Varsa) - Downsampled thumbnail
+                // Görsel veya Çizim eki (Varsa) - Downsampled thumbnail
                 firstImage?.let { imgPath ->
+                    val isDrawing = remember(imgPath) { imgPath.contains("drawing", ignoreCase = true) }
                     val context = LocalContext.current
                     val imgRequest = remember(imgPath) {
                         coil.request.ImageRequest.Builder(context)
@@ -2312,15 +2313,50 @@ fun NoteCard(
                             .crossfade(false)
                             .build()
                     }
-                    AsyncImage(
-                        model = imgRequest,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(115.dp)
                             .clip(RoundedCornerShape(10.dp))
-                    )
+                    ) {
+                        AsyncImage(
+                            model = imgRequest,
+                            contentDescription = if (isDrawing) "El Çizimi" else "Not Görseli",
+                            contentScale = if (isDrawing) ContentScale.Fit else ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(115.dp)
+                                .then(
+                                    if (isDrawing) Modifier.background(Color.White.copy(alpha = 0.96f))
+                                    else Modifier
+                                )
+                        )
+                        if (isDrawing) {
+                            Surface(
+                                shape = RoundedCornerShape(bottomEnd = 8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
+                                modifier = Modifier.align(Alignment.TopStart)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Brush,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Spacer(Modifier.width(3.dp))
+                                    Text(
+                                        text = "Çizim",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
@@ -2755,7 +2791,14 @@ fun CompactNoteCard(
                             tint = colorSpec.secondaryColor
                         )
                     }
-                    if (note.attachments.any { !it.endsWith(".mp4") && !it.endsWith(".m4a") }) {
+                    if (note.attachments.any { it.contains("drawing", ignoreCase = true) }) {
+                        Icon(
+                            Icons.Default.Brush,
+                            contentDescription = "Çizim",
+                            modifier = Modifier.size(13.dp),
+                            tint = colorSpec.secondaryColor
+                        )
+                    } else if (note.attachments.any { !it.endsWith(".mp4") && !it.endsWith(".m4a") }) {
                         Icon(
                             Icons.Default.Image,
                             contentDescription = "Görsel",

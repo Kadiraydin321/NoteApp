@@ -155,12 +155,16 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `BackupRestoreEngineTest` ile ZIP paketleme/ayrıştırma, JSON şema bütünlüğü ve Vault Magic doğrulamaları %100 test edildi.
 
 ### Aşama 22: Not Sabitleme & Çizim / Karalama Kartı İyileştirmeleri (Canvas Drawing & Visual Polish)
-- [ ] **Gelişmiş Fırça ve Kalem Paleti:** El yazısı ve çizim ekranına renk paleti, silgi modu ve kontur kalınlığı kontrolü.
-- [ ] **Görsel Önizleme:** Not detayında ve liste kartlarında çizim önizlemelerinin yüksek çözünürlüklü ve pürüzsüz render edilmesi.
+- [x] **Çizim / Karalama Kartı Önizlemeleri:** Not listesinde (`NoteCard` ve `CompactNoteCard`) ve not detay ekranında (`AttachmentList`) el çizimlerinin kırpılmadan (`ContentScale.Fit`), yüksek kontrastlı temiz arka planla ve `Icons.Default.Brush` rozetiyle ("🎨 Çizim") şık bir şekilde sunulması.
+- [x] **Görsel Önizleme ve Etiketleme:** Kompakt listede el çizimi içeren notlara fırça ikonu yerleştirilmesi, kartlarda çizim tipinin anında ayırt edilmesi.
 
 ### Aşama 23: Markdown Tablo Ayrıştırıcı & Canlı Tablo Düzenleyici (Markdown Table Editor)
 - [ ] **Görsel Tablo Kartı:** Not detayında Markdown tablolarını (`| Başlık 1 | Başlık 2 |`) okunabilir şık Material 3 ızgara formatında render etme.
 - [ ] **Hızlı Hücre Düzenleme:** Tablo hücrelerine tek dokunuşla satır/sütun ekleme ve düzenleme araç çubuğu.
+
+### Aşama 24: Not İçi Ses Kaydı Canlı Dalga Formu (Live Audio Visualizer & Waveform)
+- [ ] **Canlı Ses Dalga Formu:** Ses kaydederken mikrofon genliğine (amplitude) göre gerçek zamanlı dinamik dalga çubukları render etme (`AudioWaveformVisualizer`).
+- [ ] **Oynatıcı Dalga İlerlemesi:** Not detayında ses oynatılırken dalga formu üzerinde dokunarak (scrubbing) ileri/geri sarma.
 
 ---
 
@@ -183,3 +187,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 19 Tamamlandı]** Okuma modunda satır yüksekliği kontrolü, akıllı çift sütun gazete düzeni (ReadingColumnSplitter) ve birim testleri tamamlandı.
 * **[Aşama 20 Tamamlandı]** WorkManager periyodik çöp kutusu temizleyicisi (TrashCleanupWorker), anlık manuel tetikleme ve bağlı dosya temizliği tamamlandı.
 * **[Aşama 21 Tamamlandı]** Tam kapsamlı ZIP/JSON yedekleme motoru (notlar, kategoriler, versiyon geçmişi, özel şablonlar, medya ekleri), güvenli geri yükleme ve birim testleri tamamlandı.
+* **[Aşama 22 Tamamlandı]** El çizimi ve karalamaların kartlarda kırpılmadan Fit ölçeklemesi, yüksek kontrastlı arka planı, `🎨 Çizim` rozeti ve kompakt göstergeleri tamamlandı.
