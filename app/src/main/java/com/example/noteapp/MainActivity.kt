@@ -367,6 +367,11 @@ class MainActivity : FragmentActivity() {
                             onSaveSearchQuery = viewModel::saveSearchQuery,
                             onRemoveRecentSearch = viewModel::removeRecentSearch,
                             onClearRecentSearches = viewModel::clearRecentSearches,
+                            onMergeSelectedNotes = { moveToTrash ->
+                                viewModel.mergeSelectedNotes(moveToTrash) {
+                                    android.widget.Toast.makeText(this@MainActivity, "Seçilen notlar başarıyla birleştirildi", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
                             onSettingsClick = {
                                 navController.navigate("settings_screen")
                             }

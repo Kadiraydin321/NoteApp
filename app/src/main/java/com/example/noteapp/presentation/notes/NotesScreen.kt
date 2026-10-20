@@ -126,6 +126,7 @@ fun NotesScreen(
     onSaveSearchQuery: (String) -> Unit = {},
     onRemoveRecentSearch: (String) -> Unit = {},
     onClearRecentSearches: () -> Unit = {},
+    onMergeSelectedNotes: (Boolean) -> Unit = {},
     onSettingsClick: () -> Unit
 ) {
     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
@@ -201,6 +202,8 @@ fun NotesScreen(
     var showBatchCategoryDialog by remember { mutableStateOf(false) }
     var showBatchColorDialog by remember { mutableStateOf(false) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+    var showMergeNotesConfirm by remember { mutableStateOf(false) }
+    var moveToTrashOriginalsOnMerge by remember { mutableStateOf(true) }
     var showSelectionActionsMenu by remember { mutableStateOf(false) }
     var showEmptyTrashConfirm by remember { mutableStateOf(false) }
     var noteToDeletePermanently by remember { mutableStateOf<Note?>(null) }
@@ -742,6 +745,12 @@ fun NotesScreen(
                                 IconButton(onClick = { showBatchColorDialog = true }) {
                                     Icon(Icons.Default.Palette, contentDescription = "Renk Değiştir")
                                 }
+                                if (state.selectedNoteIds.size >= 2 && state.viewMode != NotesViewMode.TRASH) {
+                                    // Notları Birleştir
+                                    IconButton(onClick = { showMergeNotesConfirm = true }) {
+                                        Icon(Icons.Default.CallMerge, contentDescription = "Notları Birleştir")
+                                    }
+                                }
                             }
                             Box {
                                 IconButton(onClick = { showSelectionActionsMenu = true }) {
@@ -751,6 +760,16 @@ fun NotesScreen(
                                     expanded = showSelectionActionsMenu,
                                     onDismissRequest = { showSelectionActionsMenu = false }
                                 ) {
+                                    if (state.selectedNoteIds.size >= 2 && state.viewMode != NotesViewMode.TRASH) {
+                                        DropdownMenuItem(
+                                            text = { Text("Seçili ${state.selectedNoteIds.size} Notu Birleştir") },
+                                            leadingIcon = { Icon(Icons.Default.CallMerge, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                            onClick = {
+                                                showSelectionActionsMenu = false
+                                                showMergeNotesConfirm = true
+                                            }
+                                        )
+                                    }
                                     if (state.viewMode == NotesViewMode.ALL && state.selectedNoteIds.size == 1) {
                                         DropdownMenuItem(
                                             text = { Text("Paylaş") },
@@ -1814,7 +1833,58 @@ fun NotesScreen(
         )
     }
 
-    // 6. Çöp Kutusunu Boşaltma Onay Dialogu
+    // 7. Notları Birleştirme Onay Dialogu
+    if (showMergeNotesConfirm) {
+        val count = state.selectedNoteIds.size
+        AlertDialog(
+            onDismissRequest = { showMergeNotesConfirm = false },
+            icon = { Icon(Icons.Default.CallMerge, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Notları Birleştir") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "$count adet seçilen not kronolojik sırayla tek bir notta birleştirilecek. Her notun başlığı ve içeriği ayrılacak, tüm medya ekleri korunacaktır.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { moveToTrashOriginalsOnMerge = !moveToTrashOriginalsOnMerge }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Checkbox(
+                            checked = moveToTrashOriginalsOnMerge,
+                            onCheckedChange = { moveToTrashOriginalsOnMerge = it }
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Orijinal notları çöp kutusuna taşı",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onMergeSelectedNotes(moveToTrashOriginalsOnMerge)
+                        showMergeNotesConfirm = false
+                    }
+                ) {
+                    Text("Birleştir", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMergeNotesConfirm = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    // 8. Çöp Kutusunu Boşaltma Onay Dialogu
     if (showEmptyTrashConfirm) {
         AlertDialog(
             onDismissRequest = { showEmptyTrashConfirm = false },

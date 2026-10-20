@@ -479,6 +479,23 @@ class NotesViewModel @Inject constructor(
         }
     }
 
+    fun mergeSelectedNotes(moveToTrashOriginals: Boolean = true, customTitle: String? = null, onComplete: () -> Unit = {}) {
+        val ids = _state.value.selectedNoteIds
+        val selectedNotes = _state.value.notes.filter { it.id in ids }
+        if (selectedNotes.size < 2) return
+
+        viewModelScope.launch {
+            val mergedNote = com.example.noteapp.domain.util.NoteMerger.mergeNotes(selectedNotes, customTitle)
+            repository.insertNote(mergedNote)
+            if (moveToTrashOriginals) {
+                repository.moveNotesToTrash(ids.toList(), System.currentTimeMillis())
+            }
+            _state.value = _state.value.copy(selectedNoteIds = emptySet())
+            NotesWidgetProvider.updateAllWidgets(app)
+            onComplete()
+        }
+    }
+
     fun onDuplicateNote(note: Note) {
         viewModelScope.launch {
             val copyTitle = if (note.title.isNotBlank()) "${note.title} (Kopya)" else "Kopya Not"

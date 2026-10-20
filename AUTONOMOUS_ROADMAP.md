@@ -105,13 +105,18 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `TextHighlightHelperTest` ile büyük/küçük harf duyarsızlığı, tekli/çoklu eşleşme indisleri ve boş sorgu durumları %100 doğrulandı.
 
 ### Aşama 13: Çoklu Not Birleştirme Motoru (Note Merge Engine) & Toplu Aksiyonlar
-- [ ] **Çoklu Seçimde Not Birleştirme (Merge Notes):** 2 veya daha fazla not seçildiğinde üst aksiyon çubuğunda "Notları Birleştir" butonu.
-- [ ] **Akıllı İçerik & Medya Birleşimi:** Seçilen notların başlıklarını H2 Markdown başlığı (`## Başlık`) yaparak, içeriklerini ayraçlarla (`---`) bağlama ve tüm görsel/çizim/ses eklerini kayıpsız bir araya getirme.
-- [ ] **Orijinal Not Politikası Seçici Diyalog:** Birleştirme onayında kullanıcıya "Orijinal notları çöp kutusuna taşı" veya "Orijinal notları koru" seçeneği sunma.
+- [x] **Çoklu Seçimde Not Birleştirme (Merge Notes):** 2 veya daha fazla not seçildiğinde üst aksiyon çubuğunda ve eylemler menüsünde "Notları Birleştir" butonu (`CallMerge`).
+- [x] **Akıllı İçerik & Medya Birleşimi:** `NoteMerger.mergeNotes` motoru ile seçilen notların başlıklarını H2 Markdown başlığı (`## Başlık`) yaparak, içeriklerini ayraçlarla (`---`) bağlama ve tüm görsel/çizim/ses eklerini kayıpsız tekrarsız bir araya getirme.
+- [x] **Orijinal Not Politikası Seçici Diyalog:** Birleştirme onayında kullanıcıya "Orijinal notları çöp kutusuna taşı" veya "Orijinal notları koru" seçeneği sunma (`showMergeNotesConfirm`).
+- [x] **Birim Testleri:** `NoteMergerTest` ile kronolojik sıralama, içerik ayrımı, kategori korunumu ve medya tekilleştirmesi %100 doğrulandı.
 
 ### Aşama 14: Detay Ekranı Canlı Tipografi HUD & Hızlı H1/H2/H3 Başlık Formatlama
-- [ ] **Canlı İstatistik & Okuma Süresi Rozeti:** Not detay ekranında anlık kelime sayısı, karakter sayısı ve tahmini okuma süresini gösteren şık kompakt alt HUD.
-- [ ] **Hızlı Markdown Başlık Butonları:** Not düzenleme araç çubuğuna doğrudan `H1`, `H2`, `H3` ve blok alıntı (`>`) hızlı biçimlendirme butonları.
+- [ ] **Hızlı Markdown Başlık Butonları (H1, H2, H3, Alıntı, Çizgi):** Not düzenleme araç çubuğuna doğrudan `H1`, `H2`, `H3`, `>` (Blok Alıntı) ve `---` (Ayraç) hızlı biçimlendirme butonları ekleme.
+- [ ] **Canlı Tipografi HUD (Word & Reading Time Tracker):** Not detay düzenleme ekranında anlık kelime sayısı, karakter sayısı ve tahmini okuma süresini gösteren şık kompakt durum rozeti.
+
+### Aşama 15: Kategoriye Özel Renk Paletleri & Gelişmiş Sıralama Tercihleri
+- [ ] **Kategori Renk Seçici:** Yeni kategori eklerken veya düzenlerken özel renk seçebilme.
+- [ ] **Akıllı Not Arama Filtresi:** Arama yaparken sadece başlıklarda veya sadece içeriklerde arama filtresi desteği.
 
 ---
 
@@ -125,4 +130,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 10 Tamamlandı]** Ses oynatıcı kontrolleri (+5s/-5s sarma, 1.0x-2.0x değişken hız çarpanları) ve derleme doğrulaması tamamlandı.
 * **[Aşama 11 Tamamlandı]** Çöp kutusu saklama/otomatik temizleme politikası, ayarlar paneli ve not tam ekran okuma/sunum modu, birim testleriyle birlikte tamamlandı.
 * **[Aşama 12 Tamamlandı]** Arama geçmişi yönetimi, son aramalar çip şeridi ve not kartlarında anlık arama kelimesi vurgulama motoru birim testleriyle tamamlandı.
-* **[Aşama 13 Sırada]** Çoklu seçimde not birleştirme motoru (Note Merge Engine) ve orijinal not koruma/taşıma politikası geliştirilecek.
+* **[Aşama 13 Tamamlandı]** Çoklu not birleştirme motoru (Note Merge Engine), onay diyaloğu, orijinal not saklama/çöpe taşıma politikası ve birim testleri tamamlandı.
+* **[Aşama 14 Sırada]** Hızlı H1/H2/H3 başlık ve alıntı araçları ile canlı tipografi HUD rozeti geliştirilecek.
