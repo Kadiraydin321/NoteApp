@@ -97,6 +97,8 @@ class MainActivity : FragmentActivity() {
     private var pendingWidgetIntent by mutableStateOf<Intent?>(null)
     private var wasAppInBackground = false
     private var activeLockedNoteId: Long? = null
+    private var backgroundTimestamp: Long = 0L
+    private var lastUnlockTimestamp: Long = 0L
 
     private fun hasRecentDrawingHistory(path: String): Boolean = runCatching {
         val key = path.hashCode().toUInt().toString(16)
@@ -227,6 +229,7 @@ class MainActivity : FragmentActivity() {
                                         if (hasMasterPin) {
                                             if (pinInput == appSettings.masterPin) {
                                                 val id = targetNote.id
+                                                lastUnlockTimestamp = System.currentTimeMillis()
                                                 noteToUnlockWithPin = null
                                                 pinInput = ""
                                                 pinErrorText = null
@@ -243,6 +246,7 @@ class MainActivity : FragmentActivity() {
                                                     settingsManager.setMasterPin(pinInput)
                                                     Toast.makeText(this@MainActivity, "Master PIN kaydedildi", Toast.LENGTH_SHORT).show()
                                                     val id = targetNote.id
+                                                    lastUnlockTimestamp = System.currentTimeMillis()
                                                     noteToUnlockWithPin = null
                                                     pinInput = ""
                                                     pinErrorText = null
@@ -300,33 +304,43 @@ class MainActivity : FragmentActivity() {
                             onSearchChange = viewModel::onSearchQueryChanged,
                             onNoteClick = { note ->
                                 if (note.isLocked) {
-                                    biometricPromptManager.showBiometricPrompt(
-                                        title = "Kilitli Not",
-                                        description = "'${note.title}' notunu açmak için parmak izinizi veya PIN'inizi kullanın",
-                                        onResult = { result ->
-                                            when (result) {
-                                                is BiometricResult.AuthenticationSuccess -> {
-                                                    navController.navigate("note_detail_screen?noteId=${note.id}")
-                                                }
-                                                is BiometricResult.AuthenticationError -> {
-                                                    if (!appSettings.masterPin.isNullOrBlank()) {
+                                    val policy = appSettings.lockTimeoutPolicy
+                                    val isGraceActive = policy != com.example.noteapp.data.settings.LockTimeoutPolicy.IMMEDIATE &&
+                                            lastUnlockTimestamp > 0L &&
+                                            (System.currentTimeMillis() - lastUnlockTimestamp <= policy.timeoutMs)
+
+                                    if (isGraceActive) {
+                                        navController.navigate("note_detail_screen?noteId=${note.id}")
+                                    } else {
+                                        biometricPromptManager.showBiometricPrompt(
+                                            title = "Kilitli Not",
+                                            description = "'${note.title}' notunu açmak için parmak izinizi veya PIN'inizi kullanın",
+                                            onResult = { result ->
+                                                when (result) {
+                                                    is BiometricResult.AuthenticationSuccess -> {
+                                                        lastUnlockTimestamp = System.currentTimeMillis()
+                                                        navController.navigate("note_detail_screen?noteId=${note.id}")
+                                                    }
+                                                    is BiometricResult.AuthenticationError -> {
+                                                        if (!appSettings.masterPin.isNullOrBlank()) {
+                                                            noteToUnlockWithPin = note
+                                                        } else {
+                                                            Toast.makeText(this@MainActivity, result.error, Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                    is BiometricResult.AuthenticationFailed -> {
+                                                        Toast.makeText(this@MainActivity, "Kimlik doğrulama başarısız", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                    is BiometricResult.FeatureUnavailable,
+                                                    is BiometricResult.HardwareUnavailable,
+                                                    is BiometricResult.NoneEnrolled -> {
+                                                        // Biyometrik yoksa veya tanımlı değilse Master PIN sor (asla kilidi atlama)
                                                         noteToUnlockWithPin = note
-                                                    } else {
-                                                        Toast.makeText(this@MainActivity, result.error, Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
-                                                is BiometricResult.AuthenticationFailed -> {
-                                                    Toast.makeText(this@MainActivity, "Kimlik doğrulama başarısız", Toast.LENGTH_SHORT).show()
-                                                }
-                                                is BiometricResult.FeatureUnavailable,
-                                                is BiometricResult.HardwareUnavailable,
-                                                is BiometricResult.NoneEnrolled -> {
-                                                    // Biyometrik yoksa veya tanımlı değilse Master PIN sor (asla kilidi atlama)
-                                                    noteToUnlockWithPin = note
-                                                }
                                             }
-                                        }
-                                    )
+                                        )
+                                    }
                                 } else {
                                     navController.navigate("note_detail_screen?noteId=${note.id}")
                                 }
@@ -699,6 +713,7 @@ class MainActivity : FragmentActivity() {
                             onOptimizeDatabase = viewModel::optimizeDatabase,
                             onDismissMaintenanceMessage = viewModel::dismissMaintenanceMessage,
                             onTrashRetentionPolicyChange = viewModel::setTrashRetentionPolicy,
+                            onLockTimeoutPolicyChange = viewModel::setLockTimeoutPolicy,
                             onBackClick = {
                                 navController.popBackStack()
                             }
@@ -887,17 +902,21 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         super.onStop()
         wasAppInBackground = true
-        // Kullanıcı uygulamadan ayrıldığında (arka plana geçtiğinde), eğer kilitli bir nottaysa
-        // not ekranını kapatıp ana ekrana dönsün ki tekrar girildiğinde şifresiz açılmasın!
-        navControllerRef?.let { nav ->
-            val currentRoute = nav.currentBackStackEntry?.destination?.route
-            if (currentRoute?.startsWith("note_detail_screen") == true) {
-                val noteId = nav.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
-                if (noteId != -1L && activeLockedNoteId == noteId) {
-                    CoroutineScope(Dispatchers.Main).launch {
-                        val note = repository.getNoteById(noteId)
-                        if (note != null && note.isLocked) {
-                            nav.popBackStack("notes_screen", inclusive = false)
+        backgroundTimestamp = System.currentTimeMillis()
+
+        val policy = settingsManager.settings.value.lockTimeoutPolicy
+        if (policy == com.example.noteapp.data.settings.LockTimeoutPolicy.IMMEDIATE) {
+            // Anında kilitleme politikası: kullanıcı ayrıldığı anda kilitli notu kapat
+            navControllerRef?.let { nav ->
+                val currentRoute = nav.currentBackStackEntry?.destination?.route
+                if (currentRoute?.startsWith("note_detail_screen") == true) {
+                    val noteId = nav.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
+                    if (noteId != -1L && activeLockedNoteId == noteId) {
+                        CoroutineScope(Dispatchers.Main).launch {
+                            val note = repository.getNoteById(noteId)
+                            if (note != null && note.isLocked) {
+                                nav.popBackStack("notes_screen", inclusive = false)
+                            }
                         }
                     }
                 }
@@ -909,6 +928,29 @@ class MainActivity : FragmentActivity() {
         super.onResume()
         isPrivacyShieldActive.value = false
         wasAppInBackground = false
+
+        val policy = settingsManager.settings.value.lockTimeoutPolicy
+        if (policy != com.example.noteapp.data.settings.LockTimeoutPolicy.IMMEDIATE && backgroundTimestamp > 0L) {
+            val elapsed = System.currentTimeMillis() - backgroundTimestamp
+            if (elapsed > policy.timeoutMs) {
+                // Zaman aşımı doldu: kilitli not açıksa kapat ve ana ekrana dön
+                navControllerRef?.let { nav ->
+                    val currentRoute = nav.currentBackStackEntry?.destination?.route
+                    if (currentRoute?.startsWith("note_detail_screen") == true) {
+                        val noteId = nav.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
+                        if (noteId != -1L && activeLockedNoteId == noteId) {
+                            CoroutineScope(Dispatchers.Main).launch {
+                                val note = repository.getNoteById(noteId)
+                                if (note != null && note.isLocked) {
+                                    nav.popBackStack("notes_screen", inclusive = false)
+                                    Toast.makeText(this@MainActivity, "Kilit zaman aşımına uğradı", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // Kullanıcı uygulamaya geri döndüğünde, kilitli bir notta değilsek FLAG_SECURE'ı temizle:
         val currentRoute = navControllerRef?.currentBackStackEntry?.destination?.route

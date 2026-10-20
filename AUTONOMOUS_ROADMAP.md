@@ -128,15 +128,20 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri & Doğrulama:** `HtmlExporterTest` ve `StickyNotificationTest` ile HTML markdown ayrıştırma, XSS koruması ve bildirim ID senaryoları %100 doğrulandı.
 
 ### Aşama 17: Kilitli Notlar Otomatik Zaman Aşımı Politikası (Auto-Relock Timeout Policy)
-- [ ] **Zaman Aşımı Modeli & Ayarı:** `AppSettingsManager` üzerinden Anında (Varsayılan), 1 Dakika, 5 Dakika, 15 Dakika kilit koruma süresi (`LockTimeoutPolicy`).
-- [ ] **Ayarlar Ekranı Seçici:** `SettingsScreen` üzerinde güvenlik kartına kilit zaman aşımı seçenekleri.
-- [ ] **Akıllı Yeniden Kilitleme:** Kullanıcı not detayından başka uygulamaya geçip belirlenen süre içinde geri döndüğünde tekrar şifre/biyometrik sormadan akıcı çalışabilmesi, süre dolunca otomatik kilitlenmesi.
-- [ ] **Birim Testleri:** Zaman aşımı eşik hesaplayıcı testleri.
+- [x] **Zaman Aşımı Modeli & Ayarı:** `AppSettingsManager` üzerinden Anında (Varsayılan), 1 Dakika, 5 Dakika, 15 Dakika kilit koruma süresi (`LockTimeoutPolicy`).
+- [x] **Ayarlar Ekranı Seçici:** `SettingsScreen` üzerinde güvenlik kartına kilit zaman aşımı seçenekleri ve dinamik açıklamalar eklendi.
+- [x] **Akıllı Yeniden Kilitleme:** Kullanıcı kilitli notu açtıktan sonra grace period süresince tekrar şifre/biyometrik doğrulaması gerekmeden çalışır; süre dolduğunda veya uygulama kapatıldığında otomatik kilitlenir (`lastUnlockTimestamp`, `backgroundTimestamp`).
+- [x] **Birim Testleri:** `LockTimeoutPolicyTest` ile zaman aşımı hesaplayıcı ve süre eşik senaryoları %100 doğrulandı.
 
 ### Aşama 18: Not Detayında Bul ve Değiştir (In-Note Find & Replace Toolbar)
-- [ ] **Hızlı Bul & Değiştir Arayüzü:** Not detay ekranında açılabilir kompakt arama ve değiştirme araç çubuğu.
-- [ ] **Canlı Eşleşme Navigasyonu:** Toplam eşleşme sayısı (örn: `2/5`), ileri (`↓`) ve geri (`↑`) gezinme.
-- [ ] **Tekli ve Tümünü Değiştir (Replace / Replace All):** Seçilen veya tüm eşleşen kelimeleri tek dokunuşla yeni metinle değiştirme.
+- [ ] **Açılabilir Arama & Değiştirme Çubuğu:** Not düzenleme ekranında klavye üstünde veya TopAppBar altında kompakt Find & Replace dock (`FindAndReplaceBar`).
+- [ ] **Canlı Eşleşme ve Navigasyon:** Aranan kelimenin not içeriğindeki tüm indislerini bulma, aktif eşleşmeyi vurgulama (`3/8`) ve sonraki (`↓`)/önceki (`↑`) eşleşmeye odaklanma (`FindReplaceEngine`).
+- [ ] **Tekil ve Toplu Değiştirme:** "Değiştir" ve "Tümünü Değiştir" butonlarıyla anında metin ikamesi, imleç ve seçim koruması.
+- [ ] **Birim Testleri:** `FindReplaceEngineTest` ile büyük/küçük harf duyarsızlığı, tekil/tümünü değiştirme ve eşleşme navigasyonu testleri.
+
+### Aşama 19: Okuma Modunda Metin Boyutu ve Çift Sütun / Gazete Düzeni (Typography Reading Layouts)
+- [ ] **Dinamik Font Boyutu & Satır Aralığı:** Okuma modunda daha geniş tipografik ayarlar (satır aralığı, harf boşluğu).
+- [ ] **Tablet / Yatay Ekran Çift Sütun Desteği:** Geniş ekranlarda ve tabletlerde iki sütunlu akıcı okuma görünümü.
 
 ---
 
@@ -154,4 +159,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 14 Tamamlandı]** Hızlı H1/H2/H3 başlık ve ayraç araçları ile canlı okuma süresi tipografi HUD rozeti tamamlandı.
 * **[Aşama 15 Tamamlandı]** Kategori oluşturma ve düzenlemede 8 estetik palet rengi, dinamik renkli kategori rozetleri ve birim testleri tamamlandı.
 * **[Aşama 16 Tamamlandı]** Notu bildirim çubuğuna sabitleme (Sticky Note Notification) ve modern stilize HTML dışa aktarım motoru ve birim testleri tamamlandı.
-* **[Aşama 17 Sırada]** Kilitli notlar için otomatik zaman aşımı politikası (Auto-Relock Timeout Policy) geliştirilecek.
+* **[Aşama 17 Tamamlandı]** Kilitli notlar için otomatik yeniden kilitleme politikası (Auto-Relock Timeout: Anında, 1 dk, 5 dk, 15 dk) ve birim testleri tamamlandı.
+* **[Aşama 18 Sırada]** Not detayında canlı Bul ve Değiştir (In-Note Find & Replace Toolbar) aracı geliştirilecek.

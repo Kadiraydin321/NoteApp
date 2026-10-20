@@ -88,6 +88,7 @@ fun SettingsScreen(
     onOptimizeDatabase: () -> Unit = {},
     onDismissMaintenanceMessage: () -> Unit = {},
     onTrashRetentionPolicyChange: (com.example.noteapp.data.settings.TrashRetentionPolicy) -> Unit = {},
+    onLockTimeoutPolicyChange: (com.example.noteapp.data.settings.LockTimeoutPolicy) -> Unit = {},
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1485,6 +1486,48 @@ fun SettingsScreen(
                         Switch(
                             checked = settings.autoLockOnExit,
                             onCheckedChange = onAutoLockChange
+                        )
+                    }
+
+                    HorizontalDivider()
+
+                    // Otomatik Yeniden Kilitleme Süresi (Grace Period)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Otomatik Yeniden Kilitleme Süresi",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            com.example.noteapp.data.settings.LockTimeoutPolicy.values().forEach { policy ->
+                                val isSelected = settings.lockTimeoutPolicy == policy
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { onLockTimeoutPolicyChange(policy) },
+                                    label = {
+                                        Text(
+                                            when (policy) {
+                                                com.example.noteapp.data.settings.LockTimeoutPolicy.IMMEDIATE -> "Anında"
+                                                com.example.noteapp.data.settings.LockTimeoutPolicy.ONE_MINUTE -> "1 Dk"
+                                                com.example.noteapp.data.settings.LockTimeoutPolicy.FIVE_MINUTES -> "5 Dk"
+                                                com.example.noteapp.data.settings.LockTimeoutPolicy.FIFTEEN_MINUTES -> "15 Dk"
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        Text(
+                            text = settings.lockTimeoutPolicy.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 

@@ -199,6 +199,10 @@ class SettingsViewModel @Inject constructor(
         settingsManager.setTrashRetentionPolicy(policy)
     }
 
+    fun setLockTimeoutPolicy(policy: com.example.noteapp.data.settings.LockTimeoutPolicy) {
+        settingsManager.setLockTimeoutPolicy(policy)
+    }
+
     fun refreshWidget() {
         NotesWidgetProvider.updateAllWidgets(app)
     }
