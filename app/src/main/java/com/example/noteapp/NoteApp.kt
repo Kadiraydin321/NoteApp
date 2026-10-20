@@ -45,6 +45,7 @@ class NoteApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         observeNotesForWidgetSync()
+        com.example.noteapp.worker.TrashCleanupScheduler.schedulePeriodicCleanup(this)
     }
 
     /**

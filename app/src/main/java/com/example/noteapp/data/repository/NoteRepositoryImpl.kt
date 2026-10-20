@@ -119,7 +119,24 @@ class NoteRepositoryImpl @Inject constructor(
     }
 
     override suspend fun cleanUpOldTrashNotes(threshold: Long) {
-        dao.deleteOldTrashNotes(threshold)
+        try {
+            val expiredNotes = dao.getExpiredTrashNotes(threshold)
+            for (note in expiredNotes) {
+                for (attachmentPath in note.attachments) {
+                    try {
+                        val file = java.io.File(attachmentPath)
+                        if (file.exists()) file.delete()
+                    } catch (_: Exception) {}
+                }
+                if (!note.backgroundImage.isNullOrEmpty()) {
+                    try {
+                        val bgFile = java.io.File(note.backgroundImage)
+                        if (bgFile.exists()) bgFile.delete()
+                    } catch (_: Exception) {}
+                }
+            }
+        } catch (_: Exception) {}
+        dao.deleteExpiredTrashNotes(threshold)
         NotesWidgetProvider.updateAllWidgets(context)
     }
 

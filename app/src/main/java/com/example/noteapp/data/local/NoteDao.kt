@@ -47,6 +47,12 @@ interface NoteDao {
     @Query("DELETE FROM notes WHERE isDeleted = 1")
     suspend fun emptyTrash()
 
+    @Query("SELECT * FROM notes WHERE isDeleted = 1 AND ((deletedAt IS NOT NULL AND deletedAt <= :thresholdTimestamp) OR (deletedAt IS NULL AND timestamp <= :thresholdTimestamp))")
+    suspend fun getExpiredTrashNotes(thresholdTimestamp: Long): List<Note>
+
+    @Query("DELETE FROM notes WHERE isDeleted = 1 AND ((deletedAt IS NOT NULL AND deletedAt <= :thresholdTimestamp) OR (deletedAt IS NULL AND timestamp <= :thresholdTimestamp))")
+    suspend fun deleteExpiredTrashNotes(thresholdTimestamp: Long): Int
+
     @Query("SELECT * FROM notes")
     suspend fun getAllNotes(): List<Note>
 

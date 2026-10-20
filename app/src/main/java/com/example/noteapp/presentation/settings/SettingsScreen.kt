@@ -1622,6 +1622,44 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (settings.trashRetentionPolicy != com.example.noteapp.data.settings.TrashRetentionPolicy.NEVER)
+                                "WorkManager Arka Plan Temizleyici: Aktif (Günde 1 kez)"
+                            else "WorkManager Arka Plan Temizleyici: Devre Dışı",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            com.example.noteapp.worker.TrashCleanupScheduler.runImmediateCleanup(context)
+                            android.widget.Toast.makeText(context, "🗑️ Çöp kutusu temizleme görevi arka planda başlatıldı", android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = settings.trashRetentionPolicy != com.example.noteapp.data.settings.TrashRetentionPolicy.NEVER
+                    ) {
+                        Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Süresi Dolan Çöpleri Şimdi Temizle", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
 

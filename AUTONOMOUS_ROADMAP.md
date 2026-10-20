@@ -145,12 +145,17 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `ReadingColumnSplitterTest` ile kod bloklarının bölünmezliği, paragraf dengeleme ve başlık hiyerarşisi %100 doğrulandı.
 
 ### Aşama 20: Çöp Kutusu Arka Plan Otomatik Temizlik Zamanlayıcısı (WorkManager Trash Auto-Cleanup Worker)
-- [ ] **Periyodik Arka Plan Görevi:** `WorkManager` ile günde 1 kez çalışan, saklama süresi (Retention Policy: 7/30/60 gün) dolmuş çöp notlarını ve bağlı eklerini temizleyen işçi sınıfı (`TrashCleanupWorker`).
-- [ ] **Ayarlar & Manuel Tetikleme:** Ayarlar bakım sekmesinden arka plan zamanlayıcısının durumunu görme ve tek dokunuşla hemen temizleme.
+- [x] **Periyodik Arka Plan Görevi:** `WorkManager` ile günde 1 kez çalışan, saklama süresi (Retention Policy: 7/14/30 gün) dolmuş çöp notlarını ve diskteki bağlı eklerini temizleyen işçi sınıfı (`TrashCleanupWorker`, `TrashCleanupScheduler`).
+- [x] **Ayarlar & Manuel Tetikleme:** Ayarlar bakım sekmesinde WorkManager arka plan zamanlayıcısı durumu rozeti ve tek dokunuşla hemen temizleme butonu ("Süresi Dolan Çöpleri Şimdi Temizle").
+- [x] **Birim Testleri:** `TrashCleanupWorkerTest` ile zaman aşımı eşik hesaplamaları, miras (legacy) kayıt yönetimi ve çöp filtreleme %100 doğrulandı.
 
 ### Aşama 21: Not İçeriklerini JSON / ZIP Yedekleme ve Geri Yükleme Motoru (Full Backup & Restore Engine)
 - [ ] **Tam Yedek Paketi (.zip):** Tüm notları, kategorileri, hatırlatıcıları, çizimleri ve ses/resim eklerini tek bir sıkıştırılmış zip dosyası olarak dışa aktarma (`BackupRestoreEngine`).
 - [ ] **Güvenli Geri Yükleme:** Cihazdan seçilen yedek dosyasını açıp çakışmaları çözerek Room veritabanına ve medya klasörüne geri yükleme.
+
+### Aşama 22: Not Sabitleme & Çizim / Karalama Kartı İyileştirmeleri (Canvas Drawing & Visual Polish)
+- [ ] **Gelişmiş Fırça ve Kalem Paleti:** El yazısı ve çizim ekranına renk paleti, silgi modu ve kontur kalınlığı kontrolü.
+- [ ] **Görsel Önizleme:** Not detayında ve liste kartlarında çizim önizlemelerinin yüksek çözünürlüklü ve pürüzsüz render edilmesi.
 
 ---
 
@@ -171,6 +176,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 17 Tamamlandı]** Kilitli notlar için otomatik zaman aşımı politikası (Auto-Relock Timeout Policy) ve birim testleri tamamlandı.
 * **[Aşama 18 Tamamlandı]** Not detayında bul ve değiştir motoru (FindReplaceEngine), FindAndReplaceBar, dinamik arama vurgulaması ve birim testleri tamamlandı.
 * **[Aşama 19 Tamamlandı]** Okuma modunda satır yüksekliği kontrolü, akıllı çift sütun gazete düzeni (ReadingColumnSplitter) ve birim testleri tamamlandı.
-* **[Aşama 16 Tamamlandı]** Notu bildirim çubuğuna sabitleme (Sticky Note Notification) ve modern stilize HTML dışa aktarım motoru ve birim testleri tamamlandı.
-* **[Aşama 17 Tamamlandı]** Kilitli notlar için otomatik yeniden kilitleme politikası (Auto-Relock Timeout: Anında, 1 dk, 5 dk, 15 dk) ve birim testleri tamamlandı.
+* **[Aşama 20 Tamamlandı]** WorkManager periyodik çöp kutusu temizleyicisi (TrashCleanupWorker), anlık manuel tetikleme ve bağlı dosya temizliği tamamlandı.
 * **[Aşama 18 Sırada]** Not detayında canlı Bul ve Değiştir (In-Note Find & Replace Toolbar) aracı geliştirilecek.
