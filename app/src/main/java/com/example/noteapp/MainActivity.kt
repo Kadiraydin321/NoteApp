@@ -85,6 +85,9 @@ class MainActivity : FragmentActivity() {
     @Inject
     lateinit var cryptoManager: NoteCryptoManager
 
+    @Inject
+    lateinit var templateManager: com.example.noteapp.data.template.TemplateManager
+
     private val biometricPromptManager by lazy {
         BiometricPromptManager(this)
     }
@@ -280,6 +283,7 @@ class MainActivity : FragmentActivity() {
                         val state by viewModel.state.collectAsState()
                         val quickSyncState by viewModel.quickSyncState.collectAsState()
                         val noteSettingsState by viewModel.settings.collectAsState()
+                        var showTemplateSheet by remember { mutableStateOf(false) }
 
                         NotesScreen(
                             state = state,
@@ -353,14 +357,34 @@ class MainActivity : FragmentActivity() {
                             onFilterTypeChange = viewModel::setFilterType,
                             onSortOrderChange = viewModel::setSortOrder,
                             onSelectTag = viewModel::onSelectTag,
+                            onNavigateToStatistics = {
+                                navController.navigate("statistics_screen")
+                            },
+                            onOpenTemplates = {
+                                showTemplateSheet = true
+                            },
                             onSettingsClick = {
                                 navController.navigate("settings_screen")
                             }
                         )
+
+                        if (showTemplateSheet) {
+                            com.example.noteapp.presentation.components.TemplatePickerBottomSheet(
+                                templates = templateManager.getAllTemplates(),
+                                onDismiss = { showTemplateSheet = false },
+                                onTemplateSelect = { template ->
+                                    showTemplateSheet = false
+                                    navController.navigate("note_detail_screen?templateId=${template.id}")
+                                },
+                                onDeleteCustomTemplate = { id ->
+                                    templateManager.deleteCustomTemplate(id)
+                                }
+                            )
+                        }
                     }
 
                     composable(
-                        route = "note_detail_screen?noteId={noteId}&autoAction={autoAction}&sharedText={sharedText}&sharedTitle={sharedTitle}",
+                        route = "note_detail_screen?noteId={noteId}&autoAction={autoAction}&sharedText={sharedText}&sharedTitle={sharedTitle}&templateId={templateId}",
                         arguments = listOf(
                             navArgument("noteId") {
                                 type = NavType.LongType
@@ -375,6 +399,10 @@ class MainActivity : FragmentActivity() {
                                 defaultValue = ""
                             },
                             navArgument("sharedTitle") {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument("templateId") {
                                 type = NavType.StringType
                                 defaultValue = ""
                             }
@@ -513,7 +541,16 @@ class MainActivity : FragmentActivity() {
                             autoAction = autoAction?.ifBlank { null },
                             justEditedImagePath = justEditedImagePath,
                             onClearJustEditedImage = { justEditedImagePath = null },
-                            onFontSizeChange = viewModel::onFontSizeChange
+                            onFontSizeChange = viewModel::onFontSizeChange,
+                            onToggleZenMode = viewModel::toggleZenMode,
+                            onToggleFocusSound = viewModel::toggleFocusSound,
+                            onSelectFocusSound = viewModel::selectFocusSound,
+                            onFocusSoundVolumeChange = viewModel::setFocusSoundVolume,
+                            onRestoreVersion = viewModel::restoreNoteVersion,
+                            onApplyTemplate = viewModel::applyTemplate,
+                            onSaveCustomTemplate = viewModel::saveCurrentAsCustomTemplate,
+                            onDeleteCustomTemplate = viewModel::deleteCustomTemplate,
+                            availableTemplates = viewModel.getAvailableTemplates()
                         )
                     }
 
@@ -642,6 +679,9 @@ class MainActivity : FragmentActivity() {
                             onNavigateToDesignStudio = {
                                 navController.navigate("design_studio_screen")
                             },
+                            onNavigateToStatistics = {
+                                navController.navigate("statistics_screen")
+                            },
                             onBackClick = {
                                 navController.popBackStack()
                             }
@@ -668,6 +708,18 @@ class MainActivity : FragmentActivity() {
                             onWidgetFilterModeChange = viewModel::setWidgetFilterMode,
                             onWidgetShowContentChange = viewModel::setWidgetShowContent,
                             onWidgetShowLockedChange = viewModel::setWidgetShowLocked
+                        )
+                    }
+
+                    composable("statistics_screen") {
+                        val statsViewModel = hiltViewModel<com.example.noteapp.presentation.statistics.StatisticsViewModel>()
+                        val stats by statsViewModel.statistics.collectAsState()
+                        val isLoading by statsViewModel.isLoading.collectAsState()
+
+                        com.example.noteapp.presentation.statistics.StatisticsScreen(
+                            stats = stats,
+                            isLoading = isLoading,
+                            onBackClick = { navController.popBackStack() }
                         )
                     }
                 }

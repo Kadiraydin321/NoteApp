@@ -3,6 +3,7 @@ package com.example.noteapp.data.local
 import androidx.room.*
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
+import com.example.noteapp.domain.model.NoteHistory
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -88,4 +89,23 @@ interface NoteDao {
 
     @Delete
     suspend fun deleteCategory(category: Category)
+
+    // Note Version History
+    @Query("SELECT * FROM note_history WHERE noteId = :noteId ORDER BY timestamp DESC")
+    fun getHistoryForNote(noteId: Long): Flow<List<NoteHistory>>
+
+    @Query("SELECT * FROM note_history WHERE noteId = :noteId ORDER BY timestamp DESC")
+    suspend fun getHistoryListForNote(noteId: Long): List<NoteHistory>
+
+    @Query("SELECT * FROM note_history WHERE id = :historyId")
+    suspend fun getHistoryById(historyId: Long): NoteHistory?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNoteHistory(history: NoteHistory): Long
+
+    @Query("DELETE FROM note_history WHERE noteId = :noteId AND id NOT IN (SELECT id FROM note_history WHERE noteId = :noteId ORDER BY timestamp DESC LIMIT :keepCount)")
+    suspend fun pruneOldHistory(noteId: Long, keepCount: Int = 30)
+
+    @Query("DELETE FROM note_history WHERE noteId = :noteId")
+    suspend fun deleteHistoryForNote(noteId: Long)
 }

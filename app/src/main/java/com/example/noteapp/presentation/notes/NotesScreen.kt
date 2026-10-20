@@ -119,6 +119,8 @@ fun NotesScreen(
     cardElevationStyle: CardElevationStyle = CardElevationStyle.BORDERED,
     quickActionLocation: QuickActionLocation = QuickActionLocation.DRAWER_HEADER,
     searchBarShape: SearchBarShape = SearchBarShape.PILL,
+    onNavigateToStatistics: () -> Unit = {},
+    onOpenTemplates: () -> Unit = {},
     onSettingsClick: () -> Unit
 ) {
     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
@@ -423,6 +425,38 @@ fun NotesScreen(
                         onViewModeChange(NotesViewMode.ALL)
                         onFilterTypeChange(NoteTypeFilter.AUDIO)
                         scope.launch { drawerState.close() }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                // ARAÇLAR & ANALİTİK
+                Text(
+                    "Araçlar & Verimlilik",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
+                    label = { Text("İstatistikler & Analitik") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToStatistics()
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                    label = { Text("Not Şablonları") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onOpenTemplates()
                     },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
@@ -897,6 +931,14 @@ fun NotesScreen(
                                     onClick = {
                                         isFabExpanded = false
                                         handleAddNote("checklist")
+                                    }
+                                )
+                                QuickFabOption(
+                                    label = "Şablon ile Not",
+                                    icon = Icons.Default.AutoAwesome,
+                                    onClick = {
+                                        isFabExpanded = false
+                                        onOpenTemplates()
                                     }
                                 )
                                 QuickFabOption(

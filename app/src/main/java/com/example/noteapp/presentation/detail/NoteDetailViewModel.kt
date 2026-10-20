@@ -8,10 +8,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
+import com.example.noteapp.domain.model.NoteHistory
+import com.example.noteapp.domain.model.NoteTemplate
 import com.example.noteapp.domain.repository.NoteRepository
+import com.example.noteapp.data.template.TemplateManager
 import com.example.noteapp.media.AudioPlayer
 import com.example.noteapp.media.AudioRecorder
 import com.example.noteapp.media.FileStorageHelper
+import com.example.noteapp.media.FocusAudioSynthesizer
+import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.notification.AlarmScheduler
 import com.example.noteapp.data.settings.AppSettingsManager
 import com.example.noteapp.data.security.NoteCryptoManager
@@ -68,7 +73,11 @@ data class NoteDetailState(
     val noteFontSize: Float = 16f,
     val backlinks: List<Note> = emptyList(),
     val extractedWikilinks: List<String> = emptyList(),
-    val extractedTags: List<String> = emptyList()
+    val extractedTags: List<String> = emptyList(),
+    val isZenMode: Boolean = false,
+    val isSoundPlaying: Boolean = false,
+    val currentFocusSound: FocusSoundType = FocusSoundType.PINK_NOISE,
+    val noteHistoryList: List<NoteHistory> = emptyList()
 )
 
 @HiltViewModel
@@ -80,6 +89,8 @@ class NoteDetailViewModel @Inject constructor(
     private val audioPlayer: AudioPlayer,
     private val settingsManager: AppSettingsManager,
     private val cryptoManager: NoteCryptoManager,
+    private val templateManager: TemplateManager,
+    private val focusAudioSynthesizer: FocusAudioSynthesizer,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -135,6 +146,7 @@ class NoteDetailViewModel @Inject constructor(
                     _canUndo.value = false
                     _canRedo.value = false
                     restoreEditHistory(note.id)
+                    refreshNoteHistory(note.id)
                 }
             }
         } else {
@@ -144,6 +156,13 @@ class NoteDetailViewModel @Inject constructor(
                 _state.value = _state.value.copy(color = defaultColor)
             }
             lastCommittedSnapshot = NoteHistorySnapshot("", TextFieldValue(""))
+
+            val templateId = savedStateHandle.get<String>("templateId")
+            if (!templateId.isNullOrBlank()) {
+                templateManager.getAllTemplates().find { it.id == templateId }?.let { tmpl ->
+                    applyTemplate(tmpl)
+                }
+            }
         }
         _state.value = _state.value.copy(noteFontSize = settingsManager.settings.value.noteFontSize)
     }
@@ -740,8 +759,153 @@ class NoteDetailViewModel @Inject constructor(
             // Ana ekran widget'ını otomatik güncelle
             NotesWidgetProvider.updateAllWidgets(app)
 
+            recordVersionSnapshot(finalId, currentState.title, currentState.contentValue.text)
+
             _state.value = _state.value.copy(isSaved = true, updatedAt = now)
         }
+    }
+
+    private var lastRecordedVersionContent: String? = null
+    private var lastRecordedVersionTitle: String? = null
+
+    private fun recordVersionSnapshot(noteId: Long, title: String, content: String) {
+        if (noteId <= 0L) return
+        if (title.isBlank() && content.isBlank()) return
+        if (title == lastRecordedVersionTitle && content == lastRecordedVersionContent) return
+
+        val charDiff = kotlin.math.abs(content.length - (lastRecordedVersionContent?.length ?: 0))
+        val shouldRecord = lastRecordedVersionContent == null || charDiff >= 15 || title != lastRecordedVersionTitle
+
+        if (shouldRecord) {
+            lastRecordedVersionTitle = title
+            lastRecordedVersionContent = content
+
+            viewModelScope.launch {
+                val words = countWords(content)
+                val summary = if (lastRecordedVersionContent == null) "İlk sürüm" else "Otomatik yedek"
+                val history = NoteHistory(
+                    noteId = noteId,
+                    title = title,
+                    content = content,
+                    timestamp = System.currentTimeMillis(),
+                    wordCount = words,
+                    changeSummary = summary
+                )
+                repository.insertNoteHistory(history)
+                repository.pruneOldHistory(noteId, 30)
+                refreshNoteHistory(noteId)
+            }
+        }
+    }
+
+    fun refreshNoteHistory(noteId: Long? = _state.value.currentNoteId) {
+        if (noteId == null || noteId <= 0L) return
+        viewModelScope.launch {
+            repository.getHistoryForNote(noteId).collect { list ->
+                _state.value = _state.value.copy(noteHistoryList = list)
+            }
+        }
+    }
+
+    fun restoreNoteVersion(history: NoteHistory) {
+        val newContent = TextFieldValue(history.content, TextRange(history.content.length))
+        _state.value = _state.value.copy(
+            title = history.title,
+            contentValue = newContent,
+            extractedWikilinks = extractWikilinks(history.content),
+            extractedTags = extractHashtags(history.content)
+        )
+        onTextOrTitleChanged()
+
+        _state.value.currentNoteId?.let { id ->
+            viewModelScope.launch {
+                val words = countWords(history.content)
+                val snapshot = NoteHistory(
+                    noteId = id,
+                    title = history.title,
+                    content = history.content,
+                    timestamp = System.currentTimeMillis(),
+                    wordCount = words,
+                    changeSummary = "Sürüm geri yüklendi"
+                )
+                repository.insertNoteHistory(snapshot)
+                refreshNoteHistory(id)
+            }
+        }
+    }
+
+    // Odaklanma (Zen) Modu & Rahatlatıcı Ortam Sesi
+    fun toggleZenMode() {
+        val nextMode = !_state.value.isZenMode
+        _state.value = _state.value.copy(isZenMode = nextMode)
+        if (!nextMode && _state.value.isSoundPlaying) {
+            focusAudioSynthesizer.stop()
+            _state.value = _state.value.copy(isSoundPlaying = false)
+        }
+    }
+
+    fun toggleFocusSound() {
+        if (_state.value.isSoundPlaying) {
+            focusAudioSynthesizer.stop()
+            _state.value = _state.value.copy(isSoundPlaying = false)
+        } else {
+            focusAudioSynthesizer.start(_state.value.currentFocusSound)
+            _state.value = _state.value.copy(isSoundPlaying = true)
+        }
+    }
+
+    fun selectFocusSound(soundType: FocusSoundType) {
+        _state.value = _state.value.copy(currentFocusSound = soundType)
+        if (_state.value.isSoundPlaying) {
+            focusAudioSynthesizer.start(soundType)
+        }
+    }
+
+    fun setFocusSoundVolume(volume: Float) {
+        focusAudioSynthesizer.setVolume(volume)
+    }
+
+    // Şablon İşlemleri
+    fun getAvailableTemplates(): List<NoteTemplate> = templateManager.getAllTemplates()
+
+    fun applyTemplate(template: NoteTemplate) {
+        val (interpolatedTitle, interpolatedContent) = templateManager.interpolateTemplate(
+            template = template,
+            userTitleInput = _state.value.title.takeIf { it.isNotBlank() }
+        )
+        val currentText = _state.value.contentValue.text
+        val finalContent = if (currentText.isBlank()) {
+            interpolatedContent
+        } else {
+            "$currentText\n\n$interpolatedContent"
+        }
+        val finalTitle = if (_state.value.title.isBlank()) interpolatedTitle else _state.value.title
+
+        _state.value = _state.value.copy(
+            title = finalTitle,
+            contentValue = TextFieldValue(finalContent, TextRange(finalContent.length)),
+            extractedWikilinks = extractWikilinks(finalContent),
+            extractedTags = extractHashtags(finalContent)
+        )
+        onTextOrTitleChanged()
+    }
+
+    fun saveCurrentAsCustomTemplate(title: String, description: String, iconEmoji: String) {
+        templateManager.saveCustomTemplate(
+            title = title,
+            description = description,
+            content = _state.value.contentValue.text,
+            iconEmoji = iconEmoji
+        )
+    }
+
+    fun deleteCustomTemplate(templateId: String) {
+        templateManager.deleteCustomTemplate(templateId)
+    }
+
+    private fun countWords(text: String): Int {
+        if (text.isBlank()) return 0
+        return text.trim().split(Regex("\\s+")).count { it.isNotBlank() }
     }
 
     fun saveNote() {
@@ -775,6 +939,7 @@ class NoteDetailViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         audioPlayer.stop()
+        focusAudioSynthesizer.stop()
         if (_state.value.isRecordingAudio) {
             audioRecorder.stop()
         }

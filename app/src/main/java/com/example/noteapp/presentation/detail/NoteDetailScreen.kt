@@ -77,10 +77,17 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import com.example.noteapp.domain.model.Category
+import com.example.noteapp.domain.model.NoteHistory
+import com.example.noteapp.domain.model.NoteTemplate
+import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.presentation.components.AttachmentList
+import com.example.noteapp.presentation.components.FocusHudOverlay
 import com.example.noteapp.presentation.components.KeepCheckboxIcon
 import com.example.noteapp.presentation.components.MarkdownPreview
 import com.example.noteapp.presentation.components.MarkdownVisualTransformation
+import com.example.noteapp.presentation.components.NoteHistoryBottomSheet
+import com.example.noteapp.presentation.components.SaveTemplateDialog
+import com.example.noteapp.presentation.components.TemplatePickerBottomSheet
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
@@ -324,9 +331,30 @@ fun NoteDetailScreen(
     onFontSizeChange: (Float) -> Unit = {},
     onLinkClick: (String) -> Unit = {},
     onNavigateToNote: (Long) -> Unit = {},
-    onDuplicateNote: () -> Unit = {}
+    onDuplicateNote: () -> Unit = {},
+    onToggleZenMode: () -> Unit = {},
+    onToggleFocusSound: () -> Unit = {},
+    onSelectFocusSound: (FocusSoundType) -> Unit = {},
+    onFocusSoundVolumeChange: (Float) -> Unit = {},
+    onRestoreVersion: (NoteHistory) -> Unit = {},
+    onApplyTemplate: (NoteTemplate) -> Unit = {},
+    onSaveCustomTemplate: (title: String, description: String, iconEmoji: String) -> Unit = { _, _, _ -> },
+    onDeleteCustomTemplate: (String) -> Unit = {},
+    availableTemplates: List<NoteTemplate> = emptyList()
 ) {
     val context = LocalContext.current
+    var showHistorySheet by remember { mutableStateOf(false) }
+    var showTemplateSheet by remember { mutableStateOf(false) }
+    var showSaveTemplateDialog by remember { mutableStateOf(false) }
+
+    val currentWordCount = remember(state.contentValue.text) {
+        if (state.contentValue.text.isBlank()) 0
+        else state.contentValue.text.trim().split(Regex("\\s+")).count { it.isNotBlank() }
+    }
+    val currentCharCount = remember(state.contentValue.text) {
+        state.contentValue.text.length
+    }
+
     val focusRequester = remember { FocusRequester() }
     val trailingFocusRequester = remember { FocusRequester() }
     val hasChecklistItems = remember(state.contentValue.text) {
@@ -849,7 +877,9 @@ fun NoteDetailScreen(
         containerColor = animatedBgColor,
         contentColor = contentColor,
         topBar = {
-            if (isSearchActive) {
+            if (state.isZenMode) {
+                // Odaklanma modunda üst çubuk gizlenir
+            } else if (isSearchActive) {
                 TopAppBar(
                     title = {
                         TextField(
@@ -991,6 +1021,11 @@ fun NoteDetailScreen(
                             }
                         }
 
+                        // Odaklanma Modu (Zen) Butonu
+                        IconButton(onClick = onToggleZenMode) {
+                            Icon(Icons.Default.SelfImprovement, contentDescription = "Odaklanma Modu", tint = topBarIconColor)
+                        }
+
                         // Not İçi Arama Butonu
                         IconButton(onClick = { isSearchActive = true }) {
                             Icon(Icons.Default.Search, contentDescription = "Notta Ara", tint = topBarIconColor)
@@ -1006,6 +1041,48 @@ fun NoteDetailScreen(
                                 expanded = showMoreMenu,
                                 onDismissRequest = { showMoreMenu = false }
                             ) {
+                                // Odaklanma Modu (Zen)
+                                DropdownMenuItem(
+                                    text = { Text("🧘 Odaklanma Modu (Zen)") },
+                                    leadingIcon = { Icon(Icons.Default.SelfImprovement, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        onToggleZenMode()
+                                    }
+                                )
+
+                                // Versiyon Geçmişi
+                                DropdownMenuItem(
+                                    text = { Text("🕒 Versiyon Geçmişi (${state.noteHistoryList.size})") },
+                                    leadingIcon = { Icon(Icons.Default.History, contentDescription = null) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showHistorySheet = true
+                                    }
+                                )
+
+                                // Şablon Uygula
+                                DropdownMenuItem(
+                                    text = { Text("✨ Şablon Uygula") },
+                                    leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showTemplateSheet = true
+                                    }
+                                )
+
+                                // Şablon Olarak Kaydet
+                                DropdownMenuItem(
+                                    text = { Text("💾 Şablon Olarak Kaydet") },
+                                    leadingIcon = { Icon(Icons.Default.BookmarkAdd, contentDescription = null) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showSaveTemplateDialog = true
+                                    }
+                                )
+
+                                HorizontalDivider()
+
                                 // Önizleme / Düzenleme Modu
                                 DropdownMenuItem(
                                     text = { Text(if (isPreviewMode) "Düzenleme Moduna Geç" else "Önizleme Moduna Geç") },
@@ -1253,7 +1330,7 @@ fun NoteDetailScreen(
             }
         },
         bottomBar = {
-            if (!isPreviewMode) {
+            if (!isPreviewMode && !state.isZenMode) {
                 val isAppDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
                 val dockSurfaceColor = if (isAppDark) Color(0xFF22252A) else Color(0xFFFFFFFF)
                 val dockBorderColor = if (isAppDark) Color(0x30FFFFFF) else Color(0x18000000)
@@ -1827,6 +1904,19 @@ fun NoteDetailScreen(
                     }
                 }
         ) {
+            if (state.isZenMode) {
+                FocusHudOverlay(
+                    wordCount = currentWordCount,
+                    characterCount = currentCharCount,
+                    isSoundPlaying = state.isSoundPlaying,
+                    currentSoundType = state.currentFocusSound,
+                    onToggleSound = onToggleFocusSound,
+                    onSelectSoundType = onSelectFocusSound,
+                    onVolumeChange = onFocusSoundVolumeChange,
+                    onExitZenMode = onToggleZenMode,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            }
             if (!state.backgroundImage.isNullOrEmpty()) {
                 AsyncImage(
                     model = File(state.backgroundImage),
@@ -2863,6 +2953,44 @@ fun NoteDetailScreen(
                 TextButton(onClick = { showOutlineDialog = false }) {
                     Text("Kapat")
                 }
+            }
+        )
+    }
+
+    // Versiyon Geçmişi Sayfası
+    if (showHistorySheet) {
+        NoteHistoryBottomSheet(
+            historyList = state.noteHistoryList,
+            onDismiss = { showHistorySheet = false },
+            onRestoreVersion = { history ->
+                onRestoreVersion(history)
+                Toast.makeText(context, "Sürüm başarıyla geri yüklendi", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Şablon Seçici Sayfası
+    if (showTemplateSheet) {
+        TemplatePickerBottomSheet(
+            templates = availableTemplates,
+            onDismiss = { showTemplateSheet = false },
+            onTemplateSelect = onApplyTemplate,
+            onDeleteCustomTemplate = onDeleteCustomTemplate,
+            onSaveCurrentAsTemplate = {
+                showTemplateSheet = false
+                showSaveTemplateDialog = true
+            }
+        )
+    }
+
+    // Şablon Olarak Kaydet Dialogu
+    if (showSaveTemplateDialog) {
+        SaveTemplateDialog(
+            initialTitle = state.title,
+            onDismiss = { showSaveTemplateDialog = false },
+            onSave = { title, desc, emoji ->
+                onSaveCustomTemplate(title, desc, emoji)
+                Toast.makeText(context, "Şablon başarıyla kaydedildi!", Toast.LENGTH_SHORT).show()
             }
         )
     }

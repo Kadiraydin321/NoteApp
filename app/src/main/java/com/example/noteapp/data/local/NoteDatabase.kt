@@ -9,10 +9,11 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
+import com.example.noteapp.domain.model.NoteHistory
 
 @Database(
-    entities = [Note::class, Category::class],
-    version = 4,
+    entities = [Note::class, Category::class, NoteHistory::class],
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -47,6 +48,25 @@ abstract class NoteDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS note_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        noteId INTEGER NOT NULL,
+                        title TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        wordCount INTEGER NOT NULL DEFAULT 0,
+                        changeSummary TEXT DEFAULT NULL,
+                        FOREIGN KEY (noteId) REFERENCES notes (id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_note_history_noteId_timestamp ON note_history (noteId, timestamp)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_note_history_timestamp ON note_history (timestamp)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: NoteDatabase? = null
 
@@ -57,7 +77,7 @@ abstract class NoteDatabase : RoomDatabase() {
                     NoteDatabase::class.java,
                     DATABASE_NAME
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .build().also { INSTANCE = it }
             }

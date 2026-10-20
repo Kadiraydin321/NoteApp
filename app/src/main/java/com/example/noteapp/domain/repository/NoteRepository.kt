@@ -2,6 +2,7 @@ package com.example.noteapp.domain.repository
 
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
+import com.example.noteapp.domain.model.NoteHistory
 import kotlinx.coroutines.flow.Flow
 
 interface NoteRepository {
@@ -34,4 +35,12 @@ interface NoteRepository {
     suspend fun cleanUpOldTrashNotes(threshold: Long)
     suspend fun updateNotesCategory(noteIds: List<Long>, categoryId: Long?)
     suspend fun deleteNotesPermanently(noteIds: List<Long>)
+
+    // Note Version History
+    fun getHistoryForNote(noteId: Long): Flow<List<NoteHistory>>
+    suspend fun getHistoryListForNote(noteId: Long): List<NoteHistory>
+    suspend fun getHistoryById(historyId: Long): NoteHistory?
+    suspend fun insertNoteHistory(history: NoteHistory): Long
+    suspend fun pruneOldHistory(noteId: Long, keepCount: Int = 30)
+    suspend fun deleteHistoryForNote(noteId: Long)
 }

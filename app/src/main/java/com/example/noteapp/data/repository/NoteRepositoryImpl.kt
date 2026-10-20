@@ -5,6 +5,7 @@ import com.example.noteapp.data.local.NoteDao
 import com.example.noteapp.data.security.NoteCryptoManager
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
+import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -131,4 +132,12 @@ class NoteRepositoryImpl @Inject constructor(
         dao.deleteNotesPermanently(noteIds)
         NotesWidgetProvider.updateAllWidgets(context)
     }
+
+    // Note Version History
+    override fun getHistoryForNote(noteId: Long): Flow<List<NoteHistory>> = dao.getHistoryForNote(noteId)
+    override suspend fun getHistoryListForNote(noteId: Long): List<NoteHistory> = dao.getHistoryListForNote(noteId)
+    override suspend fun getHistoryById(historyId: Long): NoteHistory? = dao.getHistoryById(historyId)
+    override suspend fun insertNoteHistory(history: NoteHistory): Long = dao.insertNoteHistory(history)
+    override suspend fun pruneOldHistory(noteId: Long, keepCount: Int) = dao.pruneOldHistory(noteId, keepCount)
+    override suspend fun deleteHistoryForNote(noteId: Long) = dao.deleteHistoryForNote(noteId)
 }
