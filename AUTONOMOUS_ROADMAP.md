@@ -159,12 +159,18 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Görsel Önizleme ve Etiketleme:** Kompakt listede el çizimi içeren notlara fırça ikonu yerleştirilmesi, kartlarda çizim tipinin anında ayırt edilmesi.
 
 ### Aşama 23: Markdown Tablo Ayrıştırıcı & Canlı Tablo Düzenleyici (Markdown Table Editor)
-- [ ] **Görsel Tablo Kartı:** Not detayında Markdown tablolarını (`| Başlık 1 | Başlık 2 |`) okunabilir şık Material 3 ızgara formatında render etme.
-- [ ] **Hızlı Hücre Düzenleme:** Tablo hücrelerine tek dokunuşla satır/sütun ekleme ve düzenleme araç çubuğu.
+- [x] **Görsel Tablo Kartı:** Not detayında Markdown tablolarını (`| Başlık 1 | Başlık 2 |`) okunabilir şık Material 3 ızgara formatında render etme (`MarkdownTableView` & `MarkdownTableParser`).
+- [x] **Hızlı Hücre Düzenleme:** Tablo hücrelerine tek dokunuşla satır/sütun ekleme, hücre düzenleme ve silme araç çubuğu (`MarkdownTableParser.addRow`, `addColumn`, `deleteRow`, `deleteColumn`, `updateCell`).
+- [x] **Birim Testleri:** `MarkdownTableParserTest` ile tablo tespiti, hizalama, hücre güncelleme ve serileştirme testleri %100 doğrulandı.
 
-### Aşama 24: Not İçi Ses Kaydı Canlı Dalga Formu (Live Audio Visualizer & Waveform)
+### Aşama 24: Not İçi Ses Kaydı Canlı Dalga Formu & Dokunmatik Sarma (Live Audio Visualizer & Waveform)
 - [ ] **Canlı Ses Dalga Formu:** Ses kaydederken mikrofon genliğine (amplitude) göre gerçek zamanlı dinamik dalga çubukları render etme (`AudioWaveformVisualizer`).
 - [ ] **Oynatıcı Dalga İlerlemesi:** Not detayında ses oynatılırken dalga formu üzerinde dokunarak (scrubbing) ileri/geri sarma.
+- [ ] **Birim Testleri:** Genlik normalize edici ve dalga formu örnekleyici testleri.
+
+### Aşama 25: Android Dinamik Kısayolları (Dynamic App Shortcuts & Quick Launchers)
+- [ ] **Launcher Dinamik Kısayolları:** Android ana ekran ikonuna uzun basıldığında "Yeni Not", "Ses Kaydı", "Fotoğraflı Not", "Çizim Yap" hızlı eylem kısayollarının dinamik sunulması (`ShortcutManagerCompat`).
+- [ ] **Hızlı Başlatma Yönlendirmeleri:** Kısayollara tıklandığında ilgili not türünün doğrudan açılması.
 
 ---
 
@@ -188,3 +194,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 20 Tamamlandı]** WorkManager periyodik çöp kutusu temizleyicisi (TrashCleanupWorker), anlık manuel tetikleme ve bağlı dosya temizliği tamamlandı.
 * **[Aşama 21 Tamamlandı]** Tam kapsamlı ZIP/JSON yedekleme motoru (notlar, kategoriler, versiyon geçmişi, özel şablonlar, medya ekleri), güvenli geri yükleme ve birim testleri tamamlandı.
 * **[Aşama 22 Tamamlandı]** El çizimi ve karalamaların kartlarda kırpılmadan Fit ölçeklemesi, yüksek kontrastlı arka planı, `🎨 Çizim` rozeti ve kompakt göstergeleri tamamlandı.
+* **[Aşama 23 Tamamlandı]** Markdown tablo ayrıştırıcı motoru (MarkdownTableParser), görsel Material 3 tablo düzenleyicisi (MarkdownTableView), hücre/satır/sütun yönetimi ve birim testleri tamamlandı.

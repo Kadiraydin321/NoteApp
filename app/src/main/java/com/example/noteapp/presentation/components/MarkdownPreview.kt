@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.noteapp.domain.util.MarkdownTableParser
 
 @Composable
 fun MarkdownPreview(
@@ -84,6 +85,30 @@ fun MarkdownPreview(
                 }
                 index = if (codeEnd < lines.size) codeEnd + 1 else lines.size
                 continue
+            }
+
+            if (MarkdownTableParser.isTableStart(lines, lineIndex)) {
+                val tableResult = MarkdownTableParser.parseTable(lines, lineIndex)
+                if (tableResult != null) {
+                    val (table, nextIndex) = tableResult
+                    MarkdownTableView(
+                        table = table,
+                        contentColor = contentColor,
+                        fontSize = fontSize,
+                        isEditable = true,
+                        onTableChange = { updatedTable ->
+                            val newMarkdownTable = MarkdownTableParser.toMarkdown(updatedTable)
+                            val tableLines = newMarkdownTable.lines()
+                            val updatedLines = lines.toMutableList()
+                            val before = updatedLines.subList(0, lineIndex)
+                            val after = if (nextIndex < updatedLines.size) updatedLines.subList(nextIndex, updatedLines.size) else emptyList()
+                            val allUpdated = before + tableLines + after
+                            onContentChange(allUpdated.joinToString("\n"))
+                        }
+                    )
+                    index = nextIndex
+                    continue
+                }
             }
 
             when {
