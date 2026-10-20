@@ -46,6 +46,7 @@ class NoteApp : Application(), ImageLoaderFactory {
         super.onCreate()
         observeNotesForWidgetSync()
         com.example.noteapp.worker.TrashCleanupScheduler.schedulePeriodicCleanup(this)
+        com.example.noteapp.domain.util.AppShortcutManager.initDynamicShortcuts(this)
     }
 
     /**

@@ -79,6 +79,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.model.NoteTemplate
+import com.example.noteapp.domain.util.AppShortcutManager
 import com.example.noteapp.domain.util.FindMatch
 import com.example.noteapp.domain.util.FindReplaceEngine
 import com.example.noteapp.domain.util.ReadingColumnSplitter
@@ -1266,6 +1267,30 @@ fun NoteDetailScreen(
                                                     content = state.contentValue.text
                                                 )
                                                 Toast.makeText(context, "📌 Not bildirim çubuğuna sabitlendi", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    )
+
+                                    DropdownMenuItem(
+                                        text = { Text("Ana Ekrana Kısayol Ekle") },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.PushPin,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.secondary
+                                            )
+                                        },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            val success = AppShortcutManager.pinNoteToHomeScreen(
+                                                context = context,
+                                                noteId = currentNoteId,
+                                                noteTitle = state.title
+                                            )
+                                            if (success) {
+                                                Toast.makeText(context, "Kısayol ana ekrana eklendi", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, "Ana ekrana kısayol ekleme bu cihazda desteklenmiyor", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     )

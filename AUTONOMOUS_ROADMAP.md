@@ -168,15 +168,16 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Oynatıcı Dalga İlerlemesi & Dokunmatik Sarma (Waveform Scrubber):** Not detayında ve ekler listesinde ses oynatılırken dinamik dalga formu çubukları, oynatılan çubuk renk değişimi, dokunarak ve sürükleyerek (scrubbing) anında sarma ve zaman göstergeleri (`AudioWaveformScrubber` & `NoteDetailViewModel.seekAudioToFraction`).
 - [x] **Birim Testleri:** `WaveformHelperTest` ile genlik normalizasyonu, deterministik dalga formu üretimi, zaman biçimlendirme ve çubuk hesaplamaları %100 doğrulandı.
 
-### Aşama 25: Android Dinamik Kısayolları (Dynamic App Shortcuts & Quick Launchers)
-- [ ] **Launcher Dinamik Kısayolları:** Android ana ekran ikonuna uzun basıldığında "Yeni Not", "Ses Kaydı", "Fotoğraflı Not", "Çizim Yap" hızlı eylem kısayollarının dinamik sunulması (`ShortcutManagerCompat`).
-- [ ] **Hızlı Başlatma Yönlendirmeleri:** Kısayollara tıklandığında `MainActivity`'de `autoAction` parametresiyle ilgili not oluşturma ekranının doğrudan açılması.
-- [ ] **Birim Testleri:** Kısayol ID'leri ve intent yönlendirme eşleştirici testleri.
+### Aşama 25: Android Dinamik Kısayolları & Ana Ekrana Sabitleme (Dynamic App Shortcuts & Quick Launchers)
+- [x] **Launcher Dinamik Kısayolları:** Android ana ekran ikonuna uzun basıldığında "Yeni Not", "Ses Kaydı", "Fotoğraflı Not", "Çizim Yap" hızlı eylem kısayollarının dinamik sunulması (`AppShortcutManager.initDynamicShortcuts` & `ShortcutManagerCompat`).
+- [x] **Hızlı Başlatma Yönlendirmeleri:** Kısayollara tıklandığında `MainActivity`'de `autoAction` parametresiyle ilgili not oluşturma ekranının doğrudan açılması.
+- [x] **Ana Ekrana Not Sabitleme (Pin to Home Screen):** Not detay overflow menüsünden tek dokunuşla seçili notun Android ana ekranına bağımsız kısayol olarak sabitlenmesi (`AppShortcutManager.pinNoteToHomeScreen`).
+- [x] **Birim Testleri:** `AppShortcutManagerTest` ile kısayol ID'leri ve intent yönlendirme eşleştirici testleri %100 doğrulandı.
 
 ### Aşama 26: Notları Şifreli / Parolalı Dışa Aktarma (Encrypted Note Export / Vault Container)
-- [ ] **AES-256 Parolalı Konteyner (.notevault):** Seçilen notları veya tüm veritabanını kullanıcının belirleyeceği parola ile AES-256-GCM şifreleyerek taşınabilir dosya formatında dışa aktarma.
-- [ ] **Kasa İçe Aktarma & Çözme (Vault Importer):** Şifreli kasa dosyasını parolası girildiğinde doğrulayarak güvenle içeri aktarma.
-- [ ] **Birim Testleri:** Şifreleme/çözme, yanlış parola reddi ve dosya bütünlüğü doğrulamaları.
+- [ ] **AES-256 Parolalı Konteyner (.notevault):** Seçilen notları veya tüm veritabanını kullanıcının belirleyeceği parola ile PBKDF2/Argon2 türetimli AES-256-GCM şifreleyerek taşınabilir dosya formatında dışa aktarma (`VaultExportEngine`).
+- [ ] **Kasa İçe Aktarma & Çözme (Vault Importer):** Şifreli kasa dosyasını parolası girildiğinde doğrulayarak güvenle içeri aktarma ve notları Room'a yazma.
+- [ ] **Birim Testleri:** Şifreleme/çözme, yanlış parola reddi ve bozuk dosya koruma testleri.
 
 ---
 
@@ -202,3 +203,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 22 Tamamlandı]** El çizimi ve karalamaların kartlarda kırpılmadan Fit ölçeklemesi, yüksek kontrastlı arka planı, `🎨 Çizim` rozeti ve kompakt göstergeleri tamamlandı.
 * **[Aşama 23 Tamamlandı]** Markdown tablo ayrıştırıcı motoru (MarkdownTableParser), görsel Material 3 tablo düzenleyicisi (MarkdownTableView), hücre/satır/sütun yönetimi ve birim testleri tamamlandı.
 * **[Aşama 24 Tamamlandı]** Not içi canlı ses kaydı görselleştirici barı (AudioRecordingVisualizerBar), dokunmatik dalga formu sarıcısı (AudioWaveformScrubber), WaveformHelper motoru ve birim testleri tamamlandı.
+* **[Aşama 25 Tamamlandı]** Android dinamik launcher kısayolları (AppShortcutManager), ana ekrana not sabitleme (pinNoteToHomeScreen), intent rota çözümleyici ve birim testleri tamamlandı.
