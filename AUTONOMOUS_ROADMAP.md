@@ -61,9 +61,23 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 
 ## 📌 İlerleme Günlüğü (Progress Log)
 
+### Aşama 6: Gelişmiş Filtreleme, Kart Kontrol İlerlemesi & Stilize PDF Dışa Aktarımı
+- [x] **Etkileşimli Filtre & Etiket Şeridi (`NotesScreen`):** Aktif Kategori ve Aktif Etiket iptal butonları (`✕`), Sabitlenenler, Kilitliler, Görseller, Sesler, Hatırlatıcılar ve ilk 15 `#etiket` için hızlı yatay dokunma çipleri.
+- [x] **Not Kartı Kontrol İlerlemesi (Checklist Progress Tracker):** Tüm ızgara, liste ve kompakt modlarda `- [ ]` / `- [x]` maddeleri otomatik algılanarak `ChecklistParser` ile hesaplanır; tamamlanma oranı (`✓ 3/5 yapıldı (%60)`) ve şık minyatür `LinearProgressIndicator` kartlarda gösterilir.
+- [x] **Stilize Vektör PDF & Markdown Dışa Aktarıcı (`NoteExporter`):** Not başlıkları (`# H1, ## H2, ### H3`), kontrol kutuları (`[✓], [ ]`), madde işaretleri (`•`), alıntı çizgileri (`>`), kod blokları ve sayfa numaralı altbilgi içeren yüksek kaliteli A4 PDF çizimi.
+- [x] **Cihaz İndirilenler'e Doğrudan Kaydetme:** Android MediaStore / Q+ uyumlu, tek dokunuşla PDF dokümanlarını `Downloads/NotDefterim` klasörüne kaydetme yeteneği.
+- [x] **Renge Göre Sıralama (`NoteSortOrder.COLOR`):** Renkli notları önceliklendirip palet tonlarına göre gruplayan akıllı sıralama mantığı.
+- [x] **Birim Testleri (%100 Başarılı):** `ChecklistParserTest` ve `NoteSortTest` ile tüm checklist ve renk sıralama senaryoları doğrulandı.
+
+### Aşama 7: Akıllı Hatırlatıcılar & Bildirim Eylemleri (Smart Reminders & Snooze System)
+- [ ] **Bildirimden Hızlı Erteleme (Notification Snooze Actions):** Hatırlatıcı çaldığında bildirim üzerinden doğrudan "15 Dk Ertele", "1 Saat Ertele", "Tamamlandı Olarak İşaretle" aksiyon butonları.
+- [ ] **Tekrarlayan Hatırlatıcılar (Recurring Reminders):** Günlük, Hafta içi, Haftalık ve Aylık periyotlarda otomatik yenilenen hatırlatıcı altyapısı (`RecurrenceType`).
+- [ ] **Veritabanı Bakımı & Optimize SQL:** Room SQLite `VACUUM` ve `ANALYZE` tetikleyici yardımcı sınıf ile silinen notlardan sonra disk alanı geri kazanımı ve sorgu hızlandırma.
+
+---
+
+## 📌 İlerleme Günlüğü (Progress Log)
+
 * **[Aşama 1-5 Tamamlandı]** Şablonlar, versiyon geçmişi geri yükleme, yazma istatistikleri ve analitik ekranı, Zen odaklanma modu ve sentetik ses motoru, Room v5 migrasyonu ve birim testler başarıyla entegre edildi.
-* **[Sıradaki Backlog Genişletmesi - Aşama 6]**
-  - **PDF & Gelişmiş Dışa Aktarım (Styled PDF & Markdown Export):** Notları şık PDF dokümanı olarak dışa aktarma (başlık, tarih, etiketler, formatlı içerik).
-  - **Ana Ekranda Etiket Filtreleme Çipleri (Interactive Tag Filter Bar):** Not listesi üzerinde yatay kaydırılabilir dinamik etiket filtreleme barı.
-  - **Gelişmiş Not Sıralama Seçenekleri (Multi-criteria Sorting):** Son güncellenme, oluşturulma tarihi, alfabetik A-Z / Z-A, renge göre sıralama ve iğnelenmiş (pinned) not önceliği.
-  - **Hızlı Sesli Not & Yapılacaklar Kontrol İlerlemesi (Checklist Progress Bar):** Not kartlarında kontrol listesi varsa tamamlanma yüzdesi göstergesi (`%75 Tamamlandı [===--]`).
+* **[Aşama 6 Tamamlandı]** Etkileşimli filtre çipleri, not kartı kontrol ilerleme çubukları, stilize PDF motoru, Downloads klasörüne kaydetme ve renge göre sıralama özellikleri tamamlanıp test edildi.
+* **[Aşama 7 Sırada]** Akıllı bildirim erteleme eylemleri, tekrarlayan hatırlatıcılar ve SQLite veritabanı optimizasyonu.

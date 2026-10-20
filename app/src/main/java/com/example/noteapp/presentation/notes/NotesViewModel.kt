@@ -55,7 +55,8 @@ enum class NoteSortOrder(val title: String) {
     CREATED_DESC("Oluşturulma (En Yeni)"),
     CREATED_ASC("Oluşturulma (En Eski)"),
     TITLE_AZ("Başlık (A - Z)"),
-    TITLE_ZA("Başlık (Z - A)")
+    TITLE_ZA("Başlık (Z - A)"),
+    COLOR("Renge Göre")
 }
 
 private val hashtagRegex = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
@@ -304,6 +305,9 @@ class NotesViewModel @Inject constructor(
                     NoteSortOrder.TITLE_ZA -> Comparator { a, b ->
                         turkishCollator.compare(b.title.ifBlank { b.content }.trim(), a.title.ifBlank { a.content }.trim())
                     }
+                    NoteSortOrder.COLOR -> compareByDescending<Note> { it.color != 0 }
+                        .thenBy { it.color }
+                        .thenByDescending { modifiedTime(it) }
                 }
                 val (pinned, unpinned) = filtered.partition { it.isPinned }
                 pinned.sortedWith(comparator) + unpinned.sortedWith(comparator)

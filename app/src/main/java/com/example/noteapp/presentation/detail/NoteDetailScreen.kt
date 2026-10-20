@@ -1160,7 +1160,7 @@ fun NoteDetailScreen(
 
                                 // PDF Olarak Paylaş / Dışa Aktar
                                 DropdownMenuItem(
-                                    text = { Text("PDF Olarak Paylaş / Dışa Aktar") },
+                                    text = { Text("PDF Olarak Paylaş") },
                                     leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                     onClick = {
                                         showMoreMenu = false
@@ -1178,6 +1178,35 @@ fun NoteDetailScreen(
                                             NoteExporter.shareFile(context, pdfFile, "application/pdf", "PDF Belgesini Paylaş")
                                         } catch (e: Exception) {
                                             Toast.makeText(context, "PDF oluşturulamadı: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                )
+
+                                // PDF'i İndirilenler Klasörüne Kaydet
+                                DropdownMenuItem(
+                                    text = { Text("PDF'i İndirilenler'e Kaydet") },
+                                    leadingIcon = { Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        try {
+                                            val categoryName = categories.find { it.id == state.categoryId }?.name
+                                            val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
+                                            val pdfFile = NoteExporter.exportToPdf(
+                                                context = context,
+                                                title = state.title,
+                                                content = state.contentValue.text,
+                                                categoryName = categoryName,
+                                                dateFormatted = dateStr,
+                                                tags = state.extractedTags
+                                            )
+                                            val savedUri = NoteExporter.saveToDownloads(context, pdfFile, "application/pdf")
+                                            if (savedUri != null) {
+                                                Toast.makeText(context, "PDF İndirilenler/NotDefterim klasörüne kaydedildi", Toast.LENGTH_LONG).show()
+                                            } else {
+                                                Toast.makeText(context, "Dosya kaydedilemedi", Toast.LENGTH_SHORT).show()
+                                            }
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Hata: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 )

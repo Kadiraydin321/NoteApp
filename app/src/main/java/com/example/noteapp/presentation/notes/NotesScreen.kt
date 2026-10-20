@@ -1002,27 +1002,119 @@ fun NotesScreen(
                 )
 
                 if (state.viewMode == NotesViewMode.ALL) {
-                    // Genel görünüm filtreleri arşiv ve çöp kutusunda anlamlı değil.
+                    // Genel görünüm filtreleri & Dinamik Etiket Çipleri
                     LazyRow(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        item {
+                        // Seçili Kategori aktif filtresi varsa iptal butonuyla göster
+                        if (state.selectedCategory != null) {
+                            item(key = "active_category") {
+                                FilterChip(
+                                    selected = true,
+                                    onClick = { onCategorySelect(null) },
+                                    label = { Text(state.selectedCategory.name) },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.Label,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Kategoriyi temizle",
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        // Seçili Metin Etiketi aktif filtresi varsa iptal butonuyla göster
+                        if (state.selectedTag != null) {
+                            item(key = "active_tag") {
+                                FilterChip(
+                                    selected = true,
+                                    onClick = { onSelectTag(null) },
+                                    label = { Text("#${state.selectedTag}") },
+                                    trailingIcon = {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Etiketi temizle",
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        // Tür Filtreleri
+                        item(key = "type_all") {
                             FilterChip(
-                                selected = state.filterType == NoteTypeFilter.ALL,
-                                onClick = { onFilterTypeChange(NoteTypeFilter.ALL) },
+                                selected = state.filterType == NoteTypeFilter.ALL && state.selectedCategory == null && state.selectedTag == null,
+                                onClick = {
+                                    onFilterTypeChange(NoteTypeFilter.ALL)
+                                    if (state.selectedCategory != null) onCategorySelect(null)
+                                    if (state.selectedTag != null) onSelectTag(null)
+                                },
                                 label = { Text("Tümü") }
                             )
                         }
-                        item {
+                        item(key = "type_pinned") {
                             FilterChip(
                                 selected = state.filterType == NoteTypeFilter.PINNED,
                                 onClick = { onFilterTypeChange(NoteTypeFilter.PINNED) },
                                 label = { Text("Sabitlenenler") },
-                                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null, modifier = Modifier.size(15.dp)) }
                             )
+                        }
+                        item(key = "type_locked") {
+                            FilterChip(
+                                selected = state.filterType == NoteTypeFilter.LOCKED,
+                                onClick = { onFilterTypeChange(NoteTypeFilter.LOCKED) },
+                                label = { Text("Kilitliler") },
+                                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(15.dp)) }
+                            )
+                        }
+                        item(key = "type_media") {
+                            FilterChip(
+                                selected = state.filterType == NoteTypeFilter.MEDIA,
+                                onClick = { onFilterTypeChange(NoteTypeFilter.MEDIA) },
+                                label = { Text("Görseller") },
+                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(15.dp)) }
+                            )
+                        }
+                        item(key = "type_audio") {
+                            FilterChip(
+                                selected = state.filterType == NoteTypeFilter.AUDIO,
+                                onClick = { onFilterTypeChange(NoteTypeFilter.AUDIO) },
+                                label = { Text("Sesler") },
+                                leadingIcon = { Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(15.dp)) }
+                            )
+                        }
+                        item(key = "type_reminders") {
+                            FilterChip(
+                                selected = state.filterType == NoteTypeFilter.REMINDERS,
+                                onClick = { onFilterTypeChange(NoteTypeFilter.REMINDERS) },
+                                label = { Text("Hatırlatıcılar") },
+                                leadingIcon = { Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(15.dp)) }
+                            )
+                        }
+
+                        // Popüler Hashtag'ler
+                        allHashtags.filter { it != state.selectedTag }.take(15).forEach { tag ->
+                            item(key = "tag_$tag") {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = { onSelectTag(tag) },
+                                    label = { Text("#$tag") }
+                                )
+                            }
                         }
                     }
                 }
@@ -1726,6 +1818,10 @@ fun NoteCard(
         parseMarkdownCardPreview(note.content)
     }
 
+    val checklistStats = remember(note.content) {
+        com.example.noteapp.domain.util.ChecklistParser.parse(note.content)
+    }
+
     val cardShape = remember(cornerStyle) { RoundedCornerShape(cornerStyle.radiusDp.dp) }
     val primaryColor = MaterialTheme.colorScheme.primary
     val outlineVariantColor = MaterialTheme.colorScheme.outlineVariant
@@ -1897,6 +1993,57 @@ fun NoteCard(
                     )
                 }
 
+                if (checklistStats != null && !note.isLocked) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(colorSpec.contentColor.copy(alpha = 0.07f))
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (checklistStats.isAllCompleted) Icons.Default.CheckCircle else Icons.Default.Checklist,
+                                    contentDescription = null,
+                                    tint = if (checklistStats.isAllCompleted) MaterialTheme.colorScheme.primary else colorSpec.iconTint,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = "${checklistStats.completedCount}/${checklistStats.totalCount} yapıldı",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colorSpec.contentColor.copy(alpha = 0.85f),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            Text(
+                                text = "%${checklistStats.percent}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (checklistStats.isAllCompleted) MaterialTheme.colorScheme.primary else colorSpec.contentColor.copy(alpha = 0.75f),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { checklistStats.progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = if (checklistStats.isAllCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                            trackColor = colorSpec.contentColor.copy(alpha = 0.12f),
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // Alt Çubuk: Göstergeler (sol) ve Hızlı İşlemler (sağ)
@@ -1978,6 +2125,9 @@ fun CompactNoteCard(
     }
     val dateStr = remember(note.timestamp) {
         SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(note.timestamp))
+    }
+    val checklistStats = remember(note.content) {
+        com.example.noteapp.domain.util.ChecklistParser.parse(note.content)
     }
 
     val compactShape = remember(cornerStyle) {
@@ -2108,6 +2258,31 @@ fun CompactNoteCard(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                        }
+                    }
+                    if (checklistStats != null && !note.isLocked) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (checklistStats.isAllCompleted) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else colorSpec.contentColor.copy(alpha = 0.08f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (checklistStats.isAllCompleted) Icons.Default.CheckCircle else Icons.Default.Checklist,
+                                    contentDescription = null,
+                                    tint = if (checklistStats.isAllCompleted) MaterialTheme.colorScheme.primary else colorSpec.iconTint,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = "${checklistStats.completedCount}/${checklistStats.totalCount}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colorSpec.contentColor.copy(alpha = 0.85f),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                     if (note.reminderTime != null && note.reminderTime > 0) {
