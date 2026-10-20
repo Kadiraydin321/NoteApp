@@ -83,11 +83,14 @@ import com.example.noteapp.domain.util.AppShortcutManager
 import com.example.noteapp.domain.util.FindMatch
 import com.example.noteapp.domain.util.FindReplaceEngine
 import com.example.noteapp.domain.util.ReadingColumnSplitter
+import com.example.noteapp.domain.util.VaultExportEngine
+import com.example.noteapp.domain.util.VaultNote
 import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.notification.NotificationHelper
 import com.example.noteapp.presentation.components.AttachmentList
 import com.example.noteapp.presentation.components.AudioRecordingVisualizerBar
 import com.example.noteapp.presentation.components.CategoryColorPicker
+import com.example.noteapp.presentation.components.ExportVaultDialog
 import com.example.noteapp.presentation.components.FindAndReplaceBar
 import com.example.noteapp.presentation.components.FocusHudOverlay
 import com.example.noteapp.presentation.components.KeepCheckboxIcon
@@ -359,6 +362,7 @@ fun NoteDetailScreen(
     var showHistorySheet by remember { mutableStateOf(false) }
     var showTemplateSheet by remember { mutableStateOf(false) }
     var showSaveTemplateDialog by remember { mutableStateOf(false) }
+    var showExportVaultDialog by remember { mutableStateOf(false) }
 
     val currentWordCount = remember(state.contentValue.text) {
         if (state.contentValue.text.isBlank()) 0
@@ -1365,6 +1369,16 @@ fun NoteDetailScreen(
                                     }
                                 )
 
+                                // Şifreli Kasa (.notevault) Olarak Dışa Aktar
+                                DropdownMenuItem(
+                                    text = { Text("🔒 Şifreli Kasa (.notevault) Olarak Aktar") },
+                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showExportVaultDialog = true
+                                    }
+                                )
+
                                 // Düz Metin (.txt) Olarak Paylaş
                                 DropdownMenuItem(
                                     text = { Text("Düz Metin (.txt) Olarak Paylaş") },
@@ -1438,6 +1452,16 @@ fun NoteDetailScreen(
                                         } catch (e: Exception) {
                                             Toast.makeText(context, "Hata: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                                         }
+                                    }
+                                )
+
+                                // Şifreli Kasa (.notevault) Olarak Dışa Aktar
+                                DropdownMenuItem(
+                                    text = { Text("🔒 Şifreli Kasa (.notevault) Olarak Aktar") },
+                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showExportVaultDialog = true
                                     }
                                 )
 
@@ -3465,6 +3489,40 @@ fun NoteDetailScreen(
             onSave = { title, desc, emoji ->
                 onSaveCustomTemplate(title, desc, emoji)
                 Toast.makeText(context, "Şablon başarıyla kaydedildi!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Şifreli Kasa (.notevault) Dışa Aktarma Dialogu
+    if (showExportVaultDialog) {
+        ExportVaultDialog(
+            noteCount = 1,
+            onDismiss = { showExportVaultDialog = false },
+            onConfirm = { password ->
+                showExportVaultDialog = false
+                try {
+                    val categoryName = categories.find { it.id == state.categoryId }?.name
+                    val vaultNote = VaultNote(
+                        title = state.title,
+                        content = state.contentValue.text,
+                        color = state.color,
+                        isPinned = state.isPinned,
+                        isArchived = state.isArchived,
+                        isLocked = state.isLocked,
+                        categoryName = categoryName,
+                        createdAt = state.createdAt,
+                        updatedAt = state.updatedAt
+                    )
+                    val vaultBytes = VaultExportEngine.createVault(password, listOf(vaultNote))
+                    val fileName = state.title.ifBlank { "Not_${System.currentTimeMillis()}" }
+                    val savedFile = VaultExportEngine.saveVaultToDownloads(context, vaultBytes, fileName)
+                    Toast.makeText(context, "🔒 Şifreli kasa kaydedildi: ${savedFile.name}", Toast.LENGTH_LONG).show()
+
+                    val shareFile = VaultExportEngine.createShareableVaultFile(context, vaultBytes, fileName)
+                    NoteExporter.shareFile(context, shareFile, "application/octet-stream", "Şifreli Not Kasasını Paylaş")
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Hata: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                }
             }
         )
     }

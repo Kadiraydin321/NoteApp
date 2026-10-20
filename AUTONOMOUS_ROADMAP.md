@@ -175,9 +175,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `AppShortcutManagerTest` ile kısayol ID'leri ve intent yönlendirme eşleştirici testleri %100 doğrulandı.
 
 ### Aşama 26: Notları Şifreli / Parolalı Dışa Aktarma (Encrypted Note Export / Vault Container)
-- [ ] **AES-256 Parolalı Konteyner (.notevault):** Seçilen notları veya tüm veritabanını kullanıcının belirleyeceği parola ile PBKDF2/Argon2 türetimli AES-256-GCM şifreleyerek taşınabilir dosya formatında dışa aktarma (`VaultExportEngine`).
-- [ ] **Kasa İçe Aktarma & Çözme (Vault Importer):** Şifreli kasa dosyasını parolası girildiğinde doğrulayarak güvenle içeri aktarma ve notları Room'a yazma.
-- [ ] **Birim Testleri:** Şifreleme/çözme, yanlış parola reddi ve bozuk dosya koruma testleri.
+- [x] **AES-256 Parolalı Konteyner (.notevault):** Seçilen notları veya tüm veritabanını kullanıcının belirleyeceği parola ile PBKDF2 türetimli AES-256-GCM şifreleyerek taşınabilir dosya formatında dışa aktarma (`VaultExportEngine.createVault` & `ExportVaultDialog`).
+- [x] **Kasa İçe Aktarma & Çözme (Vault Importer):** Şifreli kasa dosyasını parolası girildiğinde doğrulayarak güvenle içeri aktarma ve notları Room'a yazma (`VaultExportEngine.readVault` & `BackupManager.restoreBackup`).
+- [x] **Birim Testleri:** `VaultExportEngineTest` ile şifreleme/çözme, yanlış parola reddi, başlık doğrulaması ve bozuk dosya koruma testleri %100 doğrulandı.
+
+### Aşama 27: Kontrol Listesi Canlı İlerleme Halkası & Akıllı Sıralayıcı (Checklist Progress Ring & Sorter)
+- [ ] **Not İçi Canlı Kontrol Listesi Özeti:** Not detay ekranında başlık yanında veya tipografi HUD'ında şık minyatür dairesel ilerleme halkası (`ChecklistProgressRing`: örn: %75 tamamlandı, 3/4).
+- [ ] **Tamamlananları Otomatik / Manuel Sıralama:** Not düzenleme ekranında tamamlanan checklist maddelerini (`- [x]`) tek dokunuşla en alta taşıma motoru (`ChecklistSorter.moveCheckedToBottom`).
+- [ ] **Birim Testleri:** `ChecklistSorterTest` ile girintileme korunumu, normal paragrafların etkilenmemesi ve tamamlananların en alta taşınması testleri.
 
 ---
 
@@ -204,3 +209,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 23 Tamamlandı]** Markdown tablo ayrıştırıcı motoru (MarkdownTableParser), görsel Material 3 tablo düzenleyicisi (MarkdownTableView), hücre/satır/sütun yönetimi ve birim testleri tamamlandı.
 * **[Aşama 24 Tamamlandı]** Not içi canlı ses kaydı görselleştirici barı (AudioRecordingVisualizerBar), dokunmatik dalga formu sarıcısı (AudioWaveformScrubber), WaveformHelper motoru ve birim testleri tamamlandı.
 * **[Aşama 25 Tamamlandı]** Android dinamik launcher kısayolları (AppShortcutManager), ana ekrana not sabitleme (pinNoteToHomeScreen), intent rota çözümleyici ve birim testleri tamamlandı.
+* **[Aşama 26 Tamamlandı]** AES-256-GCM şifreli taşınabilir not kasası motoru (.notevault), dışa/içe aktarım diyalogları (ExportVaultDialog, ImportVaultDialog), BackupManager entegrasyonu ve birim testleri tamamlandı.

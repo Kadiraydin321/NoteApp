@@ -46,6 +46,9 @@ import com.example.noteapp.data.settings.CardElevationStyle
 import com.example.noteapp.data.settings.DrawerCollapseMode
 import com.example.noteapp.data.settings.QuickActionLocation
 import com.example.noteapp.data.settings.SearchBarShape
+import com.example.noteapp.domain.util.VaultExportEngine
+import com.example.noteapp.domain.util.VaultNote
+import com.example.noteapp.presentation.components.ExportVaultDialog
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -212,6 +215,7 @@ fun NotesScreen(
     var showMergeNotesConfirm by remember { mutableStateOf(false) }
     var moveToTrashOriginalsOnMerge by remember { mutableStateOf(true) }
     var showSelectionActionsMenu by remember { mutableStateOf(false) }
+    var showBatchVaultExportDialog by remember { mutableStateOf(false) }
     var showEmptyTrashConfirm by remember { mutableStateOf(false) }
     var noteToDeletePermanently by remember { mutableStateOf<Note?>(null) }
     var showSortMenu by remember { mutableStateOf(false) }
@@ -798,6 +802,15 @@ fun NotesScreen(
                                                 onClearSelection()
                                             }
                                         )
+
+                                        DropdownMenuItem(
+                                            text = { Text("🔒 Seçilenleri Şifreli Kasa (.notevault) Olarak Aktar") },
+                                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                            onClick = {
+                                                showSelectionActionsMenu = false
+                                                showBatchVaultExportDialog = true
+                                            }
+                                        )
                                     }
                                     if (state.selectedNoteIds.isNotEmpty()) {
                                         DropdownMenuItem(
@@ -832,6 +845,15 @@ fun NotesScreen(
                                                 onClearSelection()
                                             }
                                         )
+
+                                        DropdownMenuItem(
+                                            text = { Text("🔒 Seçilenleri Şifreli Kasa (.notevault) Olarak Aktar") },
+                                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                            onClick = {
+                                                showSelectionActionsMenu = false
+                                                showBatchVaultExportDialog = true
+                                            }
+                                        )
                                     }
                                     if (state.viewMode == NotesViewMode.ALL) {
                                         DropdownMenuItem(
@@ -849,6 +871,15 @@ fun NotesScreen(
                                                 selectedNotes.forEach(onArchiveNote)
                                                 showSelectionActionsMenu = false
                                                 onClearSelection()
+                                            }
+                                        )
+
+                                        DropdownMenuItem(
+                                            text = { Text("🔒 Seçilenleri Şifreli Kasa (.notevault) Olarak Aktar") },
+                                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                            onClick = {
+                                                showSelectionActionsMenu = false
+                                                showBatchVaultExportDialog = true
                                             }
                                         )
                                     }
@@ -2040,6 +2071,43 @@ fun NotesScreen(
             dismissButton = {
                 TextButton(onClick = { showEmptyTrashConfirm = false }) {
                     Text("İptal")
+                }
+            }
+        )
+    }
+
+    // Seçili Notları Şifreli Kasa (.notevault) Olarak Dışa Aktarma
+    if (showBatchVaultExportDialog) {
+        ExportVaultDialog(
+            noteCount = selectedNotes.size,
+            onDismiss = { showBatchVaultExportDialog = false },
+            onConfirm = { password ->
+                showBatchVaultExportDialog = false
+                try {
+                    val vaultNotes = selectedNotes.map { n ->
+                        val catName = state.categories.find { it.id == n.categoryId }?.name
+                        VaultNote(
+                            title = n.title,
+                            content = n.content,
+                            color = n.color,
+                            isPinned = n.isPinned,
+                            isArchived = n.isArchived,
+                            isLocked = n.isLocked,
+                            categoryName = catName,
+                            createdAt = n.timestamp,
+                            updatedAt = if (n.updatedAt > 0) n.updatedAt else n.timestamp
+                        )
+                    }
+                    val vaultBytes = VaultExportEngine.createVault(password, vaultNotes)
+                    val fileName = "Notlarim_${selectedNotes.size}Not_${System.currentTimeMillis()}"
+                    val savedFile = VaultExportEngine.saveVaultToDownloads(context, vaultBytes, fileName)
+                    android.widget.Toast.makeText(context, "🔒 Şifreli kasa kaydedildi: ${savedFile.name}", android.widget.Toast.LENGTH_LONG).show()
+
+                    val shareFile = VaultExportEngine.createShareableVaultFile(context, vaultBytes, fileName)
+                    com.example.noteapp.util.NoteExporter.shareFile(context, shareFile, "application/octet-stream", "Şifreli Not Kasasını Paylaş")
+                    onClearSelection()
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(context, "Hata: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
         )

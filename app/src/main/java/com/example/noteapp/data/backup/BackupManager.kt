@@ -9,6 +9,8 @@ import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.model.NoteTemplate
 import com.example.noteapp.data.template.TemplateManager
 import com.example.noteapp.domain.repository.NoteRepository
+import com.example.noteapp.domain.util.VaultExportEngine
+import com.example.noteapp.domain.util.WrongPasswordException
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -333,6 +335,70 @@ class BackupManager @Inject constructor(
     ): RestoreResult = withContext(Dispatchers.IO) {
         try {
             val allBytes = inputStream.readBytes()
+
+            // 1. .notevault Şifreli Kasa Dosyası Kontrolü
+            if (VaultExportEngine.isVaultFile(allBytes)) {
+                if (vaultPassword.isNullOrBlank()) {
+                    return@withContext RestoreResult.NeedsPassword
+                }
+                val payload = try {
+                    VaultExportEngine.readVault(vaultPassword, allBytes)
+                } catch (e: WrongPasswordException) {
+                    return@withContext RestoreResult.Error("Hatalı Kasa Şifresi! Girilen parola .notevault dosyası ile eşleşmiyor.")
+                } catch (e: Exception) {
+                    return@withContext RestoreResult.Error("Şifreli kasa açılamadı: ${e.localizedMessage}")
+                }
+
+                if (clearExisting) {
+                    repository.deleteAllNotes()
+                    repository.deleteAllCategories()
+                }
+
+                val existingCategories = repository.getAllCategoriesList().toMutableList()
+                var restoredNotesCount = 0
+                var newCategoriesCount = 0
+                for (vNote in payload.notes) {
+                    var categoryId: Long? = null
+                    if (!vNote.categoryName.isNullOrBlank()) {
+                        val existingCategory = existingCategories.find { it.name.equals(vNote.categoryName, ignoreCase = true) }
+                        if (existingCategory != null) {
+                            categoryId = existingCategory.id
+                        } else {
+                            val newCatId = repository.insertCategory(
+                                Category(name = vNote.categoryName, color = 0)
+                            )
+                            categoryId = newCatId
+                            existingCategories.add(Category(id = newCatId, name = vNote.categoryName, color = 0))
+                            newCategoriesCount++
+                        }
+                    }
+
+                    val note = Note(
+                        title = vNote.title,
+                        content = vNote.content,
+                        color = vNote.color,
+                        isPinned = vNote.isPinned,
+                        isArchived = vNote.isArchived,
+                        isLocked = vNote.isLocked,
+                        categoryId = categoryId,
+                        timestamp = vNote.createdAt,
+                        updatedAt = vNote.updatedAt
+                    )
+                    repository.insertNote(note)
+                    restoredNotesCount++
+                }
+
+                NotesWidgetProvider.updateAllWidgets(context)
+
+                return@withContext RestoreResult.Success(
+                    notesCount = restoredNotesCount,
+                    categoriesCount = newCategoriesCount,
+                    attachmentsCount = 0,
+                    historyCount = 0,
+                    templatesCount = 0
+                )
+            }
+
             val isVault = allBytes.size >= (VAULT_MAGIC.size + SALT_LEN + IV_LEN + HASH_LEN) &&
                     allBytes.copyOfRange(0, VAULT_MAGIC.size).contentEquals(VAULT_MAGIC)
 
