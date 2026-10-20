@@ -164,13 +164,19 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `MarkdownTableParserTest` ile tablo tespiti, hizalama, hücre güncelleme ve serileştirme testleri %100 doğrulandı.
 
 ### Aşama 24: Not İçi Ses Kaydı Canlı Dalga Formu & Dokunmatik Sarma (Live Audio Visualizer & Waveform)
-- [ ] **Canlı Ses Dalga Formu:** Ses kaydederken mikrofon genliğine (amplitude) göre gerçek zamanlı dinamik dalga çubukları render etme (`AudioWaveformVisualizer`).
-- [ ] **Oynatıcı Dalga İlerlemesi:** Not detayında ses oynatılırken dalga formu üzerinde dokunarak (scrubbing) ileri/geri sarma.
-- [ ] **Birim Testleri:** Genlik normalize edici ve dalga formu örnekleyici testleri.
+- [x] **Canlı Ses Dalga Formu:** Ses kaydederken mikrofon genliğine (amplitude) göre gerçek zamanlı dinamik dalga çubukları render etme (`AudioRecordingVisualizerBar` & `AudioRecorder.getMaxAmplitude`).
+- [x] **Oynatıcı Dalga İlerlemesi & Dokunmatik Sarma (Waveform Scrubber):** Not detayında ve ekler listesinde ses oynatılırken dinamik dalga formu çubukları, oynatılan çubuk renk değişimi, dokunarak ve sürükleyerek (scrubbing) anında sarma ve zaman göstergeleri (`AudioWaveformScrubber` & `NoteDetailViewModel.seekAudioToFraction`).
+- [x] **Birim Testleri:** `WaveformHelperTest` ile genlik normalizasyonu, deterministik dalga formu üretimi, zaman biçimlendirme ve çubuk hesaplamaları %100 doğrulandı.
 
 ### Aşama 25: Android Dinamik Kısayolları (Dynamic App Shortcuts & Quick Launchers)
 - [ ] **Launcher Dinamik Kısayolları:** Android ana ekran ikonuna uzun basıldığında "Yeni Not", "Ses Kaydı", "Fotoğraflı Not", "Çizim Yap" hızlı eylem kısayollarının dinamik sunulması (`ShortcutManagerCompat`).
-- [ ] **Hızlı Başlatma Yönlendirmeleri:** Kısayollara tıklandığında ilgili not türünün doğrudan açılması.
+- [ ] **Hızlı Başlatma Yönlendirmeleri:** Kısayollara tıklandığında `MainActivity`'de `autoAction` parametresiyle ilgili not oluşturma ekranının doğrudan açılması.
+- [ ] **Birim Testleri:** Kısayol ID'leri ve intent yönlendirme eşleştirici testleri.
+
+### Aşama 26: Notları Şifreli / Parolalı Dışa Aktarma (Encrypted Note Export / Vault Container)
+- [ ] **AES-256 Parolalı Konteyner (.notevault):** Seçilen notları veya tüm veritabanını kullanıcının belirleyeceği parola ile AES-256-GCM şifreleyerek taşınabilir dosya formatında dışa aktarma.
+- [ ] **Kasa İçe Aktarma & Çözme (Vault Importer):** Şifreli kasa dosyasını parolası girildiğinde doğrulayarak güvenle içeri aktarma.
+- [ ] **Birim Testleri:** Şifreleme/çözme, yanlış parola reddi ve dosya bütünlüğü doğrulamaları.
 
 ---
 
@@ -195,3 +201,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 21 Tamamlandı]** Tam kapsamlı ZIP/JSON yedekleme motoru (notlar, kategoriler, versiyon geçmişi, özel şablonlar, medya ekleri), güvenli geri yükleme ve birim testleri tamamlandı.
 * **[Aşama 22 Tamamlandı]** El çizimi ve karalamaların kartlarda kırpılmadan Fit ölçeklemesi, yüksek kontrastlı arka planı, `🎨 Çizim` rozeti ve kompakt göstergeleri tamamlandı.
 * **[Aşama 23 Tamamlandı]** Markdown tablo ayrıştırıcı motoru (MarkdownTableParser), görsel Material 3 tablo düzenleyicisi (MarkdownTableView), hücre/satır/sütun yönetimi ve birim testleri tamamlandı.
+* **[Aşama 24 Tamamlandı]** Not içi canlı ses kaydı görselleştirici barı (AudioRecordingVisualizerBar), dokunmatik dalga formu sarıcısı (AudioWaveformScrubber), WaveformHelper motoru ve birim testleri tamamlandı.

@@ -576,7 +576,9 @@ class MainActivity : FragmentActivity() {
                             onDeleteCustomTemplate = viewModel::deleteCustomTemplate,
                             availableTemplates = viewModel.getAvailableTemplates(),
                             onSeekAudio = viewModel::seekAudioBy,
-                            onCycleAudioPlaybackSpeed = viewModel::cycleAudioPlaybackSpeed
+                            onCycleAudioPlaybackSpeed = viewModel::cycleAudioPlaybackSpeed,
+                            onSeekAudioFraction = viewModel::seekAudioToFraction,
+                            onCancelAudioRecording = viewModel::cancelAudioRecording
                         )
                     }
 

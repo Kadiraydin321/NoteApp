@@ -41,6 +41,10 @@ fun AttachmentList(
     canRevertImage: ((String) -> Boolean)? = null,
     onExtractText: ((String) -> Unit)? = null,
     isExtractingText: Boolean = false,
+    audioProgressFraction: Float = 0f,
+    audioCurrentPositionMs: Int = 0,
+    audioDurationMs: Int = 0,
+    onSeekAudioFraction: ((Float) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (attachments.isEmpty()) return
@@ -62,82 +66,98 @@ fun AttachmentList(
                         else MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
                     )
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.weight(1f, fill = false)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            IconButton(onClick = { onPlayAudio(path) }) {
-                                Icon(
-                                    imageVector = if (isCurrentPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
-                                    contentDescription = "Oynat / Durdur",
-                                    tint = MaterialTheme.colorScheme.primary
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                IconButton(onClick = { onPlayAudio(path) }) {
+                                    Icon(
+                                        imageVector = if (isCurrentPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                        contentDescription = "Oynat / Durdur",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Text(
+                                    text = "Ses (${File(path).name.take(14)}...)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1
                                 )
                             }
-                            Text(
-                                text = "Ses (${File(path).name.take(14)}...)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1
-                            )
-                        }
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            if (isCurrentPlaying) {
-                                // -5s Geri Sar
-                                TextButton(
-                                    onClick = { onSeekAudio?.invoke(-5) },
-                                    contentPadding = PaddingValues(horizontal = 4.dp),
-                                    modifier = Modifier.height(32.dp)
-                                ) {
-                                    Text(
-                                        "-5s",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                if (isCurrentPlaying) {
+                                    // -5s Geri Sar
+                                    TextButton(
+                                        onClick = { onSeekAudio?.invoke(-5) },
+                                        contentPadding = PaddingValues(horizontal = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(
+                                            "-5s",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    // +5s İleri Sar
+                                    TextButton(
+                                        onClick = { onSeekAudio?.invoke(5) },
+                                        contentPadding = PaddingValues(horizontal = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(
+                                            "+5s",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    // Oynatma Hızı Butonu
+                                    FilledTonalButton(
+                                        onClick = { onCycleSpeed?.invoke() },
+                                        contentPadding = PaddingValues(horizontal = 6.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Text(
+                                            text = "${playbackSpeed}x",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(Modifier.width(2.dp))
                                 }
 
-                                // +5s İleri Sar
-                                TextButton(
-                                    onClick = { onSeekAudio?.invoke(5) },
-                                    contentPadding = PaddingValues(horizontal = 4.dp),
-                                    modifier = Modifier.height(32.dp)
-                                ) {
-                                    Text(
-                                        "+5s",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                IconButton(onClick = { onDeleteAttachment(path) }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Sil")
                                 }
-
-                                // Oynatma Hızı Butonu
-                                FilledTonalButton(
-                                    onClick = { onCycleSpeed?.invoke() },
-                                    contentPadding = PaddingValues(horizontal = 6.dp),
-                                    modifier = Modifier.height(28.dp)
-                                ) {
-                                    Text(
-                                        text = "${playbackSpeed}x",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Spacer(Modifier.width(2.dp))
-                            }
-
-                            IconButton(onClick = { onDeleteAttachment(path) }) {
-                                Icon(Icons.Default.Close, contentDescription = "Sil")
                             }
                         }
+
+                        // İnteraktif Dalga Formu (Waveform Scrubber)
+                        AudioWaveformScrubber(
+                            path = path,
+                            isPlaying = isCurrentPlaying,
+                            progressFraction = if (isCurrentPlaying) audioProgressFraction else 0f,
+                            currentPositionMs = if (isCurrentPlaying) audioCurrentPositionMs else 0,
+                            durationMs = if (isCurrentPlaying) audioDurationMs else 0,
+                            onSeekFraction = { fraction ->
+                                onSeekAudioFraction?.invoke(fraction)
+                            }
+                        )
                     }
                 }
             } else {

@@ -11,6 +11,7 @@ import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.model.NoteTemplate
 import com.example.noteapp.domain.repository.NoteRepository
+import com.example.noteapp.domain.util.WaveformHelper
 import com.example.noteapp.data.template.TemplateManager
 import com.example.noteapp.media.AudioPlayer
 import com.example.noteapp.media.AudioRecorder
@@ -78,7 +79,12 @@ data class NoteDetailState(
     val isSoundPlaying: Boolean = false,
     val currentFocusSound: FocusSoundType = FocusSoundType.PINK_NOISE,
     val noteHistoryList: List<NoteHistory> = emptyList(),
-    val audioPlaybackSpeed: Float = 1.0f
+    val audioPlaybackSpeed: Float = 1.0f,
+    val recordingDurationSec: Int = 0,
+    val recordingAmplitudes: List<Float> = emptyList(),
+    val audioProgressFraction: Float = 0f,
+    val audioCurrentPositionMs: Int = 0,
+    val audioDurationMs: Int = 0
 )
 
 @HiltViewModel
@@ -116,6 +122,8 @@ class NoteDetailViewModel @Inject constructor(
         ?: UUID.randomUUID().toString().also { savedStateHandle[KEY_DRAFT_HISTORY_ID] = it }
 
     private var currentRecordingFile: File? = null
+    private var recordingJob: Job? = null
+    private var playbackJob: Job? = null
 
     init {
         val noteId = savedStateHandle.get<Long>("noteId") ?: -1L
@@ -384,11 +392,15 @@ class NoteDetailViewModel @Inject constructor(
     fun toggleAudioRecording() {
         if (_state.value.isRecordingAudio) {
             // Stop recording
+            recordingJob?.cancel()
+            recordingJob = null
             audioRecorder.stop()
             currentRecordingFile?.let { file ->
                 _state.value = _state.value.copy(
                     attachments = _state.value.attachments + file.absolutePath,
-                    isRecordingAudio = false
+                    isRecordingAudio = false,
+                    recordingDurationSec = 0,
+                    recordingAmplitudes = emptyList()
                 )
                 saveNoteQuietly()
             }
@@ -398,7 +410,43 @@ class NoteDetailViewModel @Inject constructor(
             val file = FileStorageHelper.createAudioRecordFile(app)
             currentRecordingFile = file
             audioRecorder.start(file)
-            _state.value = _state.value.copy(isRecordingAudio = true)
+            _state.value = _state.value.copy(
+                isRecordingAudio = true,
+                recordingDurationSec = 0,
+                recordingAmplitudes = emptyList()
+            )
+            recordingJob?.cancel()
+            recordingJob = viewModelScope.launch {
+                var tick = 0
+                while (_state.value.isRecordingAudio) {
+                    delay(100)
+                    tick++
+                    val amp = audioRecorder.getMaxAmplitude()
+                    val normalized = WaveformHelper.normalizeAmplitude(amp)
+                    val currentAmps = _state.value.recordingAmplitudes
+                    _state.value = _state.value.copy(
+                        recordingAmplitudes = (currentAmps + normalized).takeLast(24),
+                        recordingDurationSec = tick / 10
+                    )
+                }
+            }
+        }
+    }
+
+    fun cancelAudioRecording() {
+        if (_state.value.isRecordingAudio) {
+            recordingJob?.cancel()
+            recordingJob = null
+            audioRecorder.stop()
+            currentRecordingFile?.let { file ->
+                try { file.delete() } catch (_: Exception) {}
+            }
+            currentRecordingFile = null
+            _state.value = _state.value.copy(
+                isRecordingAudio = false,
+                recordingDurationSec = 0,
+                recordingAmplitudes = emptyList()
+            )
         }
     }
 
@@ -451,19 +499,77 @@ class NoteDetailViewModel @Inject constructor(
 
     fun toggleAudioPlayback(path: String) {
         if (_state.value.isPlayingAudio && _state.value.currentPlayingPath == path) {
+            playbackJob?.cancel()
+            playbackJob = null
             audioPlayer.stop()
-            _state.value = _state.value.copy(isPlayingAudio = false, currentPlayingPath = null)
+            _state.value = _state.value.copy(
+                isPlayingAudio = false,
+                currentPlayingPath = null,
+                audioProgressFraction = 0f,
+                audioCurrentPositionMs = 0,
+                audioDurationMs = 0
+            )
         } else {
+            playbackJob?.cancel()
             val speed = _state.value.audioPlaybackSpeed
             audioPlayer.playFile(File(path), speed) {
-                _state.value = _state.value.copy(isPlayingAudio = false, currentPlayingPath = null)
+                playbackJob?.cancel()
+                playbackJob = null
+                _state.value = _state.value.copy(
+                    isPlayingAudio = false,
+                    currentPlayingPath = null,
+                    audioProgressFraction = 0f,
+                    audioCurrentPositionMs = 0,
+                    audioDurationMs = 0
+                )
             }
-            _state.value = _state.value.copy(isPlayingAudio = true, currentPlayingPath = path)
+            val initialDuration = audioPlayer.duration
+            _state.value = _state.value.copy(
+                isPlayingAudio = true,
+                currentPlayingPath = path,
+                audioProgressFraction = 0f,
+                audioCurrentPositionMs = 0,
+                audioDurationMs = initialDuration
+            )
+            playbackJob = viewModelScope.launch {
+                while (_state.value.isPlayingAudio) {
+                    val pos = audioPlayer.currentPosition
+                    val dur = audioPlayer.duration
+                    val frac = if (dur > 0) (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
+                    _state.value = _state.value.copy(
+                        audioProgressFraction = frac,
+                        audioCurrentPositionMs = pos,
+                        audioDurationMs = dur
+                    )
+                    delay(100)
+                }
+            }
         }
     }
 
     fun seekAudioBy(seconds: Int) {
         audioPlayer.seekBy(seconds * 1000)
+        val pos = audioPlayer.currentPosition
+        val dur = audioPlayer.duration
+        val frac = if (dur > 0) (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
+        _state.value = _state.value.copy(
+            audioProgressFraction = frac,
+            audioCurrentPositionMs = pos,
+            audioDurationMs = dur
+        )
+    }
+
+    fun seekAudioToFraction(fraction: Float) {
+        val dur = audioPlayer.duration
+        if (dur > 0) {
+            val targetMs = (dur * fraction.coerceIn(0f, 1f)).toInt()
+            audioPlayer.seekTo(targetMs)
+            _state.value = _state.value.copy(
+                audioProgressFraction = fraction.coerceIn(0f, 1f),
+                audioCurrentPositionMs = targetMs,
+                audioDurationMs = dur
+            )
+        }
     }
 
     fun cycleAudioPlaybackSpeed() {
@@ -963,6 +1069,8 @@ class NoteDetailViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        recordingJob?.cancel()
+        playbackJob?.cancel()
         audioPlayer.stop()
         focusAudioSynthesizer.stop()
         if (_state.value.isRecordingAudio) {

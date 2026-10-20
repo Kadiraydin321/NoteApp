@@ -85,6 +85,7 @@ import com.example.noteapp.domain.util.ReadingColumnSplitter
 import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.notification.NotificationHelper
 import com.example.noteapp.presentation.components.AttachmentList
+import com.example.noteapp.presentation.components.AudioRecordingVisualizerBar
 import com.example.noteapp.presentation.components.CategoryColorPicker
 import com.example.noteapp.presentation.components.FindAndReplaceBar
 import com.example.noteapp.presentation.components.FocusHudOverlay
@@ -349,7 +350,9 @@ fun NoteDetailScreen(
     onDeleteCustomTemplate: (String) -> Unit = {},
     availableTemplates: List<NoteTemplate> = emptyList(),
     onSeekAudio: (Int) -> Unit = {},
-    onCycleAudioPlaybackSpeed: () -> Unit = {}
+    onCycleAudioPlaybackSpeed: () -> Unit = {},
+    onSeekAudioFraction: (Float) -> Unit = {},
+    onCancelAudioRecording: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showHistorySheet by remember { mutableStateOf(false) }
@@ -1553,6 +1556,21 @@ fun NoteDetailScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Canlı Ses Kaydı Görselleştirici Barı (Live Audio Recording Visualizer)
+                    AnimatedVisibility(
+                        visible = state.isRecordingAudio,
+                        enter = slideInVertically { it } + fadeIn(),
+                        exit = slideOutVertically { it } + fadeOut()
+                    ) {
+                        AudioRecordingVisualizerBar(
+                            durationSec = state.recordingDurationSec,
+                            amplitudes = state.recordingAmplitudes,
+                            onStop = onToggleAudioRecording,
+                            onCancel = onCancelAudioRecording,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                    }
+
                     // Kategoriye Göre Açılan Yüzen Araç Kutusu (Floating Card)
                     AnimatedVisibility(
                         visible = activeToolCategory != NoteToolCategory.NONE,
@@ -2325,6 +2343,10 @@ fun NoteDetailScreen(
                         canRevertImage = canRevertImage,
                         onExtractText = onExtractText,
                         isExtractingText = isExtractingText,
+                        audioProgressFraction = state.audioProgressFraction,
+                        audioCurrentPositionMs = state.audioCurrentPositionMs,
+                        audioDurationMs = state.audioDurationMs,
+                        onSeekAudioFraction = onSeekAudioFraction,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }
