@@ -79,10 +79,13 @@ import androidx.compose.ui.window.DialogWindowProvider
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.model.NoteTemplate
+import com.example.noteapp.domain.util.FindMatch
+import com.example.noteapp.domain.util.FindReplaceEngine
 import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.notification.NotificationHelper
 import com.example.noteapp.presentation.components.AttachmentList
 import com.example.noteapp.presentation.components.CategoryColorPicker
+import com.example.noteapp.presentation.components.FindAndReplaceBar
 import com.example.noteapp.presentation.components.FocusHudOverlay
 import com.example.noteapp.presentation.components.KeepCheckboxIcon
 import com.example.noteapp.presentation.components.MarkdownPreview
@@ -95,6 +98,7 @@ import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
 import com.example.noteapp.presentation.components.insertTextAtCursor
 import com.example.noteapp.util.NoteExporter
+import androidx.compose.ui.zIndex
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -618,32 +622,27 @@ fun NoteDetailScreen(
         }
     }
 
-    // Not İçi Arama Durumu
+    // Not İçi Arama ve Değiştirme Durumu
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var replaceQuery by remember { mutableStateOf("") }
+    var matchCase by remember { mutableStateOf(false) }
     var currentMatchIndex by remember { mutableIntStateOf(0) }
 
-    val searchMatches = remember(state.contentValue.text, searchQuery) {
-        if (searchQuery.isBlank()) emptyList<Int>()
-        else {
-            val list = mutableListOf<Int>()
-            var idx = state.contentValue.text.indexOf(searchQuery, 0, ignoreCase = true)
-            while (idx >= 0) {
-                list.add(idx)
-                idx = state.contentValue.text.indexOf(searchQuery, idx + 1, ignoreCase = true)
-            }
-            list
-        }
+    val searchMatches: List<FindMatch> = remember(state.contentValue.text, searchQuery, matchCase) {
+        if (searchQuery.isBlank()) emptyList()
+        else FindReplaceEngine.findAllMatches(state.contentValue.text, searchQuery, matchCase)
     }
 
     val activeMatchStartIndex = if (searchMatches.isNotEmpty() && currentMatchIndex in searchMatches.indices) {
-        searchMatches[currentMatchIndex]
+        searchMatches[currentMatchIndex].index
     } else null
 
     LaunchedEffect(currentMatchIndex, searchMatches) {
         if (searchMatches.isNotEmpty() && currentMatchIndex in searchMatches.indices) {
-            val start = searchMatches[currentMatchIndex]
-            val end = (start + searchQuery.length).coerceAtMost(state.contentValue.text.length)
+            val match = searchMatches[currentMatchIndex]
+            val start = match.index
+            val end = (start + match.length).coerceAtMost(state.contentValue.text.length)
             onContentValueChange(
                 state.contentValue.copy(
                     selection = TextRange(start, end)
@@ -963,73 +962,6 @@ fun NoteDetailScreen(
                 )
             } else if (state.isZenMode) {
                 // Odaklanma modunda üst çubuk gizlenir
-            } else if (isSearchActive) {
-                TopAppBar(
-                    title = {
-                        TextField(
-                            value = searchQuery,
-                            onValueChange = {
-                                searchQuery = it
-                                currentMatchIndex = 0
-                            },
-                            placeholder = { Text("Notta ara...", color = hintColor) },
-                            singleLine = true,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                cursorColor = if (isDarkBackground) Color.White else MaterialTheme.colorScheme.primary
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = animatedBgColor,
-                        titleContentColor = contentColor,
-                        actionIconContentColor = topBarIconColor,
-                        navigationIconContentColor = topBarIconColor
-                    ),
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            isSearchActive = false
-                            searchQuery = ""
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Aramayı Kapat", tint = topBarIconColor)
-                        }
-                    },
-                    actions = {
-                        if (searchMatches.isNotEmpty()) {
-                            Text(
-                                "${currentMatchIndex + 1}/${searchMatches.size}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = contentColor,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-                            IconButton(onClick = {
-                                if (searchMatches.isNotEmpty()) {
-                                    currentMatchIndex = if (currentMatchIndex > 0) currentMatchIndex - 1 else searchMatches.size - 1
-                                }
-                            }) {
-                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Önceki Eşleşme", tint = topBarIconColor)
-                            }
-                            IconButton(onClick = {
-                                if (searchMatches.isNotEmpty()) {
-                                    currentMatchIndex = if (currentMatchIndex < searchMatches.size - 1) currentMatchIndex + 1 else 0
-                                }
-                            }) {
-                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Sonraki Eşleşme", tint = topBarIconColor)
-                            }
-                        } else if (searchQuery.isNotBlank()) {
-                            Text(
-                                "0/0",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = contentColor.copy(alpha = 0.6f),
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-                        }
-                    }
-                )
             } else {
                 val isCompactScreen = LocalConfiguration.current.screenWidthDp < 400
 
@@ -1110,9 +1042,13 @@ fun NoteDetailScreen(
                             Icon(Icons.Default.SelfImprovement, contentDescription = "Odaklanma Modu", tint = topBarIconColor)
                         }
 
-                        // Not İçi Arama Butonu
-                        IconButton(onClick = { isSearchActive = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "Notta Ara", tint = topBarIconColor)
+                        // Not İçi Arama ve Değiştirme Butonu
+                        IconButton(onClick = { isSearchActive = !isSearchActive }) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Notta Bul ve Değiştir",
+                                tint = if (isSearchActive) MaterialTheme.colorScheme.primary else topBarIconColor
+                            )
                         }
 
                         // Hızlı Kilit Butonu
@@ -2172,6 +2108,81 @@ fun NoteDetailScreen(
                     }
                 }
         ) {
+            // Not İçi Bul ve Değiştir Çubuğu (Find & Replace Toolbar)
+            AnimatedVisibility(
+                visible = isSearchActive,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(10f)
+            ) {
+                FindAndReplaceBar(
+                    findQuery = searchQuery,
+                    onFindQueryChange = {
+                        searchQuery = it
+                        currentMatchIndex = 0
+                    },
+                    replaceQuery = replaceQuery,
+                    onReplaceQueryChange = { replaceQuery = it },
+                    matchCase = matchCase,
+                    onMatchCaseToggle = { matchCase = !matchCase },
+                    currentMatchIndex = currentMatchIndex,
+                    totalMatches = searchMatches.size,
+                    onPreviousMatch = {
+                        if (searchMatches.isNotEmpty()) {
+                            currentMatchIndex = if (currentMatchIndex > 0) currentMatchIndex - 1 else searchMatches.size - 1
+                        }
+                    },
+                    onNextMatch = {
+                        if (searchMatches.isNotEmpty()) {
+                            currentMatchIndex = if (currentMatchIndex < searchMatches.size - 1) currentMatchIndex + 1 else 0
+                        }
+                    },
+                    onReplaceCurrent = {
+                        if (searchMatches.isNotEmpty() && currentMatchIndex in searchMatches.indices) {
+                            val currentMatch = searchMatches[currentMatchIndex]
+                            val result = FindReplaceEngine.replaceCurrent(
+                                content = state.contentValue.text,
+                                match = currentMatch,
+                                replacement = replaceQuery
+                            )
+                            onContentValueChange(
+                                TextFieldValue(
+                                    text = result.newContent,
+                                    selection = TextRange(result.newSelectionIndex)
+                                )
+                            )
+                            if (currentMatchIndex >= searchMatches.size - 1) {
+                                currentMatchIndex = (searchMatches.size - 2).coerceAtLeast(0)
+                            }
+                        }
+                    },
+                    onReplaceAll = {
+                        val result = FindReplaceEngine.replaceAll(
+                            content = state.contentValue.text,
+                            query = searchQuery,
+                            replacement = replaceQuery,
+                            matchCase = matchCase
+                        )
+                        if (result.count > 0) {
+                            onContentValueChange(
+                                TextFieldValue(
+                                    text = result.newContent,
+                                    selection = TextRange(result.newSelectionIndex)
+                                )
+                            )
+                            Toast.makeText(context, "${result.count} eşleşme değiştirildi", Toast.LENGTH_SHORT).show()
+                            currentMatchIndex = 0
+                        }
+                    },
+                    onClose = {
+                        isSearchActive = false
+                        searchQuery = ""
+                    }
+                )
+            }
+
             if (state.isZenMode) {
                 FocusHudOverlay(
                     wordCount = currentWordCount,
@@ -2201,6 +2212,9 @@ fun NoteDetailScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = if (isPresentationMode) 22.dp else 16.dp, vertical = 8.dp)
             ) {
+                if (isSearchActive) {
+                    Spacer(modifier = Modifier.height(56.dp))
+                }
                 // Notun Atandığı Kategori Etiketi (Varsa)
                 val currentCategory = categories.firstOrNull { it.id == state.categoryId }
                 if (currentCategory != null) {
@@ -2348,12 +2362,13 @@ fun NoteDetailScreen(
                     val rawText = state.contentValue.text
                     val lines = rawText.lines()
 
-                    val markdownTransformation = remember(hideMarkdownTokens, isSearchActive, searchQuery, activeMatchStartIndex, state.noteFontSize) {
+                    val markdownTransformation = remember(hideMarkdownTokens, isSearchActive, searchQuery, activeMatchStartIndex, state.noteFontSize, matchCase) {
                         MarkdownVisualTransformation(
                             hideSyntaxTokens = hideMarkdownTokens && !isSearchActive,
                             searchQuery = if (isSearchActive) searchQuery else "",
                             activeMatchStartIndex = if (isSearchActive) activeMatchStartIndex else null,
-                            baseFontSize = state.noteFontSize
+                            baseFontSize = state.noteFontSize,
+                            matchCase = matchCase
                         )
                     }
 

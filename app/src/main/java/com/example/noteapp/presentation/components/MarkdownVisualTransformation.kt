@@ -41,7 +41,8 @@ class MarkdownVisualTransformation(
     private val codeBgColor: Color = Color(0x1F000000),
     private val searchQuery: String = "",
     private val activeMatchStartIndex: Int? = null,
-    private val baseFontSize: Float = 16f
+    private val baseFontSize: Float = 16f,
+    private val matchCase: Boolean = false
 ) : VisualTransformation {
 
     override fun filter(text: AnnotatedString): TransformedText {
@@ -210,7 +211,7 @@ class MarkdownVisualTransformation(
 
             // 8. Not İçi Arama Vurgusu (Search Query Highlighting)
             if (searchQuery.isNotBlank()) {
-                var searchIdx = raw.indexOf(searchQuery, 0, ignoreCase = true)
+                var searchIdx = raw.indexOf(searchQuery, 0, ignoreCase = !matchCase)
                 while (searchIdx >= 0) {
                     val endIdx = (searchIdx + searchQuery.length).coerceAtMost(raw.length)
                     val isActive = activeMatchStartIndex != null && searchIdx == activeMatchStartIndex
@@ -237,7 +238,7 @@ class MarkdownVisualTransformation(
                             endIdx
                         )
                     }
-                    searchIdx = raw.indexOf(searchQuery, searchIdx + 1, ignoreCase = true)
+                    searchIdx = raw.indexOf(searchQuery, searchIdx + 1, ignoreCase = !matchCase)
                 }
             }
         }

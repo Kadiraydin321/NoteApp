@@ -134,14 +134,18 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `LockTimeoutPolicyTest` ile zaman aşımı hesaplayıcı ve süre eşik senaryoları %100 doğrulandı.
 
 ### Aşama 18: Not Detayında Bul ve Değiştir (In-Note Find & Replace Toolbar)
-- [ ] **Açılabilir Arama & Değiştirme Çubuğu:** Not düzenleme ekranında klavye üstünde veya TopAppBar altında kompakt Find & Replace dock (`FindAndReplaceBar`).
-- [ ] **Canlı Eşleşme ve Navigasyon:** Aranan kelimenin not içeriğindeki tüm indislerini bulma, aktif eşleşmeyi vurgulama (`3/8`) ve sonraki (`↓`)/önceki (`↑`) eşleşmeye odaklanma (`FindReplaceEngine`).
-- [ ] **Tekil ve Toplu Değiştirme:** "Değiştir" ve "Tümünü Değiştir" butonlarıyla anında metin ikamesi, imleç ve seçim koruması.
-- [ ] **Birim Testleri:** `FindReplaceEngineTest` ile büyük/küçük harf duyarsızlığı, tekil/tümünü değiştirme ve eşleşme navigasyonu testleri.
+- [x] **Açılabilir Arama & Değiştirme Çubuğu:** Not düzenleme ekranında klavye üstünde veya TopAppBar altında kompakt Find & Replace dock (`FindAndReplaceBar`).
+- [x] **Canlı Eşleşme ve Navigasyon:** Aranan kelimenin not içeriğindeki tüm indislerini bulma, aktif eşleşmeyi vurgulama (`3/8`) ve sonraki (`↓`)/önceki (`↑`) eşleşmeye odaklanma (`FindReplaceEngine`).
+- [x] **Tekil ve Toplu Değiştirme:** "Değiştir" ve "Tümünü Değiştir" butonlarıyla anında metin ikamesi, imleç ve seçim koruması, büyük/küçük harf duyarlılığı (`Aa`).
+- [x] **Birim Testleri:** `FindReplaceEngineTest` ile büyük/küçük harf duyarsızlığı, tekil/tümünü değiştirme ve eşleşme navigasyonu testleri %100 doğrulandı.
 
 ### Aşama 19: Okuma Modunda Metin Boyutu ve Çift Sütun / Gazete Düzeni (Typography Reading Layouts)
 - [ ] **Dinamik Font Boyutu & Satır Aralığı:** Okuma modunda daha geniş tipografik ayarlar (satır aralığı, harf boşluğu).
 - [ ] **Tablet / Yatay Ekran Çift Sütun Desteği:** Geniş ekranlarda ve tabletlerde iki sütunlu akıcı okuma görünümü.
+
+### Aşama 20: Çöp Kutusu Arka Plan Otomatik Temizlik Zamanlayıcısı (WorkManager Trash Auto-Cleanup Worker)
+- [ ] **Periyodik Arka Plan Görevi:** `WorkManager` ile günde 1 kez çalışan, saklama süresi (Retention Policy: 7/30/60 gün) dolmuş çöp notlarını ve bağlı eklerini temizleyen işçi sınıfı (`TrashCleanupWorker`).
+- [ ] **Ayarlar & Manuel Tetikleme:** Ayarlar bakım sekmesinden arka plan zamanlayıcısının durumunu görme ve tek dokunuşla hemen temizleme.
 
 ---
 
@@ -158,6 +162,9 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 13 Tamamlandı]** Çoklu not birleştirme motoru (Note Merge Engine), onay diyaloğu, orijinal not saklama/çöpe taşıma politikası ve birim testleri tamamlandı.
 * **[Aşama 14 Tamamlandı]** Hızlı H1/H2/H3 başlık ve ayraç araçları ile canlı okuma süresi tipografi HUD rozeti tamamlandı.
 * **[Aşama 15 Tamamlandı]** Kategori oluşturma ve düzenlemede 8 estetik palet rengi, dinamik renkli kategori rozetleri ve birim testleri tamamlandı.
+* **[Aşama 16 Tamamlandı]** Notu bildirim çubuğuna sabitleme (Sticky Note) ve modern stilize HTML dışa aktarma tamamlandı.
+* **[Aşama 17 Tamamlandı]** Kilitli notlar için otomatik zaman aşımı politikası (Auto-Relock Timeout Policy) ve birim testleri tamamlandı.
+* **[Aşama 18 Tamamlandı]** Not detayında bul ve değiştir motoru (FindReplaceEngine), FindAndReplaceBar, dinamik arama vurgulaması ve birim testleri tamamlandı.
 * **[Aşama 16 Tamamlandı]** Notu bildirim çubuğuna sabitleme (Sticky Note Notification) ve modern stilize HTML dışa aktarım motoru ve birim testleri tamamlandı.
 * **[Aşama 17 Tamamlandı]** Kilitli notlar için otomatik yeniden kilitleme politikası (Auto-Relock Timeout: Anında, 1 dk, 5 dk, 15 dk) ve birim testleri tamamlandı.
 * **[Aşama 18 Sırada]** Not detayında canlı Bul ve Değiştir (In-Note Find & Replace Toolbar) aracı geliştirilecek.
