@@ -25,9 +25,13 @@ fun MarkdownPreview(
     contentColor: Color,
     onLinkClick: (String) -> Unit = {},
     fontSize: Float = 16f,
+    lineHeightMultiplier: Float = 1.35f,
+    letterSpacingSp: Float = 0f,
     modifier: Modifier = Modifier
 ) {
     val lines = content.lines()
+    val computedLineHeight = (fontSize * lineHeightMultiplier).sp
+    val computedLetterSpacing = letterSpacingSp.sp
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -70,6 +74,8 @@ fun MarkdownPreview(
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = fontSize.sp,
+                                lineHeight = computedLineHeight,
+                                letterSpacing = computedLetterSpacing,
                                 color = contentColor
                             ),
                             onLinkClick = onLinkClick
@@ -106,6 +112,8 @@ fun MarkdownPreview(
                             text = parseInlineMarkdown(itemText),
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontSize = fontSize.sp,
+                                lineHeight = computedLineHeight,
+                                letterSpacing = computedLetterSpacing,
                                 textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None,
                                 color = if (isChecked) contentColor.copy(alpha = 0.5f) else contentColor
                             )
@@ -128,6 +136,8 @@ fun MarkdownPreview(
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = if (level <= 2) FontWeight.Bold else FontWeight.SemiBold,
                             fontSize = headingSize.sp,
+                            lineHeight = (headingSize * lineHeightMultiplier).sp,
+                            letterSpacing = computedLetterSpacing,
                             color = contentColor
                         ),
                         modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
@@ -235,7 +245,12 @@ fun MarkdownPreview(
                         Text("• ", style = MaterialTheme.typography.bodyLarge.copy(color = contentColor, fontWeight = FontWeight.Bold))
                         MarkdownText(
                             text = parseInlineMarkdown(bulletText),
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = fontSize.sp, color = contentColor),
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = fontSize.sp,
+                                lineHeight = computedLineHeight,
+                                letterSpacing = computedLetterSpacing,
+                                color = contentColor
+                            ),
                             onLinkClick = onLinkClick
                         )
                     }
@@ -255,6 +270,8 @@ fun MarkdownPreview(
                             text = parseInlineMarkdown(item.groupValues[2]),
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontSize = fontSize.sp,
+                                lineHeight = computedLineHeight,
+                                letterSpacing = computedLetterSpacing,
                                 color = contentColor
                             ),
                             onLinkClick = onLinkClick
@@ -269,7 +286,12 @@ fun MarkdownPreview(
                     } else {
                         MarkdownText(
                             text = parseInlineMarkdown(trimmed),
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = fontSize.sp, color = contentColor),
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = fontSize.sp,
+                                lineHeight = computedLineHeight,
+                                letterSpacing = computedLetterSpacing,
+                                color = contentColor
+                            ),
                             onLinkClick = onLinkClick
                         )
                     }

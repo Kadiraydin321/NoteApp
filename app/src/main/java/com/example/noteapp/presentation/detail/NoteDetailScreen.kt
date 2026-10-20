@@ -81,6 +81,7 @@ import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.model.NoteTemplate
 import com.example.noteapp.domain.util.FindMatch
 import com.example.noteapp.domain.util.FindReplaceEngine
+import com.example.noteapp.domain.util.ReadingColumnSplitter
 import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.notification.NotificationHelper
 import com.example.noteapp.presentation.components.AttachmentList
@@ -441,6 +442,9 @@ fun NoteDetailScreen(
     var isPreviewMode by remember { mutableStateOf(false) }
     var isPresentationMode by remember { mutableStateOf(false) }
     var presentationFontSize by remember(state.noteFontSize) { mutableFloatStateOf(state.noteFontSize + 2f) }
+    var presentationLineSpacingMultiplier by remember { mutableFloatStateOf(1.5f) }
+    val isTabletOrLandscape = LocalConfiguration.current.screenWidthDp >= 600
+    var isTwoColumnMode by remember(isTabletOrLandscape) { mutableStateOf(isTabletOrLandscape) }
     var hideMarkdownTokens by remember { mutableStateOf(true) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
@@ -935,6 +939,52 @@ fun NoteDetailScreen(
                                     color = topBarIconColor
                                 )
                             }
+                        }
+
+                        // Satır Aralığı Döngüsü (1.3x -> 1.5x -> 1.8x)
+                        IconButton(
+                            onClick = {
+                                presentationLineSpacingMultiplier = when (presentationLineSpacingMultiplier) {
+                                    1.3f -> 1.5f
+                                    1.5f -> 1.8f
+                                    else -> 1.3f
+                                }
+                            }
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.FormatLineSpacing,
+                                        contentDescription = "Satır Aralığı",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = topBarIconColor
+                                    )
+                                    Spacer(Modifier.width(2.dp))
+                                    Text(
+                                        text = "${presentationLineSpacingMultiplier}x",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = topBarIconColor
+                                    )
+                                }
+                            }
+                        }
+
+                        // Tek/Çift Sütun Okuma Modu
+                        IconButton(
+                            onClick = { isTwoColumnMode = !isTwoColumnMode }
+                        ) {
+                            Icon(
+                                imageVector = if (isTwoColumnMode) Icons.Default.ViewAgenda else Icons.Default.ViewColumn,
+                                contentDescription = if (isTwoColumnMode) "Tek Sütun Görünümüne Geç" else "Çift Sütun Görünümüne Geç",
+                                tint = if (isTwoColumnMode) MaterialTheme.colorScheme.primary else topBarIconColor
+                            )
                         }
 
                         IconButton(
@@ -2327,37 +2377,80 @@ fun NoteDetailScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // İçerik Alanı: Sunum, Önizleme veya Canlı Düzenleme
-                if (isPresentationMode || isPreviewMode) {
+                if (isPresentationMode) {
+                    if (isTwoColumnMode && state.contentValue.text.length > 50) {
+                        val split = remember(state.contentValue.text) {
+                            ReadingColumnSplitter.splitIntoBalancedColumns(state.contentValue.text)
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                MarkdownPreview(
+                                    content = split.leftColumn,
+                                    onContentChange = {},
+                                    contentColor = contentColor,
+                                    onLinkClick = onLinkClick,
+                                    fontSize = presentationFontSize,
+                                    lineHeightMultiplier = presentationLineSpacingMultiplier,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                MarkdownPreview(
+                                    content = split.rightColumn,
+                                    onContentChange = {},
+                                    contentColor = contentColor,
+                                    onLinkClick = onLinkClick,
+                                    fontSize = presentationFontSize,
+                                    lineHeightMultiplier = presentationLineSpacingMultiplier,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    } else {
+                        MarkdownPreview(
+                            content = state.contentValue.text,
+                            onContentChange = {},
+                            contentColor = contentColor,
+                            onLinkClick = onLinkClick,
+                            fontSize = presentationFontSize,
+                            lineHeightMultiplier = presentationLineSpacingMultiplier,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 16.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                    OutlinedButton(
+                        onClick = { isPresentationMode = false },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Okuma / Sunum Modunu Kapat")
+                    }
+                    Spacer(modifier = Modifier.height(64.dp))
+                } else if (isPreviewMode) {
                     MarkdownPreview(
                         content = state.contentValue.text,
                         onContentChange = { updated ->
-                            if (!isPresentationMode) {
-                                onContentValueChange(TextFieldValue(updated))
-                            }
+                            onContentValueChange(TextFieldValue(updated))
                         },
                         contentColor = contentColor,
                         onLinkClick = onLinkClick,
-                        fontSize = if (isPresentationMode) presentationFontSize else state.noteFontSize,
+                        fontSize = state.noteFontSize,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = if (isPresentationMode) 16.dp else 48.dp)
+                            .padding(top = 8.dp, bottom = 48.dp)
                     )
-
-                    if (isPresentationMode) {
-                        Spacer(modifier = Modifier.height(24.dp))
-                        OutlinedButton(
-                            onClick = { isPresentationMode = false },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Okuma / Sunum Modunu Kapat")
-                        }
-                        Spacer(modifier = Modifier.height(64.dp))
-                    }
                 } else {
                     val rawText = state.contentValue.text
                     val lines = rawText.lines()
