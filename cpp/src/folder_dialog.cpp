@@ -11,6 +11,11 @@ namespace byterescue {
 
 std::string FolderDialog::open_folder_dialog(const std::string& title) {
 #ifdef _WIN32
+    HWND hwndOwner = GetForegroundWindow();
+    if (!hwndOwner) {
+        hwndOwner = GetDesktopWindow();
+    }
+
     HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 
     // Modern IFileOpenDialog
@@ -25,7 +30,8 @@ std::string FolderDialog::open_folder_dialog(const std::string& title) {
         std::wstring wtitle(title.begin(), title.end());
         pFileOpen->SetTitle(wtitle.c_str());
 
-        if (SUCCEEDED(pFileOpen->Show(NULL))) {
+        // Bring dialog to foreground window
+        if (SUCCEEDED(pFileOpen->Show(hwndOwner))) {
             IShellItem* pItem = nullptr;
             if (SUCCEEDED(pFileOpen->GetResult(&pItem))) {
                 PWSTR pszFilePath = nullptr;
@@ -46,6 +52,7 @@ std::string FolderDialog::open_folder_dialog(const std::string& title) {
 
     // Fallback: SHBrowseForFolderA
     BROWSEINFOA bi = { 0 };
+    bi.hwndOwner = hwndOwner;
     bi.lpszTitle = title.c_str();
     bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
     LPITEMIDLIST pidl = SHBrowseForFolderA(&bi);
@@ -68,11 +75,16 @@ std::string FolderDialog::open_folder_dialog(const std::string& title) {
 
 std::string FolderDialog::open_file_dialog(const std::string& title, const std::string& filter_desc) {
 #ifdef _WIN32
+    HWND hwndOwner = GetForegroundWindow();
+    if (!hwndOwner) {
+        hwndOwner = GetDesktopWindow();
+    }
+
     OPENFILENAMEA ofn = { 0 };
     char szFile[MAX_PATH] = { 0 };
 
     ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = NULL;
+    ofn.hwndOwner = hwndOwner;
     ofn.lpstrFile = szFile;
     ofn.nMaxFile = sizeof(szFile);
     ofn.lpstrFilter = "Tüm Desteklenen Dosyalar (*.img;*.raw;*.*)\0*.img;*.raw;*.*\0Tüm Dosyalar (*.*)\0*.*\0";

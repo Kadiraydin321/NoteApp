@@ -37,6 +37,7 @@ if [ ! -f "${ZIG}" ]; then
 fi
 
 echo "[2/4] C++ kaynak kodları derleniyor (ByteRescue.exe)..."
+/mnt/c/Windows/System32/taskkill.exe /F /IM ByteRescue.exe < /dev/null 2>/dev/null || true
 "${ZIG}" c++ -target x86_64-windows -std=c++17 -O3 \
     cpp/src/main.cpp \
     cpp/src/http_server.cpp \

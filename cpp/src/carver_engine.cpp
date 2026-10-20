@@ -343,8 +343,15 @@ void CarverEngine::scan_directory_recursive(const std::string& dir_path, const S
             std::string filename = entry.path().filename().string();
 
             if (entry.is_directory(ec)) {
-                // Avoid recursive loops or huge unrelated folders
-                if (filename != "node_modules" && filename != ".git" && filename != "AppData" && dir_queue.size() < 2000) {
+                // Avoid recursive loops or huge unrelated Windows/system folders
+                if (filename == "Windows" || filename == "WINDOWS" ||
+                    filename == "Program Files" || filename == "Program Files (x86)" ||
+                    filename == "ProgramData" || filename == "$Recycle.Bin" ||
+                    filename == "$RECYCLE.BIN" || filename == "System Volume Information" ||
+                    filename == "node_modules" || filename == ".git" || filename == "AppData") {
+                    continue;
+                }
+                if (dir_queue.size() < 5000) {
                     dir_queue.push_back(path_str);
                 }
             } else if (entry.is_regular_file(ec)) {
