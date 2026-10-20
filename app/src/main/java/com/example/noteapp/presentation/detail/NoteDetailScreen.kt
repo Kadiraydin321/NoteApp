@@ -340,7 +340,9 @@ fun NoteDetailScreen(
     onApplyTemplate: (NoteTemplate) -> Unit = {},
     onSaveCustomTemplate: (title: String, description: String, iconEmoji: String) -> Unit = { _, _, _ -> },
     onDeleteCustomTemplate: (String) -> Unit = {},
-    availableTemplates: List<NoteTemplate> = emptyList()
+    availableTemplates: List<NoteTemplate> = emptyList(),
+    onSeekAudio: (Int) -> Unit = {},
+    onCycleAudioPlaybackSpeed: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showHistorySheet by remember { mutableStateOf(false) }
@@ -2010,6 +2012,9 @@ fun NoteDetailScreen(
                         onPlayAudio = onToggleAudioPlayback,
                         isPlayingAudio = state.isPlayingAudio,
                         currentPlayingPath = state.currentPlayingPath,
+                        playbackSpeed = state.audioPlaybackSpeed,
+                        onSeekAudio = onSeekAudio,
+                        onCycleSpeed = onCycleAudioPlaybackSpeed,
                         onImageClick = { imageViewerPath = it },
                         onRevertImage = { revertConfirmPath = it },
                         canRevertImage = canRevertImage,

@@ -86,9 +86,19 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Toplu PDF Birleştirme (Batch Export):** `NoteExporter.exportMultipleToPdf` motoru ile seçilen tüm notlar (başlık, tarih, kategori, etiketler ve formatlı içerik) tek bir dokümanda alt alta estetik biçimde birleştirilip PDF olarak dışa aktarılır ve paylaşılır.
 
 ### Aşama 10: Ses Kaydı Oynatıcı Kontrolleri (+5s/-5s Sarma & 1.0x-2.0x Hızlandırma)
-- [ ] **Ses Sarma Butonları:** Not içi ses oynatıcıya 5 saniye ileri (+5s) ve 5 saniye geri (-5s) sarma kontrolleri.
-- [ ] **Oynatma Hızı Çarpanı:** Ses notları için 1.0x, 1.25x, 1.5x ve 2.0x değişken oynatma hızları.
-- [ ] **Son Doğrulama & Sürüm Bütünlüğü:** Tüm modüllerin kapsamlı derleme testi ve APK paketleme doğrulaması.
+- [x] **Ses Sarma Butonları:** Not içi ses oynatıcıya 5 saniye ileri (+5s) ve 5 saniye geri (-5s) sarma kontrolleri (`AudioPlayer.seekBy` ve `AttachmentList`).
+- [x] **Oynatma Hızı Çarpanı:** Ses notları için 1.0x, 1.25x, 1.5x ve 2.0x değişken oynatma hızları (`AudioPlayer.setPlaybackSpeed` ve `cycleAudioPlaybackSpeed`).
+- [x] **Son Doğrulama & Sürüm Bütünlüğü:** Tüm modüllerin kapsamlı derleme testi ve APK paketleme doğrulaması (`testDebugUnitTest` ve `assembleDebug` %100 başarılı).
+
+### Aşama 11: Çöp Kutusu Otomatik Temizleme Politikası & Okuma / Sunum Modu (Trash Auto-Purge & Presentation Mode)
+- [ ] **Çöp Kutusu Saklama Politikası (Retention Policy):** `AppSettingsManager` üzerinden 7 gün, 14 gün, 30 gün veya Asla (Devre Dışı) seçenekleri.
+- [ ] **Otomatik Süresi Dolan Not Temizliği:** Uygulama açılışında veya Çöp Kutusu ekranına girildiğinde belirlenen süreden eski silinmiş notların arka planda sessizce kalıcı silinmesi.
+- [ ] **Çöp Kutusu Bilgi Başlığı (Info Banner):** `TrashScreen` üzerinde kullanıcının seçtiği otomatik temizleme süresini gösteren ve tek dokunuşla ayarlara yönlendiren bilgi kartı.
+- [ ] **Tam Ekran Okuma / Sunum Modu (Reader Presentation View):** Notu sadece görüntüleme amacıyla kazaen düzenlemeleri engelleyen, font boyutu ayarlanabilir, konforlu kenar boşlukları ve şık tipografi sunan sunum görünümü.
+
+### Aşama 12: Arama İçi Anahtar Kelime Vurgulama & Son Aramalar Geçmişi (Search Highlighting & History)
+- [ ] **Arama Geçmişi Saklama (Recent Search Queries):** Kullanıcının yaptığı son aramaların DataStore/SharedPreferences üzerinde saklanması ve arama çubuğu boşken öneri olarak sunulması.
+- [ ] **Arama Sonuçlarında Kelime Vurgulama (Keyword Highlighting):** Not listesinde ve arama ekranında aranan kelimelerin metin içinde `AnnotatedString` ile sarı/vurgulu arka planla gösterilmesi.
 
 ---
 
@@ -99,4 +109,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 7 Tamamlandı]** Çok kademeli bildirim erteleme eylemleri (15 dk & 1 saat), SQLite WAL checkpoint & VACUUM optimizasyon motoru ve Ayarlar bakım paneli devreye alındı.
 * **[Aşama 8 Tamamlandı]** Günlük kelime hedefi takip kartı, not detay hızlı kilit ikonu, not çoğaltma ve birim testleri tamamlandı.
 * **[Aşama 9 Tamamlandı]** Çoklu seçimde toplu renk değiştirme diyaloğu, toplu notları tek PDF dokümanında birleştirme motoru ve kategori atamaları tamamlandı.
-* **[Aşama 10 Sırada]** Ses oynatıcı kontrolleri (+5s/-5s sarma, değişken hız çarpanları) ve sürüm kapanış doğrulaması.
+* **[Aşama 10 Tamamlandı]** Ses oynatıcı kontrolleri (+5s/-5s sarma, 1.0x-2.0x değişken hız çarpanları) ve derleme doğrulaması tamamlandı.
+* **[Aşama 11 Sırada]** Çöp kutusu saklama/otomatik temizleme politikası ve not tam ekran okuma/sunum modu geliştirilecek.

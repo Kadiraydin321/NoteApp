@@ -77,7 +77,8 @@ data class NoteDetailState(
     val isZenMode: Boolean = false,
     val isSoundPlaying: Boolean = false,
     val currentFocusSound: FocusSoundType = FocusSoundType.PINK_NOISE,
-    val noteHistoryList: List<NoteHistory> = emptyList()
+    val noteHistoryList: List<NoteHistory> = emptyList(),
+    val audioPlaybackSpeed: Float = 1.0f
 )
 
 @HiltViewModel
@@ -449,11 +450,27 @@ class NoteDetailViewModel @Inject constructor(
             audioPlayer.stop()
             _state.value = _state.value.copy(isPlayingAudio = false, currentPlayingPath = null)
         } else {
-            audioPlayer.playFile(File(path)) {
+            val speed = _state.value.audioPlaybackSpeed
+            audioPlayer.playFile(File(path), speed) {
                 _state.value = _state.value.copy(isPlayingAudio = false, currentPlayingPath = null)
             }
             _state.value = _state.value.copy(isPlayingAudio = true, currentPlayingPath = path)
         }
+    }
+
+    fun seekAudioBy(seconds: Int) {
+        audioPlayer.seekBy(seconds * 1000)
+    }
+
+    fun cycleAudioPlaybackSpeed() {
+        val nextSpeed = when (_state.value.audioPlaybackSpeed) {
+            1.0f -> 1.25f
+            1.25f -> 1.5f
+            1.5f -> 2.0f
+            else -> 1.0f
+        }
+        audioPlayer.setPlaybackSpeed(nextSpeed)
+        _state.value = _state.value.copy(audioPlaybackSpeed = nextSpeed)
     }
 
     fun onDeleteAttachment(path: String) {

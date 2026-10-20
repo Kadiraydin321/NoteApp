@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import java.io.File
@@ -28,6 +29,9 @@ fun AttachmentList(
     onPlayAudio: (String) -> Unit,
     isPlayingAudio: Boolean,
     currentPlayingPath: String?,
+    playbackSpeed: Float = 1.0f,
+    onSeekAudio: ((Int) -> Unit)? = null,
+    onCycleSpeed: (() -> Unit)? = null,
     onImageClick: (String) -> Unit = {},
     onRevertImage: ((String) -> Unit)? = null,
     canRevertImage: ((String) -> Boolean)? = null,
@@ -44,35 +48,91 @@ fun AttachmentList(
         attachments.forEach { path ->
             val isAudio = path.endsWith(".mp4") || path.endsWith(".m4a") || path.endsWith(".mp3")
             if (isAudio) {
+                val isCurrentPlaying = isPlayingAudio && currentPlayingPath == path
                 // Ses Kaydı Oynatıcı Kartı
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isCurrentPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                        else MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+                    )
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.weight(1f, fill = false)
+                        ) {
                             IconButton(onClick = { onPlayAudio(path) }) {
                                 Icon(
-                                    imageVector = if (isPlayingAudio && currentPlayingPath == path) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                    imageVector = if (isCurrentPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
                                     contentDescription = "Oynat / Durdur",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                             Text(
-                                text = "Ses Kaydı (${File(path).name.take(15)}...)",
-                                style = MaterialTheme.typography.bodyMedium
+                                text = "Ses (${File(path).name.take(14)}...)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1
                             )
                         }
 
-                        IconButton(onClick = { onDeleteAttachment(path) }) {
-                            Icon(Icons.Default.Close, contentDescription = "Sil")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            if (isCurrentPlaying) {
+                                // -5s Geri Sar
+                                TextButton(
+                                    onClick = { onSeekAudio?.invoke(-5) },
+                                    contentPadding = PaddingValues(horizontal = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text(
+                                        "-5s",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // +5s İleri Sar
+                                TextButton(
+                                    onClick = { onSeekAudio?.invoke(5) },
+                                    contentPadding = PaddingValues(horizontal = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text(
+                                        "+5s",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // Oynatma Hızı Butonu
+                                FilledTonalButton(
+                                    onClick = { onCycleSpeed?.invoke() },
+                                    contentPadding = PaddingValues(horizontal = 6.dp),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Text(
+                                        text = "${playbackSpeed}x",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(Modifier.width(2.dp))
+                            }
+
+                            IconButton(onClick = { onDeleteAttachment(path) }) {
+                                Icon(Icons.Default.Close, contentDescription = "Sil")
+                            }
                         }
                     }
                 }

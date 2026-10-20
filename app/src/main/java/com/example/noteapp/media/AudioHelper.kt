@@ -43,25 +43,76 @@ class AudioRecorder(private val context: Context) {
 
 class AudioPlayer(private val context: Context) {
     private var player: MediaPlayer? = null
+    private var currentSpeed: Float = 1.0f
 
-    fun playFile(file: File, onComplete: () -> Unit = {}) {
+    fun playFile(file: File, speed: Float = 1.0f, onComplete: () -> Unit = {}) {
         stop()
+        currentSpeed = speed
         MediaPlayer.create(context, android.net.Uri.fromFile(file))?.apply {
             player = this
             setOnCompletionListener {
                 stop()
                 onComplete()
             }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && speed != 1.0f) {
+                try {
+                    playbackParams = playbackParams.setSpeed(speed)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
             start()
         }
     }
 
+    fun seekBy(deltaMs: Int) {
+        player?.let { p ->
+            try {
+                val newPos = (p.currentPosition + deltaMs).coerceIn(0, p.duration)
+                p.seekTo(newPos)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun seekTo(positionMs: Int) {
+        player?.let { p ->
+            try {
+                p.seekTo(positionMs.coerceIn(0, p.duration))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        currentSpeed = speed
+        player?.let { p ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    p.playbackParams = p.playbackParams.setSpeed(speed)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
     fun stop() {
-        player?.stop()
-        player?.release()
+        try {
+            player?.stop()
+            player?.release()
+        } catch (_: Exception) {}
         player = null
     }
 
     val isPlaying: Boolean
-        get() = player?.isPlaying == true
+        get() = try { player?.isPlaying == true } catch (_: Exception) { false }
+
+    val currentPosition: Int
+        get() = try { player?.currentPosition ?: 0 } catch (_: Exception) { 0 }
+
+    val duration: Int
+        get() = try { player?.duration ?: 0 } catch (_: Exception) { 0 }
 }
