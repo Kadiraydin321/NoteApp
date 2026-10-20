@@ -39,7 +39,8 @@ class ReminderActionReceiver : BroadcastReceiver() {
             ACTION_SNOOZE -> {
                 val title = intent.getStringExtra(EXTRA_NOTE_TITLE) ?: ""
                 val content = intent.getStringExtra(EXTRA_NOTE_CONTENT) ?: ""
-                val snoozeTime = System.currentTimeMillis() + (15 * 60 * 1000L)
+                val snoozeMinutes = intent.getIntExtra(EXTRA_SNOOZE_MINUTES, 15)
+                val snoozeTime = System.currentTimeMillis() + (snoozeMinutes * 60 * 1000L)
 
                 val scheduler = AndroidAlarmScheduler(context)
                 scheduler.schedule(noteId, title, content, snoozeTime)
@@ -50,7 +51,8 @@ class ReminderActionReceiver : BroadcastReceiver() {
                         repository.insertNote(note.copy(reminderTime = snoozeTime))
                     }
                 }
-                Toast.makeText(context, "⏱ Hatırlatıcı 15 dakika ertelendi", Toast.LENGTH_SHORT).show()
+                val label = if (snoozeMinutes >= 60) "${snoozeMinutes / 60} saat" else "$snoozeMinutes dakika"
+                Toast.makeText(context, "⏱ Hatırlatıcı $label ertelendi", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -61,5 +63,6 @@ class ReminderActionReceiver : BroadcastReceiver() {
         const val EXTRA_NOTE_ID = "extra_note_id"
         const val EXTRA_NOTE_TITLE = "extra_note_title"
         const val EXTRA_NOTE_CONTENT = "extra_note_content"
+        const val EXTRA_SNOOZE_MINUTES = "extra_snooze_minutes"
     }
 }

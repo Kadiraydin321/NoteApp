@@ -641,6 +641,7 @@ class MainActivity : FragmentActivity() {
                         val backupUiState by viewModel.backupUiState.collectAsState()
                         val syncUiState by viewModel.syncUiState.collectAsState()
                         val updateUiState by viewModel.updateUiState.collectAsState()
+                        val maintenanceUiState by viewModel.maintenanceUiState.collectAsState()
 
                         SettingsScreen(
                             initialFocusSection = focus,
@@ -648,6 +649,7 @@ class MainActivity : FragmentActivity() {
                             backupUiState = backupUiState,
                             syncUiState = syncUiState,
                             updateUiState = updateUiState,
+                            maintenanceUiState = maintenanceUiState,
                             onWidgetFilterChange = viewModel::setWidgetFilterMode,
                             onWidgetShowLockedChange = viewModel::setWidgetShowLocked,
                             onWidgetShowContentChange = viewModel::setWidgetShowContent,
@@ -682,6 +684,8 @@ class MainActivity : FragmentActivity() {
                             onNavigateToStatistics = {
                                 navController.navigate("statistics_screen")
                             },
+                            onOptimizeDatabase = viewModel::optimizeDatabase,
+                            onDismissMaintenanceMessage = viewModel::dismissMaintenanceMessage,
                             onBackClick = {
                                 navController.popBackStack()
                             }

@@ -69,10 +69,15 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Renge Göre Sıralama (`NoteSortOrder.COLOR`):** Renkli notları önceliklendirip palet tonlarına göre gruplayan akıllı sıralama mantığı.
 - [x] **Birim Testleri (%100 Başarılı):** `ChecklistParserTest` ve `NoteSortTest` ile tüm checklist ve renk sıralama senaryoları doğrulandı.
 
-### Aşama 7: Akıllı Hatırlatıcılar & Bildirim Eylemleri (Smart Reminders & Snooze System)
-- [ ] **Bildirimden Hızlı Erteleme (Notification Snooze Actions):** Hatırlatıcı çaldığında bildirim üzerinden doğrudan "15 Dk Ertele", "1 Saat Ertele", "Tamamlandı Olarak İşaretle" aksiyon butonları.
-- [ ] **Tekrarlayan Hatırlatıcılar (Recurring Reminders):** Günlük, Hafta içi, Haftalık ve Aylık periyotlarda otomatik yenilenen hatırlatıcı altyapısı (`RecurrenceType`).
-- [ ] **Veritabanı Bakımı & Optimize SQL:** Room SQLite `VACUUM` ve `ANALYZE` tetikleyici yardımcı sınıf ile silinen notlardan sonra disk alanı geri kazanımı ve sorgu hızlandırma.
+### Aşama 7: Akıllı Hatırlatıcılar & SQLite Veritabanı Bakımı (Smart Reminders & Storage Optimization)
+- [x] **Bildirimden Hızlı Erteleme (Notification Snooze Actions):** Hatırlatıcı çaldığında bildirim üzerinden doğrudan "✓ Tamamlandı", "⏱ 15 Dk Ertele" ve "⏱ 1 Saat Ertele" aksiyon butonları (`ReminderActionReceiver` & `NotificationHelper`).
+- [x] **SQLite WAL Checkpoint, VACUUM ve ANALYZE Motoru:** `DatabaseMaintenanceManager` ile disk alanı geri kazanımı, indeks optimizasyonu ve geçici önbellek/çöp temizliği.
+- [x] **Ayarlar Ekranında Bakım Paneli (`SettingsScreen`):** Canlı veritabanı boyutu, önbellek boyutu göstergesi ve tek dokunuşla optimizasyon tetikleyici.
+
+### Aşama 8: Not Çoğaltma (Duplicate Note) & Günlük Yazma Hedefi (Daily Word Goal)
+- [ ] **Not Çoğaltma (Duplicate Note):** Not detay ekranındaki açılır menüden ve ana listeden tek dokunuşla notun başlık, içerik, kategori ve etiketleriyle birlikte birebir kopyasını oluşturma.
+- [ ] **Günlük Kelime Hedefi Takibi (Daily Writing Target):** `AppSettings` üzerinde günlük kelime hedefi (örn. 500 kelime) belirleme ve `StatisticsScreen` üzerinde dairesel hedef tamamlanma halkası.
+- [ ] **Not Detay Hızlı Kilit Kısayolu:** Not düzenleme ekranında üst çubukta anında kilit açma/kapama ikonu.
 
 ---
 
@@ -80,4 +85,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 
 * **[Aşama 1-5 Tamamlandı]** Şablonlar, versiyon geçmişi geri yükleme, yazma istatistikleri ve analitik ekranı, Zen odaklanma modu ve sentetik ses motoru, Room v5 migrasyonu ve birim testler başarıyla entegre edildi.
 * **[Aşama 6 Tamamlandı]** Etkileşimli filtre çipleri, not kartı kontrol ilerleme çubukları, stilize PDF motoru, Downloads klasörüne kaydetme ve renge göre sıralama özellikleri tamamlanıp test edildi.
-* **[Aşama 7 Sırada]** Akıllı bildirim erteleme eylemleri, tekrarlayan hatırlatıcılar ve SQLite veritabanı optimizasyonu.
+* **[Aşama 7 Tamamlandı]** Çok kademeli bildirim erteleme eylemleri (15 dk & 1 saat), SQLite WAL checkpoint & VACUUM optimizasyon motoru ve Ayarlar bakım paneli devreye alındı.
+* **[Aşama 8 Sırada]** Not çoğaltma, günlük kelime hedefi takip halkası ve hızlı kilit kısayolu.

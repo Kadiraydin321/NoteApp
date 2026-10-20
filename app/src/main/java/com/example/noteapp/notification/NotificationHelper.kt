@@ -61,16 +61,32 @@ class NotificationHelper(private val context: Context) {
         )
 
         // Aksiyon 2: 15 Dakika Ertele
-        val snoozeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+        val snooze15Intent = Intent(context, ReminderActionReceiver::class.java).apply {
             action = ReminderActionReceiver.ACTION_SNOOZE
             putExtra(ReminderActionReceiver.EXTRA_NOTE_ID, noteId)
             putExtra(ReminderActionReceiver.EXTRA_NOTE_TITLE, title)
             putExtra(ReminderActionReceiver.EXTRA_NOTE_CONTENT, content)
+            putExtra(ReminderActionReceiver.EXTRA_SNOOZE_MINUTES, 15)
         }
-        val snoozePendingIntent = PendingIntent.getBroadcast(
+        val snooze15PendingIntent = PendingIntent.getBroadcast(
             context,
             (noteId * 10 + 2).toInt(),
-            snoozeIntent,
+            snooze15Intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Aksiyon 3: 1 Saat Ertele
+        val snooze60Intent = Intent(context, ReminderActionReceiver::class.java).apply {
+            action = ReminderActionReceiver.ACTION_SNOOZE
+            putExtra(ReminderActionReceiver.EXTRA_NOTE_ID, noteId)
+            putExtra(ReminderActionReceiver.EXTRA_NOTE_TITLE, title)
+            putExtra(ReminderActionReceiver.EXTRA_NOTE_CONTENT, content)
+            putExtra(ReminderActionReceiver.EXTRA_SNOOZE_MINUTES, 60)
+        }
+        val snooze60PendingIntent = PendingIntent.getBroadcast(
+            context,
+            (noteId * 10 + 3).toInt(),
+            snooze60Intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -83,7 +99,8 @@ class NotificationHelper(private val context: Context) {
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .addAction(android.R.drawable.checkbox_on_background, "✓ Tamamlandı", donePendingIntent)
-            .addAction(android.R.drawable.ic_popup_sync, "⏱ 15 Dk Ertele", snoozePendingIntent)
+            .addAction(android.R.drawable.ic_popup_sync, "⏱ 15 Dk", snooze15PendingIntent)
+            .addAction(android.R.drawable.ic_popup_sync, "⏱ 1 Saat", snooze60PendingIntent)
             .build()
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

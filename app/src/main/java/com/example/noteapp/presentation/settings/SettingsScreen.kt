@@ -54,6 +54,7 @@ fun SettingsScreen(
     backupUiState: BackupUiState,
     syncUiState: SyncUiState = SyncUiState(),
     updateUiState: UpdateUiState = UpdateUiState(),
+    maintenanceUiState: MaintenanceUiState = MaintenanceUiState(),
     onWidgetFilterChange: (WidgetFilterMode) -> Unit,
     onWidgetShowLockedChange: (Boolean) -> Unit,
     onWidgetShowContentChange: (Boolean) -> Unit = {},
@@ -84,6 +85,8 @@ fun SettingsScreen(
     onMarkDialogShown: (Int) -> Unit = {},
     onNavigateToDesignStudio: () -> Unit = {},
     onNavigateToStatistics: () -> Unit = {},
+    onOptimizeDatabase: () -> Unit = {},
+    onDismissMaintenanceMessage: () -> Unit = {},
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1507,6 +1510,94 @@ fun SettingsScreen(
                 }
             }
 
+            // ==========================================
+            // VERİTABANI & DEPOLAMA BAKIMI (MAINTENANCE)
+            // ==========================================
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.AutoFixNormal,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                "Veritabanı & Depolama Bakımı",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Text(
+                        "Uygulama zamanla silinen notlardan ve geçici dosyalardan kalan kullanılmayan boşlukları barındırabilir. SQLite WAL Checkpoint, VACUUM ve ANALYZE motoru veritabanını defragmente eder, boyutunu küçültür ve sorgu hızını en üst seviyeye çıkarır.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    HorizontalDivider()
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Veritabanı Boyutu", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text(
+                                if (maintenanceUiState.dbSizeKb > 0) "${maintenanceUiState.dbSizeKb} KB" else "Hesaplanıyor...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Önbellek & Çöp", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text(
+                                "${maintenanceUiState.cacheSizeKb} KB",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    FilledTonalButton(
+                        onClick = onOptimizeDatabase,
+                        enabled = !maintenanceUiState.isOperating,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (maintenanceUiState.isOperating) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Optimize Ediliyor...")
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Veritabanını ve Önbelleği Optimize Et")
+                        }
+                    }
+                }
+            }
+
             // Sürüm Bilgisi
             Box(
                 modifier = Modifier
@@ -1950,6 +2041,27 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = onDismissUpdateStatus) {
                     Text("Kapat")
+                }
+            }
+        )
+    }
+
+    // 7. Veritabanı Bakım Sonuç Penceresi
+    maintenanceUiState.message?.let { msg ->
+        AlertDialog(
+            onDismissRequest = onDismissMaintenanceMessage,
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text("Veritabanı Bakımı") },
+            text = { Text(msg) },
+            confirmButton = {
+                TextButton(onClick = onDismissMaintenanceMessage) {
+                    Text("Tamam")
                 }
             }
         )

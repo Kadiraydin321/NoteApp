@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.noteapp.data.backup.BackupManager
 import com.example.noteapp.data.backup.BackupResult
 import com.example.noteapp.data.backup.RestoreResult
+import com.example.noteapp.data.local.DatabaseMaintenanceManager
+import com.example.noteapp.data.local.MaintenanceResult
 import com.example.noteapp.data.settings.AppSettings
 import com.example.noteapp.data.settings.AppSettingsManager
 import com.example.noteapp.data.settings.WidgetFilterMode
@@ -57,13 +59,22 @@ data class UpdateUiState(
     val message: String? = null
 )
 
+data class MaintenanceUiState(
+    val isOperating: Boolean = false,
+    val dbSizeKb: Long = 0L,
+    val cacheSizeKb: Long = 0L,
+    val lastResult: MaintenanceResult? = null,
+    val message: String? = null
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val app: Application,
     private val settingsManager: AppSettingsManager,
     private val backupManager: BackupManager,
     private val desktopSyncClient: DesktopSyncClient,
-    private val updateManager: AppUpdateManager
+    private val updateManager: AppUpdateManager,
+    private val maintenanceManager: DatabaseMaintenanceManager
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> = settingsManager.settings
@@ -77,7 +88,11 @@ class SettingsViewModel @Inject constructor(
     private val _updateUiState = MutableStateFlow(UpdateUiState())
     val updateUiState: StateFlow<UpdateUiState> = _updateUiState.asStateFlow()
 
+    private val _maintenanceUiState = MutableStateFlow(MaintenanceUiState())
+    val maintenanceUiState: StateFlow<MaintenanceUiState> = _maintenanceUiState.asStateFlow()
+
     init {
+        loadStorageInfo()
         viewModelScope.launch {
             updateManager.updateStatus.collect { status ->
                 _updateUiState.value = _updateUiState.value.copy(
@@ -502,5 +517,44 @@ class SettingsViewModel @Inject constructor(
     fun markDialogShown(versionCode: Int) {
         updateManager.markDialogShown(versionCode)
         _updateUiState.value = _updateUiState.value.copy(hasShownDialogForVersion = versionCode)
+    }
+
+    // ==========================================
+    // VERİTABANI & DEPOLAMA BAKIMI (MAINTENANCE)
+    // ==========================================
+
+    fun loadStorageInfo() {
+        viewModelScope.launch {
+            val (dbBytes, cacheBytes) = maintenanceManager.getStorageInfo()
+            _maintenanceUiState.value = _maintenanceUiState.value.copy(
+                dbSizeKb = dbBytes / 1024L,
+                cacheSizeKb = cacheBytes / 1024L
+            )
+        }
+    }
+
+    fun optimizeDatabase() {
+        viewModelScope.launch {
+            _maintenanceUiState.value = _maintenanceUiState.value.copy(isOperating = true)
+            val result = maintenanceManager.optimizeDatabase()
+            val (newDbBytes, newCacheBytes) = maintenanceManager.getStorageInfo()
+            val totalFreedKb = (result.freedBytes + result.freedCacheBytes) / 1024L
+
+            _maintenanceUiState.value = _maintenanceUiState.value.copy(
+                isOperating = false,
+                dbSizeKb = newDbBytes / 1024L,
+                cacheSizeKb = newCacheBytes / 1024L,
+                lastResult = result,
+                message = if (totalFreedKb > 0) {
+                    "Veritabanı optimize edildi! $totalFreedKb KB disk alanı geri kazanıldı ve indeksler yenilendi (${result.executionTimeMs} ms)."
+                } else {
+                    "Veritabanı zaten en üst düzeyde optimize durumda. İndeksler doğrulandı (${result.executionTimeMs} ms)."
+                }
+            )
+        }
+    }
+
+    fun dismissMaintenanceMessage() {
+        _maintenanceUiState.value = _maintenanceUiState.value.copy(message = null)
     }
 }
