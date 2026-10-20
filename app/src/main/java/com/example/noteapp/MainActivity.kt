@@ -346,6 +346,7 @@ class MainActivity : FragmentActivity() {
                             onAddCategory = viewModel::onAddCategory,
                             onDeleteCategory = viewModel::onDeleteCategory,
                             onRenameCategory = viewModel::onRenameCategory,
+                            onUpdateCategoryColor = viewModel::onUpdateCategoryColor,
                             onLayoutModeChange = viewModel::setLayoutMode,
                             onToggleNoteSelection = viewModel::toggleNoteSelection,
                             onSelectAllNotes = viewModel::selectAllNotes,

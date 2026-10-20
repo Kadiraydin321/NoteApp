@@ -551,10 +551,20 @@ class NotesViewModel @Inject constructor(
         }
     }
 
-    fun onAddCategory(name: String) {
+    fun onAddCategory(name: String, color: Int = 0) {
         if (name.isBlank()) return
         viewModelScope.launch {
-            repository.insertCategory(Category(name = name.trim()))
+            repository.insertCategory(Category(name = name.trim(), color = color))
+        }
+    }
+
+    fun onAddCategory(name: String) {
+        onAddCategory(name, 0)
+    }
+
+    fun onUpdateCategoryColor(category: Category, color: Int) {
+        viewModelScope.launch {
+            repository.insertCategory(category.copy(color = color))
         }
     }
 

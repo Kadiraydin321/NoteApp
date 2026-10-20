@@ -351,13 +351,17 @@ class NoteDetailViewModel @Inject constructor(
         saveNoteQuietly()
     }
 
-    fun onAddCategory(name: String) {
+    fun onAddCategory(name: String, color: Int = 0) {
         if (name.isBlank()) return
         viewModelScope.launch {
-            val newId = repository.insertCategory(Category(name = name.trim()))
+            val newId = repository.insertCategory(Category(name = name.trim(), color = color))
             _state.value = _state.value.copy(categoryId = newId)
             saveNoteQuietly()
         }
+    }
+
+    fun onAddCategory(name: String) {
+        onAddCategory(name, 0)
     }
 
     fun onAddImage(uri: Uri) {

@@ -116,8 +116,20 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri & Derleme Doğrulaması:** `MarkdownWrapTest` ve `assembleDebug` ile tüm markdown biçimlendirme senaryoları %100 doğrulandı.
 
 ### Aşama 15: Kategoriye Özel Renk Paletleri & Renkli Kategori Çipleri (Colored Category Badges)
-- [ ] **Kategori Renk Seçici:** Yeni kategori oluştururken veya var olanı düzenlerken 8 estetik palet renginden seçim yapabilme (`Category.color`).
-- [ ] **Görsel Kategori Rozetleri:** Menü çekmecesinde, not detay çipinde ve not kartlarında kategorinin seçilen rengiyle yumuşak tonlu arka plan ve nokta ikonuyla şık gösterilmesi.
+- [x] **Kategori Renk Seçici:** Yeni kategori oluştururken veya var olanı düzenlerken 8 estetik palet renginden seçim yapabilme (`Category.DEFAULT_COLORS`, `CategoryColorPicker`).
+- [x] **Kategori Düzenleme Yeteneği:** Kategorileri Yönet ekranından mevcut kategorilerin adını ve rengini anında düzenleyebilme (`categoryToEdit`, `onUpdateCategoryColor`).
+- [x] **Görsel Kategori Rozetleri:** Menü çekmecesinde, filtre çiplerinde, not detayında ve tüm liste modlarında (ızgara, liste, kompakt) kategorinin rengiyle uyumlu zarif renkli rozet ve nokta göstergeleri (`CategoryBadge`).
+- [x] **Birim Testleri:** `CategoryColorTest` ile palet tekilliği, varsayılan değerler ve renk güncelleme senaryoları %100 doğrulandı.
+
+### Aşama 16: Notu Bildirim Çubuğuna Sabitleme (Sticky Note Notification) & Stilize HTML Dışa Aktarım
+- [ ] **Bildirime Sabitleme Motoru (Sticky Notification):** Not detay ekranından tek dokunuşla notun Android bildirim paneline kalıcı/sabit (ongoing) olarak iğnelenmesi (`NotificationHelper.showStickyNotification`).
+- [ ] **Bildirim Aksiyonları:** Bildirim üzerinden tek dokunuşla notu açma veya sabitlemeyi kaldırma ("📌 Kaldır" / `ACTION_UNPIN_STICKY`).
+- [ ] **Stilize HTML Web Dokümanı Dışa Aktarımı:** Notları responsive, modern koyu/açık tema destekli CSS içeren tekil `.html` dosyası olarak kaydedip tarayıcıda veya masaüstünde açabilme (`NoteExporter.exportToHtml`).
+- [ ] **Birim Testleri & Doğrulama:** Sticky bildirim ID ve HTML dışa aktarım testleri.
+
+### Aşama 17: Kilitli Notlar Otomatik Zaman Aşımı Politikası (Auto-Relock Timeout Policy)
+- [ ] **Zaman Aşımı Ayarı:** `AppSettingsManager` üzerinden Anında, 1 Dakika, 5 Dakika, 15 Dakika kilit koruma süresi.
+- [ ] **Akıllı Yeniden Kilitleme:** Uygulama arka plana atıldığında süre dolana kadar kullanıcının biyometrik/PIN doğrulaması yapmadan notu düzenlemeye devam edebilmesi.
 
 ---
 
@@ -133,4 +145,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 12 Tamamlandı]** Arama geçmişi yönetimi, son aramalar çip şeridi ve not kartlarında anlık arama kelimesi vurgulama motoru birim testleriyle tamamlandı.
 * **[Aşama 13 Tamamlandı]** Çoklu not birleştirme motoru (Note Merge Engine), onay diyaloğu, orijinal not saklama/çöpe taşıma politikası ve birim testleri tamamlandı.
 * **[Aşama 14 Tamamlandı]** Hızlı H1/H2/H3 başlık ve ayraç araçları ile canlı okuma süresi tipografi HUD rozeti tamamlandı.
-* **[Aşama 15 Sırada]** Kategori oluşturma ve düzenlemede renk paleti seçimi ve renkli kategori rozetleri geliştirilecek.
+* **[Aşama 15 Tamamlandı]** Kategori oluşturma ve düzenlemede 8 estetik palet rengi, dinamik renkli kategori rozetleri ve birim testleri tamamlandı.
+* **[Aşama 16 Sırada]** Notu bildirim çubuğuna sabitleme (Sticky Note) ve modern stilize HTML dışa aktarım motoru geliştirilecek.

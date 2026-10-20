@@ -73,6 +73,8 @@ import coil.compose.AsyncImage
 import com.example.noteapp.data.settings.NotesLayoutMode
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
+import com.example.noteapp.presentation.components.CategoryBadge
+import com.example.noteapp.presentation.components.CategoryColorPicker
 import com.example.noteapp.presentation.components.parseMarkdownCardPreview
 import com.example.noteapp.presentation.theme.getNoteColorSpec
 import kotlinx.coroutines.launch
@@ -96,9 +98,10 @@ fun NotesScreen(
     onEmptyTrash: () -> Unit,
     onCategorySelect: (Category?) -> Unit,
     onViewModeChange: (NotesViewMode) -> Unit,
-    onAddCategory: (String) -> Unit,
+    onAddCategory: (String, Int) -> Unit = { _, _ -> },
     onDeleteCategory: (Category) -> Unit = {},
     onRenameCategory: (Category, String) -> Unit = { _, _ -> },
+    onUpdateCategoryColor: (Category, Int) -> Unit = { _, _ -> },
     onLayoutModeChange: (NotesLayoutMode) -> Unit = {},
     onToggleNoteSelection: (Long) -> Unit = {},
     onSelectAllNotes: (List<Note>) -> Unit = {},
@@ -197,8 +200,12 @@ fun NotesScreen(
 
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var newCategoryName by remember { mutableStateOf("") }
+    var newCategoryColor by remember { mutableIntStateOf(0) }
     var showManageCategoriesDialog by remember { mutableStateOf(false) }
     var categoryToDelete by remember { mutableStateOf<Category?>(null) }
+    var categoryToEdit by remember { mutableStateOf<Category?>(null) }
+    var editCategoryName by remember { mutableStateOf("") }
+    var editCategoryColor by remember { mutableIntStateOf(0) }
     var showBatchCategoryDialog by remember { mutableStateOf(false) }
     var showBatchColorDialog by remember { mutableStateOf(false) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
@@ -553,7 +560,18 @@ fun NotesScreen(
                     Column {
                         categoriesToShow.forEach { category ->
                             NavigationDrawerItem(
-                                icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
+                                icon = {
+                                    if (category.color != 0) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(category.color))
+                                        )
+                                    } else {
+                                        Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null)
+                                    }
+                                },
                                 label = { Text(category.name) },
                                 selected = state.viewMode == NotesViewMode.ALL &&
                                         state.filterType == NoteTypeFilter.ALL &&
@@ -1146,11 +1164,20 @@ fun NotesScreen(
                                     onClick = { onCategorySelect(null) },
                                     label = { Text(state.selectedCategory.name) },
                                     leadingIcon = {
-                                        Icon(
-                                            Icons.AutoMirrored.Filled.Label,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                        if (state.selectedCategory.color != 0) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(10.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(state.selectedCategory.color))
+                                            )
+                                        } else {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.Label,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     },
                                     trailingIcon = {
                                         Icon(
@@ -1381,9 +1408,11 @@ fun NotesScreen(
                                         contentType = { "note_card" }
                                     ) { note ->
                                         val isSelected = state.selectedNoteIds.contains(note.id)
+                                        val category = state.categories.find { it.id == note.categoryId }
                                         NoteCard(
                                             modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
+                                            category = category,
                                             viewMode = state.viewMode,
                                             searchQuery = state.searchQuery,
                                             isSelected = isSelected,
@@ -1419,9 +1448,11 @@ fun NotesScreen(
                                         contentType = { "note_card" }
                                     ) { note ->
                                         val isSelected = state.selectedNoteIds.contains(note.id)
+                                        val category = state.categories.find { it.id == note.categoryId }
                                         NoteCard(
                                             modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
+                                            category = category,
                                             viewMode = state.viewMode,
                                             searchQuery = state.searchQuery,
                                             isSelected = isSelected,
@@ -1461,6 +1492,7 @@ fun NotesScreen(
                                         CompactNoteCard(
                                             modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
+                                            category = category,
                                             categoryName = category?.name,
                                             viewMode = state.viewMode,
                                             searchQuery = state.searchQuery,
@@ -1555,21 +1587,38 @@ fun NotesScreen(
     // 1. Yeni Kategori Ekleme Dialogu
     if (showAddCategoryDialog) {
         AlertDialog(
-            onDismissRequest = { showAddCategoryDialog = false },
+            onDismissRequest = {
+                showAddCategoryDialog = false
+                newCategoryColor = 0
+            },
             title = { Text("Yeni Kategori Oluştur") },
             text = {
-                OutlinedTextField(
-                    value = newCategoryName,
-                    onValueChange = { newCategoryName = it },
-                    placeholder = { Text("Kategori adı (örn: İş, Kişisel)") },
-                    singleLine = true
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = newCategoryName,
+                        onValueChange = { newCategoryName = it },
+                        placeholder = { Text("Kategori adı (örn: İş, Kişisel)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        text = "Kategori Rengi",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    CategoryColorPicker(
+                        selectedColor = newCategoryColor,
+                        onColorSelected = { newCategoryColor = it }
+                    )
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
                     if (newCategoryName.isNotBlank()) {
-                        onAddCategory(newCategoryName)
+                        onAddCategory(newCategoryName, newCategoryColor)
                         newCategoryName = ""
+                        newCategoryColor = 0
                         showAddCategoryDialog = false
                     }
                 }) {
@@ -1577,7 +1626,10 @@ fun NotesScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddCategoryDialog = false }) {
+                TextButton(onClick = {
+                    showAddCategoryDialog = false
+                    newCategoryColor = 0
+                }) {
                     Text("İptal")
                 }
             }
@@ -1593,7 +1645,7 @@ fun NotesScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 350.dp)
+                        .heightIn(max = 380.dp)
                 ) {
                     if (state.categories.isEmpty()) {
                         Text(
@@ -1619,22 +1671,47 @@ fun NotesScreen(
                                     ) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.weight(1f)
                                         ) {
-                                            Icon(
-                                                Icons.AutoMirrored.Filled.Label,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(14.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        if (category.color != 0) Color(category.color)
+                                                        else MaterialTheme.colorScheme.primary
+                                                    )
                                             )
-                                            Text(category.name, fontWeight = FontWeight.Medium)
+                                            Text(
+                                                category.name,
+                                                fontWeight = FontWeight.Medium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                         }
 
-                                        IconButton(onClick = { categoryToDelete = category }) {
-                                            Icon(
-                                                Icons.Default.Delete,
-                                                contentDescription = "Sil",
-                                                tint = MaterialTheme.colorScheme.error
-                                            )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            IconButton(onClick = {
+                                                categoryToEdit = category
+                                                editCategoryName = category.name
+                                                editCategoryColor = category.color
+                                            }) {
+                                                Icon(
+                                                    Icons.Default.Edit,
+                                                    contentDescription = "Düzenle",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                            IconButton(onClick = { categoryToDelete = category }) {
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "Sil",
+                                                    tint = MaterialTheme.colorScheme.error,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1646,6 +1723,55 @@ fun NotesScreen(
             confirmButton = {
                 TextButton(onClick = { showManageCategoriesDialog = false }) {
                     Text("Kapat")
+                }
+            }
+        )
+    }
+
+    // 3. Kategori Düzenleme Dialogu (İsim & Renk Değiştirme)
+    categoryToEdit?.let { cat ->
+        AlertDialog(
+            onDismissRequest = { categoryToEdit = null },
+            title = { Text("Kategoriyi Düzenle") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = editCategoryName,
+                        onValueChange = { editCategoryName = it },
+                        placeholder = { Text("Kategori adı") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        text = "Kategori Rengi",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    CategoryColorPicker(
+                        selectedColor = editCategoryColor,
+                        onColorSelected = { editCategoryColor = it }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (editCategoryName.isNotBlank()) {
+                        if (editCategoryName != cat.name) {
+                            onRenameCategory(cat, editCategoryName)
+                        }
+                        if (editCategoryColor != cat.color) {
+                            onUpdateCategoryColor(cat, editCategoryColor)
+                        }
+                        categoryToEdit = null
+                    }
+                }) {
+                    Text("Kaydet")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { categoryToEdit = null }) {
+                    Text("İptal")
                 }
             }
         )
@@ -1724,7 +1850,12 @@ fun NotesScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(if (cat.color != 0) Color(cat.color) else MaterialTheme.colorScheme.primary)
+                                    )
                                     Text(cat.name)
                                 }
                             }
@@ -2078,6 +2209,7 @@ private fun noteEntranceModifier(noteId: Long): Modifier {
 @Composable
 fun NoteCard(
     note: Note,
+    category: Category? = null,
     viewMode: NotesViewMode,
     searchQuery: String = "",
     isSelected: Boolean = false,
@@ -2353,7 +2485,8 @@ fun NoteCard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.weight(1f, fill = false)
                     ) {
                         if (note.reminderTime != null && note.reminderTime > 0) {
                             Icon(
@@ -2369,6 +2502,12 @@ fun NoteCard(
                                 contentDescription = "Ses Kaydı",
                                 modifier = Modifier.size(14.dp),
                                 tint = colorSpec.iconTint
+                            )
+                        }
+                        if (category != null) {
+                            CategoryBadge(
+                                category = category,
+                                contentColorHint = colorSpec.contentColor
                             )
                         }
                     }
@@ -2402,6 +2541,7 @@ fun NoteCard(
 @Composable
 fun CompactNoteCard(
     note: Note,
+    category: Category? = null,
     categoryName: String? = null,
     viewMode: NotesViewMode,
     searchQuery: String = "",
@@ -2562,7 +2702,12 @@ fun CompactNoteCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.weight(1f, fill = false)
                 ) {
-                    if (!categoryName.isNullOrBlank()) {
+                    if (category != null) {
+                        CategoryBadge(
+                            category = category,
+                            contentColorHint = colorSpec.contentColor
+                        )
+                    } else if (!categoryName.isNullOrBlank()) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = colorSpec.contentColor.copy(alpha = 0.08f)

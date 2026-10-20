@@ -43,4 +43,19 @@ data class Category(
     val id: Long = 0,
     val name: String,
     val color: Int = 0
-)
+) {
+    companion object {
+        val DEFAULT_COLORS: List<Int> = listOf(
+            0,                     // 0: Nötr / Varsayılan
+            0xFFE53935.toInt(),   // Mercan Kırmızısı
+            0xFFFB8C00.toInt(),   // Sıcak Turuncu
+            0xFFFDD835.toInt(),   // Kehribar Sarısı
+            0xFF43A047.toInt(),   // Zümrüt Yeşili
+            0xFF00ACC1.toInt(),   // Camgöbeği Turkuaz
+            0xFF1E88E5.toInt(),   // Okyanus Mavisi
+            0xFF8E24AA.toInt(),   // Ametist Moru
+            0xFFD81B60.toInt(),   // Gül Pembesi
+            0xFF6D4C41.toInt()    // Arduvaz Kahve
+        )
+    }
+}

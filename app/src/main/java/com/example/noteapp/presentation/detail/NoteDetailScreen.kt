@@ -81,6 +81,7 @@ import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.model.NoteTemplate
 import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.presentation.components.AttachmentList
+import com.example.noteapp.presentation.components.CategoryColorPicker
 import com.example.noteapp.presentation.components.FocusHudOverlay
 import com.example.noteapp.presentation.components.KeepCheckboxIcon
 import com.example.noteapp.presentation.components.MarkdownPreview
@@ -304,7 +305,7 @@ fun NoteDetailScreen(
     onUndo: () -> Unit = {},
     onRedo: () -> Unit = {},
     onCategoryChange: (Long?) -> Unit = {},
-    onAddCategory: (String) -> Unit = {},
+    onAddCategory: (String, Int) -> Unit = { _, _ -> },
     onTitleChange: (String) -> Unit,
     onContentValueChange: (TextFieldValue) -> Unit,
     onColorChange: (Int) -> Unit,
@@ -439,6 +440,7 @@ fun NoteDetailScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var newCategoryName by remember { mutableStateOf("") }
+    var newCategoryColor by remember { mutableIntStateOf(0) }
     var showStatsDialog by remember { mutableStateOf(false) }
     var revertConfirmPath by remember { mutableStateOf<String?>(null) }
     var showMoreMenu by remember { mutableStateOf(false) }
@@ -1874,9 +1876,18 @@ fun NoteDetailScreen(
                                                     selected = isSelected,
                                                     onClick = { onCategoryChange(if (isSelected) null else category.id) },
                                                     label = { Text(category.name) },
-                                                    leadingIcon = if (isSelected) {
-                                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                                    } else null
+                                                    leadingIcon = {
+                                                        if (isSelected) {
+                                                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                        } else if (category.color != 0) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(10.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(Color(category.color))
+                                                            )
+                                                        } else null
+                                                    }
                                                 )
                                             }
                                         }
@@ -2108,18 +2119,31 @@ fun NoteDetailScreen(
                 // Notun Atandığı Kategori Etiketi (Varsa)
                 val currentCategory = categories.firstOrNull { it.id == state.categoryId }
                 if (currentCategory != null) {
+                    val hasColor = currentCategory.color != 0
+                    val catColor = if (hasColor) Color(currentCategory.color) else contentColor
                     SuggestionChip(
                         onClick = {
                             activeToolCategory = if (activeToolCategory == NoteToolCategory.CATEGORY) NoteToolCategory.NONE else NoteToolCategory.CATEGORY
                         },
-                        label = { Text(currentCategory.name, style = MaterialTheme.typography.labelSmall) },
-                        icon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                        label = { Text(currentCategory.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold) },
+                        icon = {
+                            if (hasColor) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(catColor)
+                                )
+                            } else {
+                                Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(14.dp))
+                            }
+                        },
                         colors = SuggestionChipDefaults.suggestionChipColors(
-                            containerColor = if (isDarkBackground) Color(0x33FFFFFF) else Color(0x1A000000),
-                            labelColor = contentColor,
-                            iconContentColor = contentColor
+                            containerColor = if (hasColor) catColor.copy(alpha = 0.16f) else (if (isDarkBackground) Color(0x33FFFFFF) else Color(0x1A000000)),
+                            labelColor = if (hasColor) catColor.copy(alpha = 0.95f) else contentColor,
+                            iconContentColor = if (hasColor) catColor else contentColor
                         ),
-                        border = BorderStroke(1.dp, if (isDarkBackground) Color(0x33FFFFFF) else Color(0x22000000)),
+                        border = BorderStroke(1.dp, if (hasColor) catColor.copy(alpha = 0.4f) else (if (isDarkBackground) Color(0x33FFFFFF) else Color(0x22000000))),
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
                 }
@@ -2904,21 +2928,36 @@ fun NoteDetailScreen(
             onDismissRequest = {
                 showAddCategoryDialog = false
                 newCategoryName = ""
+                newCategoryColor = 0
             },
             title = { Text("Yeni Kategori Oluştur") },
             text = {
-                OutlinedTextField(
-                    value = newCategoryName,
-                    onValueChange = { newCategoryName = it },
-                    placeholder = { Text("Kategori adı (örn: Projeler)") },
-                    singleLine = true
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = newCategoryName,
+                        onValueChange = { newCategoryName = it },
+                        placeholder = { Text("Kategori adı (örn: Projeler)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        text = "Kategori Rengi",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    CategoryColorPicker(
+                        selectedColor = newCategoryColor,
+                        onColorSelected = { newCategoryColor = it }
+                    )
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
                     if (newCategoryName.isNotBlank()) {
-                        onAddCategory(newCategoryName)
+                        onAddCategory(newCategoryName, newCategoryColor)
                         newCategoryName = ""
+                        newCategoryColor = 0
                         showAddCategoryDialog = false
                     }
                 }) {
@@ -2929,6 +2968,7 @@ fun NoteDetailScreen(
                 TextButton(onClick = {
                     showAddCategoryDialog = false
                     newCategoryName = ""
+                    newCategoryColor = 0
                 }) {
                     Text("İptal")
                 }
