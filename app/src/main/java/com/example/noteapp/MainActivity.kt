@@ -364,6 +364,9 @@ class MainActivity : FragmentActivity() {
                             onOpenTemplates = {
                                 showTemplateSheet = true
                             },
+                            onSaveSearchQuery = viewModel::saveSearchQuery,
+                            onRemoveRecentSearch = viewModel::removeRecentSearch,
+                            onClearRecentSearches = viewModel::clearRecentSearches,
                             onSettingsClick = {
                                 navController.navigate("settings_screen")
                             }

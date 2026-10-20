@@ -123,6 +123,9 @@ fun NotesScreen(
     searchBarShape: SearchBarShape = SearchBarShape.PILL,
     onNavigateToStatistics: () -> Unit = {},
     onOpenTemplates: () -> Unit = {},
+    onSaveSearchQuery: (String) -> Unit = {},
+    onRemoveRecentSearch: (String) -> Unit = {},
+    onClearRecentSearches: () -> Unit = {},
     onSettingsClick: () -> Unit
 ) {
     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
@@ -139,10 +142,13 @@ fun NotesScreen(
         }
     }
 
-    val handleOpenNote: (Note) -> Unit = remember(onNoteClick, drawerState, scope) {
+    val handleOpenNote: (Note) -> Unit = remember(onNoteClick, drawerState, scope, state.searchQuery) {
         { note ->
             if (drawerState.isOpen) {
                 scope.launch { drawerState.snapTo(DrawerValue.Closed) }
+            }
+            if (state.searchQuery.isNotBlank()) {
+                onSaveSearchQuery(state.searchQuery)
             }
             onNoteClick(note)
         }
@@ -1035,12 +1041,74 @@ fun NotesScreen(
                             }
                         }
                     } else null,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Search
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onSearch = {
+                            if (state.searchQuery.isNotBlank()) {
+                                onSaveSearchQuery(state.searchQuery)
+                            }
+                        }
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp),
                     shape = RoundedCornerShape(searchBarShape.cornerDp.dp),
                     singleLine = true
                 )
+
+                // Son Aramalar Geçmişi Çipleri (Arama kutusu boşken)
+                if (state.searchQuery.isEmpty() && state.recentSearches.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        item(key = "recent_label") {
+                            Text(
+                                "Son:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        items(state.recentSearches, key = { "recent_$it" }) { query ->
+                            InputChip(
+                                selected = false,
+                                onClick = { onSearchChange(query) },
+                                label = { Text(query, style = MaterialTheme.typography.labelSmall) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.History,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Kaldır",
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable { onRemoveRecentSearch(query) }
+                                    )
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
+                        item(key = "clear_all_recent") {
+                            TextButton(
+                                onClick = onClearRecentSearches,
+                                contentPadding = PaddingValues(horizontal = 6.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text("Temizle", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
 
                 if (state.viewMode == NotesViewMode.ALL) {
                     // Genel görünüm filtreleri & Dinamik Etiket Çipleri
@@ -1298,6 +1366,7 @@ fun NotesScreen(
                                             modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
                                             viewMode = state.viewMode,
+                                            searchQuery = state.searchQuery,
                                             isSelected = isSelected,
                                             isSelectionMode = isSelectionMode,
                                             cornerStyle = cardCornerStyle,
@@ -1335,6 +1404,7 @@ fun NotesScreen(
                                             modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
                                             viewMode = state.viewMode,
+                                            searchQuery = state.searchQuery,
                                             isSelected = isSelected,
                                             isSelectionMode = isSelectionMode,
                                             cornerStyle = cardCornerStyle,
@@ -1374,6 +1444,7 @@ fun NotesScreen(
                                             note = note,
                                             categoryName = category?.name,
                                             viewMode = state.viewMode,
+                                            searchQuery = state.searchQuery,
                                             isSelected = isSelected,
                                             isSelectionMode = isSelectionMode,
                                             cornerStyle = cardCornerStyle,
@@ -1938,6 +2009,7 @@ private fun noteEntranceModifier(noteId: Long): Modifier {
 fun NoteCard(
     note: Note,
     viewMode: NotesViewMode,
+    searchQuery: String = "",
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
     cornerStyle: CardCornerStyle = CardCornerStyle.ROUNDED,
@@ -2058,7 +2130,12 @@ fun NoteCard(
                 ) {
                     if (note.title.isNotEmpty()) {
                         Text(
-                            text = note.title,
+                            text = if (searchQuery.isNotBlank()) com.example.noteapp.domain.util.TextHighlightHelper.highlightQuery(
+                                text = note.title,
+                                query = searchQuery,
+                                highlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                                highlightTextColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ) else androidx.compose.ui.text.AnnotatedString(note.title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = colorSpec.contentColor,
@@ -2129,10 +2206,15 @@ fun NoteCard(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
-                } else if (displayContent.isNotEmpty()) {
+                } else if (displayContent.text.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = displayContent,
+                        text = if (searchQuery.isNotBlank()) com.example.noteapp.domain.util.TextHighlightHelper.highlightQuery(
+                            text = displayContent.text,
+                            query = searchQuery,
+                            highlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                            highlightTextColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ) else displayContent,
                         style = MaterialTheme.typography.bodyMedium,
                         color = colorSpec.contentColor,
                         maxLines = 6,
@@ -2252,6 +2334,7 @@ fun CompactNoteCard(
     note: Note,
     categoryName: String? = null,
     viewMode: NotesViewMode,
+    searchQuery: String = "",
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
     cornerStyle: CardCornerStyle = CardCornerStyle.ROUNDED,
@@ -2345,11 +2428,28 @@ fun CompactNoteCard(
                 }
 
                 // Başlık ve Kısa Özeti
-                val titleSnippet = remember(note.title, note.content, note.isLocked) {
+                val titleSnippet = remember(note.title, note.content, note.isLocked, searchQuery) {
+                    val rawTitle = note.title.ifBlank { "Başlıksız Not" }
+                    val highlightedTitle = if (searchQuery.isNotBlank()) {
+                        com.example.noteapp.domain.util.TextHighlightHelper.highlightQuery(
+                            text = rawTitle,
+                            query = searchQuery,
+                            highlightColor = colorSpec.contentColor.copy(alpha = 0.22f)
+                        )
+                    } else androidx.compose.ui.text.AnnotatedString(rawTitle)
+
                     val preview = if (!note.isLocked && note.content.isNotBlank()) {
-                        parseMarkdownCardPreview(note.content, lineLimit = 1)
+                        val parsed = parseMarkdownCardPreview(note.content, lineLimit = 1)
+                        if (searchQuery.isNotBlank()) {
+                            com.example.noteapp.domain.util.TextHighlightHelper.highlightQuery(
+                                text = parsed.text,
+                                query = searchQuery,
+                                highlightColor = colorSpec.contentColor.copy(alpha = 0.22f)
+                            )
+                        } else parsed
                     } else androidx.compose.ui.text.AnnotatedString("")
-                    Pair(note.title.ifBlank { "Başlıksız Not" }, preview)
+
+                    Pair(highlightedTitle, preview)
                 }
 
                 Text(

@@ -79,7 +79,8 @@ data class NotesState(
     val filterType: NoteTypeFilter = NoteTypeFilter.ALL,
     val sortOrder: NoteSortOrder = NoteSortOrder.MODIFIED_DESC,
     val selectedTag: String? = null,
-    val trashRetentionPolicy: com.example.noteapp.data.settings.TrashRetentionPolicy = com.example.noteapp.data.settings.TrashRetentionPolicy.DAYS_30
+    val trashRetentionPolicy: com.example.noteapp.data.settings.TrashRetentionPolicy = com.example.noteapp.data.settings.TrashRetentionPolicy.DAYS_30,
+    val recentSearches: List<String> = emptyList()
 )
 
 @HiltViewModel
@@ -98,6 +99,8 @@ class NotesViewModel @Inject constructor(
     private val _state = MutableStateFlow(NotesState(layoutMode = settingsManager.settings.value.layoutMode))
     val state: StateFlow<NotesState> = _state.asStateFlow()
 
+    private val searchPrefs = app.getSharedPreferences("app_search_history", android.content.Context.MODE_PRIVATE)
+
     private var notesJob: Job? = null
     private var derivedNotesJob: Job? = null
     private var hashtagSourcesJob: Job? = null
@@ -110,6 +113,38 @@ class NotesViewModel @Inject constructor(
         loadCategories()
         loadHashtags()
         observeSettings()
+        _state.value = _state.value.copy(recentSearches = loadRecentSearches())
+    }
+
+    private fun loadRecentSearches(): List<String> {
+        val raw = searchPrefs.getString("recent_queries", null) ?: return emptyList()
+        return raw.split("|||").filter { it.isNotBlank() }
+    }
+
+    private fun saveRecentSearchesToPrefs(list: List<String>) {
+        searchPrefs.edit().putString("recent_queries", list.joinToString("|||")).apply()
+    }
+
+    fun saveSearchQuery(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.length < 2) return
+        val current = _state.value.recentSearches.toMutableList()
+        current.remove(trimmed)
+        current.add(0, trimmed)
+        val pruned = current.take(8)
+        _state.value = _state.value.copy(recentSearches = pruned)
+        saveRecentSearchesToPrefs(pruned)
+    }
+
+    fun removeRecentSearch(query: String) {
+        val updated = _state.value.recentSearches.filter { it != query }
+        _state.value = _state.value.copy(recentSearches = updated)
+        saveRecentSearchesToPrefs(updated)
+    }
+
+    fun clearRecentSearches() {
+        _state.value = _state.value.copy(recentSearches = emptyList())
+        saveRecentSearchesToPrefs(emptyList())
     }
 
     private fun cleanUpTrash() {

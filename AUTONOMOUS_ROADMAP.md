@@ -99,12 +99,19 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `TrashRetentionTest` ile tüm eşik değer ve retention gün hesaplamaları test edildi (%100 Başarılı).
 
 ### Aşama 12: Arama İçi Anahtar Kelime Vurgulama & Son Aramalar Geçmişi (Search Highlighting & History)
-- [ ] **Arama Geçmişi Saklama (Recent Search Queries):** Kullanıcının yaptığı son aramaların DataStore/SharedPreferences üzerinde saklanması ve arama çubuğu boşken hızlı öneri çipleri olarak sunulması.
-- [ ] **Arama Sonuçlarında Kelime Vurgulama (Keyword Highlighting):** Not listesinde ve arama ekranında aranan kelimelerin metin içinde `AnnotatedString` ile sarı/vurgulu arka planla gösterilmesi.
+- [x] **Arama Geçmişi Saklama (Recent Search Queries):** Kullanıcının yaptığı son aramaların SharedPreferences üzerinde saklanması (`app_search_history`), en fazla 8 aramanın güncel tutulması ve arama çubuğu boşken etkileşimli yatay çipleriyle sunulması.
+- [x] **Son Arama Yönetimi:** Çipten tek dokunuşla arama yapma, çipten kaldırma (`✕`) ve tüm geçmişi tek dokunuşla temizleme aksiyonları (`saveSearchQuery`, `removeRecentSearch`, `clearRecentSearches`).
+- [x] **Arama Sonuçlarında Kelime Vurgulama (Keyword Highlighting):** `TextHighlightHelper.highlightQuery` motoru ile tüm not listelerinde (`NoteCard` ve `CompactNoteCard`) aranan kelimenin başlıkta ve içerik önizlemesinde renkli vurgulu arka planla gösterilmesi.
+- [x] **Birim Testleri:** `TextHighlightHelperTest` ile büyük/küçük harf duyarsızlığı, tekli/çoklu eşleşme indisleri ve boş sorgu durumları %100 doğrulandı.
 
-### Aşama 13: Güvenli Çevrimdışı Kasa / Biyometrik Kilit Geliştirmeleri & Not Birleştirme (Note Merge)
-- [ ] **İki veya Daha Fazla Notu Birleştirme (Merge Notes):** Çoklu seçim modunda seçilen notların tek bir notta birleştirilmesi (başlıklar H2 olarak eklenir, içerikler ayrılır ve medya ekleri korunur).
-- [ ] **Kilitli Notlar Güvenlik İyileştirmeleri:** Biyometrik prompt veya PIN doğrulamasının arka plana atıldığında otomatik güvenli sıfırlanması.
+### Aşama 13: Çoklu Not Birleştirme Motoru (Note Merge Engine) & Toplu Aksiyonlar
+- [ ] **Çoklu Seçimde Not Birleştirme (Merge Notes):** 2 veya daha fazla not seçildiğinde üst aksiyon çubuğunda "Notları Birleştir" butonu.
+- [ ] **Akıllı İçerik & Medya Birleşimi:** Seçilen notların başlıklarını H2 Markdown başlığı (`## Başlık`) yaparak, içeriklerini ayraçlarla (`---`) bağlama ve tüm görsel/çizim/ses eklerini kayıpsız bir araya getirme.
+- [ ] **Orijinal Not Politikası Seçici Diyalog:** Birleştirme onayında kullanıcıya "Orijinal notları çöp kutusuna taşı" veya "Orijinal notları koru" seçeneği sunma.
+
+### Aşama 14: Detay Ekranı Canlı Tipografi HUD & Hızlı H1/H2/H3 Başlık Formatlama
+- [ ] **Canlı İstatistik & Okuma Süresi Rozeti:** Not detay ekranında anlık kelime sayısı, karakter sayısı ve tahmini okuma süresini gösteren şık kompakt alt HUD.
+- [ ] **Hızlı Markdown Başlık Butonları:** Not düzenleme araç çubuğuna doğrudan `H1`, `H2`, `H3` ve blok alıntı (`>`) hızlı biçimlendirme butonları.
 
 ---
 
@@ -117,4 +124,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 9 Tamamlandı]** Çoklu seçimde toplu renk değiştirme diyaloğu, toplu notları tek PDF dokümanında birleştirme motoru ve kategori atamaları tamamlandı.
 * **[Aşama 10 Tamamlandı]** Ses oynatıcı kontrolleri (+5s/-5s sarma, 1.0x-2.0x değişken hız çarpanları) ve derleme doğrulaması tamamlandı.
 * **[Aşama 11 Tamamlandı]** Çöp kutusu saklama/otomatik temizleme politikası, ayarlar paneli ve not tam ekran okuma/sunum modu, birim testleriyle birlikte tamamlandı.
-* **[Aşama 12 Sırada]** Arama geçmişi yönetimi ve not listesinde arama anahtar kelimesi vurgulama motoru geliştirilecek.
+* **[Aşama 12 Tamamlandı]** Arama geçmişi yönetimi, son aramalar çip şeridi ve not kartlarında anlık arama kelimesi vurgulama motoru birim testleriyle tamamlandı.
+* **[Aşama 13 Sırada]** Çoklu seçimde not birleştirme motoru (Note Merge Engine) ve orijinal not koruma/taşıma politikası geliştirilecek.
