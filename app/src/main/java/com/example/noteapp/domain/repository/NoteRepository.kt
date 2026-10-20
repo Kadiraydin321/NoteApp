@@ -43,4 +43,6 @@ interface NoteRepository {
     suspend fun insertNoteHistory(history: NoteHistory): Long
     suspend fun pruneOldHistory(noteId: Long, keepCount: Int = 30)
     suspend fun deleteHistoryForNote(noteId: Long)
+    suspend fun getAllNoteHistory(): List<NoteHistory>
+    suspend fun insertNoteHistories(histories: List<NoteHistory>)
 }

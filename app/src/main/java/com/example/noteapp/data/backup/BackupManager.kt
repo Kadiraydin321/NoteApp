@@ -5,6 +5,9 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
+import com.example.noteapp.domain.model.NoteHistory
+import com.example.noteapp.domain.model.NoteTemplate
+import com.example.noteapp.data.template.TemplateManager
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -43,7 +46,9 @@ sealed class RestoreResult {
     data class Success(
         val notesCount: Int,
         val categoriesCount: Int,
-        val attachmentsCount: Int
+        val attachmentsCount: Int,
+        val historyCount: Int = 0,
+        val templatesCount: Int = 0
     ) : RestoreResult()
 
     data class Error(val message: String) : RestoreResult()
@@ -53,7 +58,8 @@ sealed class RestoreResult {
 @Singleton
 class BackupManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val repository: NoteRepository
+    private val repository: NoteRepository,
+    private val templateManager: TemplateManager
 ) {
 
     companion object {
@@ -151,6 +157,7 @@ class BackupManager @Inject constructor(
                     put("isPinned", note.isPinned)
                     put("isArchived", note.isArchived)
                     put("isDeleted", note.isDeleted)
+                    put("deletedAt", note.deletedAt ?: JSONObject.NULL)
                     put("isLocked", note.isLocked)
                     put("reminderTime", note.reminderTime ?: JSONObject.NULL)
                     put("attachments", relativeAttachments)
@@ -161,6 +168,43 @@ class BackupManager @Inject constructor(
 
             zipOut.putNextEntry(ZipEntry("notes.json"))
             zipOut.write(notesArray.toString(2).toByteArray(Charsets.UTF_8))
+            zipOut.closeEntry()
+
+            // 4. Versiyon Geçmişi (note_history.json)
+            val historyList = repository.getAllNoteHistory()
+            val historyArray = JSONArray()
+            for (h in historyList) {
+                val hObj = JSONObject().apply {
+                    put("id", h.id)
+                    put("noteId", h.noteId)
+                    put("title", h.title)
+                    put("content", h.content)
+                    put("timestamp", h.timestamp)
+                    put("changeSummary", h.changeSummary ?: JSONObject.NULL)
+                }
+                historyArray.put(hObj)
+            }
+            zipOut.putNextEntry(ZipEntry("note_history.json"))
+            zipOut.write(historyArray.toString(2).toByteArray(Charsets.UTF_8))
+            zipOut.closeEntry()
+
+            // 5. Özel Şablonlar (templates.json)
+            val customTemplates = templateManager.getCustomTemplates()
+            val templatesArray = JSONArray()
+            for (tmpl in customTemplates) {
+                val tmplObj = JSONObject().apply {
+                    put("id", tmpl.id)
+                    put("title", tmpl.title)
+                    put("description", tmpl.description)
+                    put("iconEmoji", tmpl.iconEmoji)
+                    put("contentTemplate", tmpl.contentTemplate)
+                    put("defaultTitle", tmpl.defaultTitle)
+                    put("categoryName", tmpl.categoryName ?: JSONObject.NULL)
+                }
+                templatesArray.put(tmplObj)
+            }
+            zipOut.putNextEntry(ZipEntry("templates.json"))
+            zipOut.write(templatesArray.toString(2).toByteArray(Charsets.UTF_8))
             zipOut.closeEntry()
         }
 
@@ -336,6 +380,8 @@ class BackupManager @Inject constructor(
             // 1. ZIP İçeriğini Ayrıştır ve Ekleri Dosya Sistemine Çıkar
             var notesJsonStr: String? = null
             var categoriesJsonStr: String? = null
+            var historyJsonStr: String? = null
+            var templatesJsonStr: String? = null
             val extractedAttachmentMap = mutableMapOf<String, String>()
             var attachmentsCount = 0
 
@@ -350,6 +396,12 @@ class BackupManager @Inject constructor(
                             }
                             name == "categories.json" -> {
                                 categoriesJsonStr = zipIn.bufferedReader(Charsets.UTF_8).readText()
+                            }
+                            name == "note_history.json" -> {
+                                historyJsonStr = zipIn.bufferedReader(Charsets.UTF_8).readText()
+                            }
+                            name == "templates.json" -> {
+                                templatesJsonStr = zipIn.bufferedReader(Charsets.UTF_8).readText()
                             }
                             name.startsWith("attachments/") -> {
                                 val fileName = File(name).name
@@ -434,6 +486,7 @@ class BackupManager @Inject constructor(
                         isPinned = obj.optBoolean("isPinned", false),
                         isArchived = obj.optBoolean("isArchived", false),
                         isDeleted = obj.optBoolean("isDeleted", false),
+                        deletedAt = if (obj.isNull("deletedAt")) null else obj.optLong("deletedAt"),
                         isLocked = obj.optBoolean("isLocked", false),
                         reminderTime = if (obj.isNull("reminderTime")) null else obj.optLong("reminderTime"),
                         attachments = resolvedAttachments,
@@ -446,13 +499,65 @@ class BackupManager @Inject constructor(
                 repository.insertNotes(notesToInsert)
             }
 
+            // 5. Versiyon Geçmişini İçe Aktar
+            var historyCount = 0
+            if (!historyJsonStr.isNullOrBlank()) {
+                val hArray = JSONArray(historyJsonStr)
+                val historyToInsert = mutableListOf<NoteHistory>()
+                for (i in 0 until hArray.length()) {
+                    val obj = hArray.getJSONObject(i)
+                    historyToInsert.add(
+                        NoteHistory(
+                            id = if (clearExisting) obj.optLong("id", 0L) else 0L,
+                            noteId = obj.getLong("noteId"),
+                            title = obj.getString("title"),
+                            content = obj.getString("content"),
+                            timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
+                            changeSummary = if (obj.isNull("changeSummary")) null else obj.optString("changeSummary")
+                        )
+                    )
+                }
+                if (historyToInsert.isNotEmpty()) {
+                    repository.insertNoteHistories(historyToInsert)
+                    historyCount = historyToInsert.size
+                }
+            }
+
+            // 6. Özel Not Şablonlarını İçe Aktar
+            var templatesCount = 0
+            if (!templatesJsonStr.isNullOrBlank()) {
+                val tArray = JSONArray(templatesJsonStr)
+                val templatesToInsert = mutableListOf<NoteTemplate>()
+                for (i in 0 until tArray.length()) {
+                    val obj = tArray.getJSONObject(i)
+                    templatesToInsert.add(
+                        NoteTemplate(
+                            id = obj.getString("id"),
+                            title = obj.getString("title"),
+                            description = obj.optString("description", ""),
+                            iconEmoji = obj.optString("iconEmoji", "📝"),
+                            contentTemplate = obj.getString("contentTemplate"),
+                            defaultTitle = obj.optString("defaultTitle", obj.getString("title")),
+                            categoryName = if (obj.isNull("categoryName")) null else obj.optString("categoryName"),
+                            isBuiltIn = false
+                        )
+                    )
+                }
+                if (templatesToInsert.isNotEmpty()) {
+                    templateManager.restoreCustomTemplates(templatesToInsert, clearExisting = clearExisting)
+                    templatesCount = templatesToInsert.size
+                }
+            }
+
             // Widget'ları Anında Güncelle
             NotesWidgetProvider.updateAllWidgets(context)
 
             RestoreResult.Success(
                 notesCount = notesToInsert.size,
                 categoriesCount = categoriesToInsert.size,
-                attachmentsCount = attachmentsCount
+                attachmentsCount = attachmentsCount,
+                historyCount = historyCount,
+                templatesCount = templatesCount
             )
         } catch (e: Exception) {
             e.printStackTrace()

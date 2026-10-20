@@ -114,4 +114,10 @@ interface NoteDao {
 
     @Query("DELETE FROM note_history WHERE noteId = :noteId")
     suspend fun deleteHistoryForNote(noteId: Long)
+
+    @Query("SELECT * FROM note_history")
+    suspend fun getAllNoteHistory(): List<NoteHistory>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNoteHistories(histories: List<NoteHistory>)
 }

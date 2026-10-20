@@ -157,4 +157,6 @@ class NoteRepositoryImpl @Inject constructor(
     override suspend fun insertNoteHistory(history: NoteHistory): Long = dao.insertNoteHistory(history)
     override suspend fun pruneOldHistory(noteId: Long, keepCount: Int) = dao.pruneOldHistory(noteId, keepCount)
     override suspend fun deleteHistoryForNote(noteId: Long) = dao.deleteHistoryForNote(noteId)
+    override suspend fun getAllNoteHistory(): List<NoteHistory> = dao.getAllNoteHistory()
+    override suspend fun insertNoteHistories(histories: List<NoteHistory>) = dao.insertNoteHistories(histories)
 }

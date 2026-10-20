@@ -345,6 +345,33 @@ class TemplateManager @Inject constructor(
     }
 
     /**
+     * Yedekten gelen şablonları mevcut şablonlara ekler veya üzerine yazar.
+     */
+    fun restoreCustomTemplates(templates: List<NoteTemplate>, clearExisting: Boolean = false) {
+        val currentList = if (clearExisting) mutableListOf() else getCustomTemplates().toMutableList()
+        val existingIds = currentList.map { it.id }.toSet()
+        for (tmpl in templates) {
+            if (!existingIds.contains(tmpl.id)) {
+                currentList.add(tmpl)
+            }
+        }
+        val jsonArray = JSONArray()
+        currentList.forEach { tmpl ->
+            val obj = JSONObject().apply {
+                put("id", tmpl.id)
+                put("title", tmpl.title)
+                put("description", tmpl.description)
+                put("iconEmoji", tmpl.iconEmoji)
+                put("contentTemplate", tmpl.contentTemplate)
+                put("defaultTitle", tmpl.defaultTitle)
+                put("categoryName", tmpl.categoryName)
+            }
+            jsonArray.put(obj)
+        }
+        prefs.edit().putString(KEY_CUSTOM_TEMPLATES, jsonArray.toString()).apply()
+    }
+
+    /**
      * Şablon içerisindeki dinamik etiketleri ({DATE}, {TIME}, {DAY}, {TITLE}) güncel değerlerle doldurur.
      */
     fun interpolateTemplate(

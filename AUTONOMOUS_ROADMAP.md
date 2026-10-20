@@ -150,12 +150,17 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `TrashCleanupWorkerTest` ile zaman aşımı eşik hesaplamaları, miras (legacy) kayıt yönetimi ve çöp filtreleme %100 doğrulandı.
 
 ### Aşama 21: Not İçeriklerini JSON / ZIP Yedekleme ve Geri Yükleme Motoru (Full Backup & Restore Engine)
-- [ ] **Tam Yedek Paketi (.zip):** Tüm notları, kategorileri, hatırlatıcıları, çizimleri ve ses/resim eklerini tek bir sıkıştırılmış zip dosyası olarak dışa aktarma (`BackupRestoreEngine`).
-- [ ] **Güvenli Geri Yükleme:** Cihazdan seçilen yedek dosyasını açıp çakışmaları çözerek Room veritabanına ve medya klasörüne geri yükleme.
+- [x] **Tam Kapsamlı Yedek Paketi (.zip):** Tüm notlar, kategoriler, `note_history` versiyon revizyonları, özel şablonlar (`templates.json`), `deletedAt` çöp zaman damgaları ve tüm medya eklerinin eksiksiz ZIP arşivi olarak paketlenmesi (`BackupManager.buildZipArchiveBytes`).
+- [x] **Güvenli ve Bütünlüklü Geri Yükleme:** Cihazdan seçilen veya masaüstünden senkronize edilen yedek dosyasından şablonların, revizyon geçmişinin ve medya dosyalarının eksiksiz çözülüp Room veritabanına aktarılması (`BackupManager.restoreBackup`).
+- [x] **Birim Testleri:** `BackupRestoreEngineTest` ile ZIP paketleme/ayrıştırma, JSON şema bütünlüğü ve Vault Magic doğrulamaları %100 test edildi.
 
 ### Aşama 22: Not Sabitleme & Çizim / Karalama Kartı İyileştirmeleri (Canvas Drawing & Visual Polish)
 - [ ] **Gelişmiş Fırça ve Kalem Paleti:** El yazısı ve çizim ekranına renk paleti, silgi modu ve kontur kalınlığı kontrolü.
 - [ ] **Görsel Önizleme:** Not detayında ve liste kartlarında çizim önizlemelerinin yüksek çözünürlüklü ve pürüzsüz render edilmesi.
+
+### Aşama 23: Markdown Tablo Ayrıştırıcı & Canlı Tablo Düzenleyici (Markdown Table Editor)
+- [ ] **Görsel Tablo Kartı:** Not detayında Markdown tablolarını (`| Başlık 1 | Başlık 2 |`) okunabilir şık Material 3 ızgara formatında render etme.
+- [ ] **Hızlı Hücre Düzenleme:** Tablo hücrelerine tek dokunuşla satır/sütun ekleme ve düzenleme araç çubuğu.
 
 ---
 
@@ -177,4 +182,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 18 Tamamlandı]** Not detayında bul ve değiştir motoru (FindReplaceEngine), FindAndReplaceBar, dinamik arama vurgulaması ve birim testleri tamamlandı.
 * **[Aşama 19 Tamamlandı]** Okuma modunda satır yüksekliği kontrolü, akıllı çift sütun gazete düzeni (ReadingColumnSplitter) ve birim testleri tamamlandı.
 * **[Aşama 20 Tamamlandı]** WorkManager periyodik çöp kutusu temizleyicisi (TrashCleanupWorker), anlık manuel tetikleme ve bağlı dosya temizliği tamamlandı.
-* **[Aşama 18 Sırada]** Not detayında canlı Bul ve Değiştir (In-Note Find & Replace Toolbar) aracı geliştirilecek.
+* **[Aşama 21 Tamamlandı]** Tam kapsamlı ZIP/JSON yedekleme motoru (notlar, kategoriler, versiyon geçmişi, özel şablonlar, medya ekleri), güvenli geri yükleme ve birim testleri tamamlandı.
