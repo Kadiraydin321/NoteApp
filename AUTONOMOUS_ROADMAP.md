@@ -271,9 +271,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `CodeSyntaxHighlighterTest` ile anahtar kelime, dize, yorum satırı, sayı tespiti, dil eşleştirme ve bilinmeyen diller için güvenli geri dönüş (fallback) testleri %100 doğrulandı.
 
 ### Aşama 45: Not Detayı İçindekiler Tablosu & Başlık Gezgini (Table of Contents & Headings Outline Drawer)
-- [ ] **Başlık Ayrıştırma & İçindekiler Motoru (`NoteOutlineEngine`):** Not içeriğindeki H1, H2, H3 (`#`, `##`, `###`) başlıklarını kod bloklarından izole ederek ağaç hiyerarşisi şeklinde ayrıştıran, her bölümün kelime sayısını ve satır ofsetini hesaplayan saf domain motoru (`HeadingItem`).
-- [ ] **Etkileşimli İçindekiler Paneli (`NoteOutlineBottomSheet`):** Not detayında araç çubuğundan tek tıkla açılan içindekiler gezgini; H1/H2/H3 girintili modern ağaç görünümü, bölüm kelime sayaçları ve tıklandığında imleci doğrudan o başlığa odaklayıp kaydıran hızlı atlama mekanizması.
-- [ ] **Birim Testleri:** `NoteOutlineEngineTest` ile H1/H2/H3 seviye ayrımı, kod blokları içindeki sahte başlıkları filtreleme, özel karakterler ve boş başlık dayanıklılık testleri.
+- [x] **Başlık Ayrıştırma & İçindekiler Motoru (`NoteOutlineEngine`):** Not içeriğindeki H1, H2, H3 (`#`, `##`, `###`) başlıklarını kod bloklarından izole ederek ağaç hiyerarşisi şeklinde ayrıştıran, her bölümün kelime sayısını ve satır ofsetini hesaplayan saf domain motoru (`HeadingItem`, `NoteOutline`); tek dokunuşla nota eklenebilir Markdown TOC üretimi (`generateMarkdownToc`).
+- [x] **Etkileşimli İçindekiler Paneli (`NoteOutlineBottomSheet`):** Not detayında üç nokta menüsünden tek tıkla açılan içindekiler gezgini; H1/H2/H3 girintili modern ağaç görünümü, bölüm kelime sayaçları, "İçindekiler Listesini Not Başına Ekle" eylemi ve tıklandığında imleci doğrudan o başlığa odaklayan hızlı atlama mekanizması.
+- [x] **Birim Testleri:** `NoteOutlineEngineTest` ile H1/H2/H3 seviye ayrımı, kod blokları içindeki sahte başlıkları filtreleme, bölüm kelime sayıları ve bağlantılı Markdown TOC üretimi testleri %100 doğrulandı.
+
+### Aşama 46: Ses Kaydı Dalga Formu Hassas Kırpıcı & Ses Notu Düzenleyici (Voice Memo Waveform Trimmer & Range Selector)
+- [ ] **Ses Dalga Formu Kırpma Motoru (`AudioWaveformTrimmer`):** Ses kayıtlarının başlangıç ve bitiş yüzdelerine göre süre aralığını hesaplayan (`TrimWindow`), genlik (amplitude) örnekleme dizisini hassas dilimleyen ve minimum süre sınırlarını denetleyen saf domain motoru.
+- [ ] **Etkileşimli Ses Kırpma Paneli (`AudioTrimmerBottomSheet`):** Not eklerindeki ses dosyalarında kırpma eylemi; görsel dalga formu üzerinde başlangıç ve bitiş çubukları, seçilen aralığı canlı dinleme ve kırpılmış yeni ses kaydı oluşturma.
+- [ ] **Birim Testleri:** `AudioWaveformTrimmerTest` ile milisaniye aralık hesaplaması, genlik dilimleme, geçersiz aralık düzeltme ve sınır koşul testleri.
 
 ---
 
@@ -319,3 +324,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 42 Tamamlandı]** Dinamik metin genişletici & akıllı not parçacıkları motoru (TextMacroExpander, SnippetPickerBottomSheet, dinamik tarih/saat damgaları, admonition/callout blokları, araç çubuğu ⚡ butonu ve menü entegrasyonu) ve birim testleri tamamlandı.
 * **[Aşama 43 Tamamlandı]** Not zaman çizelgesi & bölümlü gruplama motoru (NoteTimelineGrouper, NoteGroupingMode, TimelineBucket, NotesScreen üst çubuk döngü butonu, Staggered Grid/List/Compact List section header entegrasyonu) ve birim testleri tamamlandı.
 * **[Aşama 44 Tamamlandı]** Kod blokları sözdizimi renklendirici & kopyalama paketi (CodeSyntaxHighlighter, MarkdownPreview dil rozeti, yatay kaydırmalı monospace render ve tek dokunuşla kod kopyalama düğmesi) ve birim testleri tamamlandı.
+* **[Aşama 45 Tamamlandı]** Not detayı içindekiler tablosu & başlık gezgini (NoteOutlineEngine, NoteOutlineBottomSheet, H1/H2/H3 ağaç görünümü, bölüm kelime sayaçları ve tek tıkla başlığa atlama) ve birim testleri tamamlandı.

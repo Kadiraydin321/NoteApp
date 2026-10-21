@@ -122,6 +122,7 @@ import com.example.noteapp.presentation.components.DraftRecoveryBanner
 import com.example.noteapp.presentation.components.NoteInsightsBottomSheet
 import com.example.noteapp.presentation.components.NoteLinkGraphBottomSheet
 import com.example.noteapp.presentation.components.SmartCopyBottomSheet
+import com.example.noteapp.presentation.components.NoteOutlineBottomSheet
 import com.example.noteapp.presentation.components.SnippetPickerBottomSheet
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
@@ -1745,19 +1746,14 @@ fun NoteDetailScreen(
                                 HorizontalDivider()
 
                                 // İçindekiler Tablosu (Outline)
-                                val hasHeadings = remember(state.contentValue.text) {
-                                    state.contentValue.text.lines().any { it.trimStart().startsWith("#") }
-                                }
-                                if (hasHeadings) {
-                                    DropdownMenuItem(
-                                        text = { Text("İçindekiler (Başlıklar)") },
-                                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = null) },
-                                        onClick = {
-                                            showOutlineDialog = true
-                                            showMoreMenu = false
-                                        }
-                                    )
-                                }
+                                DropdownMenuItem(
+                                    text = { Text("📑 İçindekiler Tablosu (Başlıklar)") },
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        showOutlineDialog = true
+                                        showMoreMenu = false
+                                    }
+                                )
 
                                 // Markdown İşaretleri Gizleme / Gösterme
                                 DropdownMenuItem(
@@ -3854,87 +3850,23 @@ fun NoteDetailScreen(
 
 
 
-    // İçindekiler (Outline / Başlıklar) Dialogu
+    // İçindekiler (Outline & Başlık Gezgini) Alt Sayfası
     if (showOutlineDialog) {
-        val headingsList = remember(state.contentValue.text) {
-            state.contentValue.text.lines().mapIndexedNotNull { index, line ->
-                val trimmed = line.trimStart()
-                if (trimmed.startsWith("#")) {
-                    val level = trimmed.takeWhile { it == '#' }.length
-                    val title = trimmed.drop(level).trim()
-                    if (title.isNotEmpty()) Triple(index, level, title) else null
-                } else null
-            }
-        }
-
-        AlertDialog(
+        NoteOutlineBottomSheet(
+            content = state.contentValue.text,
             onDismissRequest = { showOutlineDialog = false },
-            icon = { Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            title = { Text("İçindekiler Tablosu") },
-            text = {
-                if (headingsList.isEmpty()) {
-                    Text(
-                        "Notta henüz herhangi bir başlık (# Başlık) bulunmuyor.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            onSelectHeading = { heading ->
+                onContentValueChange(
+                    state.contentValue.copy(
+                        selection = TextRange(heading.charOffset.coerceAtMost(state.contentValue.text.length))
                     )
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        headingsList.forEach { (lineIndex, level, title) ->
-                            val indent = ((level - 1).coerceAtLeast(0) * 16).dp
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = indent)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        showOutlineDialog = false
-                                        val lineOffsets = state.contentValue.text.lines().runningFold(0) { acc, l -> acc + l.length + 1 }
-                                        val targetOffset = lineOffsets.getOrNull(lineIndex) ?: 0
-                                        onContentValueChange(
-                                            state.contentValue.copy(
-                                                selection = TextRange(targetOffset.coerceAtMost(state.contentValue.text.length))
-                                            )
-                                        )
-                                        runCatching { focusRequester.requestFocus() }
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "H$level",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = title,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = if (level == 1) FontWeight.Bold else FontWeight.Medium
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                )
+                runCatching { focusRequester.requestFocus() }
             },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showOutlineDialog = false }) {
-                    Text("Kapat")
-                }
+            onInsertToc = { tocMarkdown ->
+                val currentText = state.contentValue.text
+                val newText = if (currentText.isBlank()) tocMarkdown else "$tocMarkdown\n\n$currentText"
+                onContentValueChange(TextFieldValue(newText, TextRange(tocMarkdown.length)))
             }
         )
     }
