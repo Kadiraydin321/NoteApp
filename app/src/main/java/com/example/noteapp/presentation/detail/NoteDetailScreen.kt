@@ -6,6 +6,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -89,6 +90,8 @@ import com.example.noteapp.domain.util.FindMatch
 import com.example.noteapp.domain.util.FindReplaceEngine
 import com.example.noteapp.domain.util.GalleryGridCalculator
 import com.example.noteapp.domain.util.ReadingColumnSplitter
+import com.example.noteapp.domain.util.SplitPaneLayoutHelper
+import com.example.noteapp.domain.util.SplitRatio
 import com.example.noteapp.domain.util.TagSuggestionEngine
 import com.example.noteapp.domain.util.VaultExportEngine
 import com.example.noteapp.domain.util.VaultNote
@@ -507,6 +510,15 @@ fun NoteDetailScreen(
     var presentationLineSpacingMultiplier by remember { mutableFloatStateOf(1.5f) }
     val isTabletOrLandscape = LocalConfiguration.current.screenWidthDp >= 600
     var isTwoColumnMode by remember(isTabletOrLandscape) { mutableStateOf(isTabletOrLandscape) }
+    val currentConfig = LocalConfiguration.current
+    val isSplitSupported = remember(currentConfig.screenWidthDp, currentConfig.orientation) {
+        SplitPaneLayoutHelper.isSplitPaneSupported(
+            currentConfig.screenWidthDp,
+            currentConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
+        )
+    }
+    var isSplitPaneActive by rememberSaveable { mutableStateOf(false) }
+    var splitRatio by rememberSaveable { mutableStateOf(SplitRatio.EQUAL) }
     var hideMarkdownTokens by remember { mutableStateOf(true) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
@@ -1211,6 +1223,17 @@ fun NoteDetailScreen(
                             }
                         }
 
+                        // Çift Bölmeli Canlı Düzenleyici (Split-Pane) Butonu (Sadece desteklenen geniş/yatay ekranlarda)
+                        if (isSplitSupported) {
+                            IconButton(onClick = { isSplitPaneActive = !isSplitPaneActive }) {
+                                Icon(
+                                    imageVector = if (isSplitPaneActive) Icons.Default.ViewStream else Icons.Default.VerticalSplit,
+                                    contentDescription = if (isSplitPaneActive) "Tek Bölmeli Görünüm" else "Çift Bölmeli Canlı Düzenleyici",
+                                    tint = if (isSplitPaneActive) MaterialTheme.colorScheme.primary else topBarIconColor
+                                )
+                            }
+                        }
+
                         // Odaklanma Modu (Zen) Butonu
                         IconButton(onClick = onToggleZenMode) {
                             Icon(Icons.Default.SelfImprovement, contentDescription = "Odaklanma Modu", tint = topBarIconColor)
@@ -1369,6 +1392,37 @@ fun NoteDetailScreen(
                                         showMoreMenu = false
                                     }
                                 )
+
+                                // Çift Bölmeli Canlı Düzenleyici (Split-Pane)
+                                if (isSplitSupported) {
+                                    DropdownMenuItem(
+                                        text = { Text(if (isSplitPaneActive) "Çift Bölmeli Ekranı Kapat" else "🪟 Çift Bölmeli Canlı Düzenleyici") },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = if (isSplitPaneActive) Icons.Default.ViewStream else Icons.Default.VerticalSplit,
+                                                contentDescription = null,
+                                                tint = if (isSplitPaneActive) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                            )
+                                        },
+                                        onClick = {
+                                            isSplitPaneActive = !isSplitPaneActive
+                                            showMoreMenu = false
+                                        }
+                                    )
+                                    if (isSplitPaneActive) {
+                                        DropdownMenuItem(
+                                            text = { Text("Bölme Oranı: ${splitRatio.title}") },
+                                            leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
+                                            onClick = {
+                                                splitRatio = when (splitRatio) {
+                                                    SplitRatio.EQUAL -> SplitRatio.WIDE_EDITOR
+                                                    SplitRatio.WIDE_EDITOR -> SplitRatio.WIDE_PREVIEW
+                                                    SplitRatio.WIDE_PREVIEW -> SplitRatio.EQUAL
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
 
                                 // Okuma / Sunum Modu (Presentation Mode)
                                 DropdownMenuItem(
@@ -2797,7 +2851,8 @@ fun NoteDetailScreen(
                         )
                     }
 
-                    if (hasChecklistItems) {
+                    val editorBody: @Composable () -> Unit = {
+                        if (hasChecklistItems) {
                         // GOOGLE KEEP TARZI İNTERAKTİF ONAY KUTULARI (CHECKLIST)
                         val lastChecklistIdx = remember(rawText) { lines.indexOfLast { isChecklistLine(it) } }
                         val trailingLines = remember(rawText, lastChecklistIdx) {
@@ -3259,6 +3314,102 @@ fun NoteDetailScreen(
                                 .defaultMinSize(minHeight = 400.dp)
                                 .focusRequester(focusRequester)
                         )
+                    }
+                    }
+
+                    if (isSplitPaneActive && isSplitSupported) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(splitRatio.editorWeight)
+                                    .fillMaxWidth()
+                            ) {
+                                editorBody()
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .defaultMinSize(minHeight = 400.dp)
+                                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            )
+
+                            Column(
+                                modifier = Modifier
+                                    .weight(splitRatio.previewWeight)
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (isDarkBackground) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                    )
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Visibility,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Canlı Önizleme",
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                        onClick = {
+                                            splitRatio = when (splitRatio) {
+                                                SplitRatio.EQUAL -> SplitRatio.WIDE_EDITOR
+                                                SplitRatio.WIDE_EDITOR -> SplitRatio.WIDE_PREVIEW
+                                                SplitRatio.WIDE_PREVIEW -> SplitRatio.EQUAL
+                                            }
+                                        }
+                                    ) {
+                                        Text(
+                                            text = splitRatio.title,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                )
+                                MarkdownPreview(
+                                    content = state.contentValue.text,
+                                    onContentChange = { updated ->
+                                        onContentValueChange(TextFieldValue(updated))
+                                    },
+                                    contentColor = contentColor,
+                                    onLinkClick = onLinkClick,
+                                    fontSize = state.noteFontSize,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    } else {
+                        editorBody()
                     }
                 }
 

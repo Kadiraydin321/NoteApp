@@ -251,9 +251,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `TaskAnalyticsEngineTest` ile görev ayıklama, toplu durum değiştirme, sona taşıma, boş maddeleri filtreleme ve metin format koruma testleri %100 doğrulandı.
 
 ### Aşama 41: Çift Bölmeli Canlı Düzenleyici & Geniş Ekran / Tablet Uyarlaması (Split-Pane Live Markdown Editor & Tablet Layout)
-- [ ] **Geniş Ekran Bölünmüş Düzen Motoru (`SplitPaneLayoutHelper`):** Cihaz yatay modda veya ekran genişliği $\ge 600$ dp olduğunda (tablet, katlanabilir ekran, Chromebook) sol tarafta düzenleme alanı, sağ tarafta canlı render edilen Markdown önizleme sunan çift bölmeli düzen; bölme oranları (50/50, 40/60) ve ekran boyutu sınıflayıcısı.
-- [ ] **Eş Zamanlı Canlı Önizleme & Görünüm:** Not detay ekranında geniş ekranda klavyeden yazıldığı anda sağ bölmede anlık formatlanmış zengin metin, tablolar ve checklist renderı; tek dokunuşla tam ekran / bölünmüş ekran geçişi.
-- [ ] **Birim Testleri:** `SplitPaneLayoutHelperTest` ile ekran genişliği sınıfı hesaplama, yatay/dikey bölme optimizasyonu ve çift bölme uygunluk testleri.
+- [x] **Geniş Ekran Bölünmüş Düzen Motoru (`SplitPaneLayoutHelper`):** Cihaz yatay modda veya ekran genişliği $\ge 600$ dp olduğunda (tablet, katlanabilir ekran, Chromebook) sol tarafta düzenleme alanı, sağ tarafta canlı render edilen Markdown önizleme sunan çift bölmeli düzen; bölme oranları (%50/%50, %60/%40, %40/%60) ve ekran boyutu sınıflayıcısı (`COMPACT`, `MEDIUM`, `EXPANDED`).
+- [x] **Eş Zamanlı Canlı Önizleme & Görünüm:** Not detay ekranında geniş ekranda klavyeden yazıldığı anda sağ bölmede anlık formatlanmış zengin metin, tablolar ve checklist renderı; üst çubukta ve üç nokta menüsünde tek dokunuşla tam ekran / bölünmüş ekran geçişi ve canlı bölme oranı seçimi.
+- [x] **Birim Testleri:** `SplitPaneLayoutHelperTest` ile ekran genişliği sınıfı hesaplama, yatay/dikey bölme optimizasyonu, scroll sync yüzdesi ve çift bölme uygunluk testleri %100 doğrulandı.
+
+### Aşama 42: Dinamik Metin Genişletici & Akıllı Not Parçacıkları (Text Snippet & Macro Expansion Engine)
+- [ ] **Metin Makro & Parçacık Motoru (`TextMacroExpander`):** Not düzenleyicide sık kullanılan metin kalıplarını, dinamik tarih/saat damgalarını, çağrı kutularını (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`), toplantı özetlerini ve markdown kod bloklarını kısa tetikleyicilerle (`:date`, `:time`, `:todo`, `:callout`, `:table`, vb.) anında genişleten motor; imleç konumu hesaplama ve değişken yerleştirme.
+- [ ] **Etkileşimli Parçacık Seçici & Kısayol Menüsü (`SnippetPickerBottomSheet`):** Not detayında araç çubuğundan veya klavyeden tetiklenen hızlı makro menüsü, kategorize edilmiş parçacıklar, anında önizleme ve tek dokunuşla imleç konumuna yapıştırma.
+- [ ] **Birim Testleri:** `TextMacroExpanderTest` ile makro tetikleyici tespiti, dinamik değişken yerleştirme (`{date}`, `{time}`, `{weekday}`), imleç ofset hesabı ve geçersiz girdi dayanıklılık testleri.
 
 ---
 
@@ -295,3 +300,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 38 Tamamlandı]** Akıllı not içi okuma metrikleri ve metin analiz paneli (NoteMetricsEngine, NoteInsightsBottomSheet, okunabilirlik dereceleri, sesli/sessiz okuma süreleri, kelime zenginliği, anahtar kelime frekans analizi) ve birim testleri tamamlandı.
 * **[Aşama 39 Tamamlandı]** İki yönlü not bağlantı haritası ve ters bağlantı gezgini (NoteLinkGraphEngine, NoteLinkGraphBottomSheet, geri referanslar, hayalet bağlantı tespiti, 2. derece ilişkili notlar ve BFS en kısa yol analizi) ve birim testleri tamamlandı.
 * **[Aşama 40 Tamamlandı]** Akıllı görev & yapılacaklar listesi analitiği ve eylem paneli (TaskAnalyticsEngine, ChecklistActionBottomSheet, tamamlananları aşağı taşıma, toplu tamamlama/sıfırlama, tamamlananları temizleme ve panoya aktarma) ve birim testleri tamamlandı.
+* **[Aşama 41 Tamamlandı]** Çift bölmeli canlı düzenleyici ve geniş ekran / tablet uyarlaması (SplitPaneLayoutHelper, SplitRatio, NoteDetailScreen üst çubuk ve menü entegrasyonu, eş zamanlı Markdown canlı önizleme paneli) ve birim testleri tamamlandı.
