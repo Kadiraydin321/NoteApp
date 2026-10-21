@@ -27,8 +27,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import com.example.noteapp.domain.util.NoteGroupingMode
+import com.example.noteapp.domain.util.NoteSection
+import com.example.noteapp.domain.util.NoteTimelineGrouper
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -75,6 +79,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.toArgb
 import coil.compose.AsyncImage
 import com.example.noteapp.data.settings.NotesLayoutMode
@@ -153,6 +158,7 @@ fun NotesScreen(
     val screenDensity = LocalDensity.current
     val homeGlowColor = MaterialTheme.colorScheme.primary
     var showTagManagerSheet by remember { mutableStateOf(false) }
+    var groupingMode by rememberSaveable { mutableStateOf(NoteGroupingMode.FLAT) }
 
     // Ekran açıldığında veya nota girip geri dönüldüğünde menünün donup gri ekran yapmasını önle
     LaunchedEffect(Unit) {
@@ -314,6 +320,13 @@ fun NotesScreen(
     val allHashtags = state.allHashtags
     val filteredNotes = state.filteredNotes
     val selectedNotes = filteredNotes.filter { it.id in state.selectedNoteIds }
+    val noteSections = remember(filteredNotes, groupingMode, state.categories) {
+        when (groupingMode) {
+            NoteGroupingMode.FLAT -> listOf(NoteSection("all", "", items = filteredNotes))
+            NoteGroupingMode.TIMELINE -> NoteTimelineGrouper.groupNotesByTimeline(filteredNotes)
+            NoteGroupingMode.CATEGORY -> NoteTimelineGrouper.groupNotesByCategory(filteredNotes, state.categories)
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -1033,6 +1046,25 @@ fun NotesScreen(
                                         contentDescription = "Görünüm Düzenini Değiştir"
                                     )
                                 }
+
+                                // Gruplama Modu Değiştirici (Düz Liste / Zaman Çizelgesi / Kategori)
+                                IconButton(onClick = {
+                                    groupingMode = when (groupingMode) {
+                                        NoteGroupingMode.FLAT -> NoteGroupingMode.TIMELINE
+                                        NoteGroupingMode.TIMELINE -> NoteGroupingMode.CATEGORY
+                                        NoteGroupingMode.CATEGORY -> NoteGroupingMode.FLAT
+                                    }
+                                }) {
+                                    Icon(
+                                        imageVector = when (groupingMode) {
+                                            NoteGroupingMode.FLAT -> Icons.Default.FormatListBulleted
+                                            NoteGroupingMode.TIMELINE -> Icons.Default.Timeline
+                                            NoteGroupingMode.CATEGORY -> Icons.Default.Folder
+                                        },
+                                        contentDescription = "Gruplama: ${groupingMode.title}",
+                                        tint = if (groupingMode != NoteGroupingMode.FLAT) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                    )
+                                }
                             }
                             if (quickActionLocation == QuickActionLocation.TOP_APP_BAR) {
                                 IconButton(onClick = { showQuickSyncDialog = true }) {
@@ -1540,39 +1572,51 @@ fun NotesScreen(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalItemSpacing = 12.dp
                                 ) {
-                                    items(
-                                        items = filteredNotes,
-                                        key = { it.id },
-                                        contentType = { "note_card" }
-                                    ) { note ->
-                                        val isSelected = state.selectedNoteIds.contains(note.id)
-                                        val category = state.categories.find { it.id == note.categoryId }
-                                        val isCategoryLocked = state.lockedCategoryIds.contains(note.categoryId)
-                                        val isConcealed = isNoteConcealed(note)
-                                        NoteCard(
-                                            modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
-                                            note = note,
-                                            category = category,
-                                            isCategoryLocked = isCategoryLocked,
-                                            isConcealed = isConcealed,
-                                            viewMode = state.viewMode,
-                                            searchQuery = state.searchQuery,
-                                            isSelected = isSelected,
-                                            isSelectionMode = isSelectionMode,
-                                            cornerStyle = cardCornerStyle,
-                                            elevationStyle = cardElevationStyle,
-                                            onClick = {
-                                                if (isSelectionMode) onToggleNoteSelection(note.id)
-                                                else handleOpenNote(note)
-                                            },
-                                            onLongClick = { onToggleNoteSelection(note.id) },
-                                            onPinClick = { onPinNote(note) },
-                                            onShareClick = { onShareNote(note) },
-                                            onArchiveClick = { onArchiveNote(note) },
-                                            onDeleteClick = { handleDeleteNote(note) },
-                                            onRestoreClick = { onRestoreNote(note) },
-                                            onDeletePermanentlyClick = { noteToDeletePermanently = note }
-                                        )
+                                    noteSections.forEach { section ->
+                                        if (section.title.isNotEmpty()) {
+                                            item(span = StaggeredGridItemSpan.FullLine, key = "sec_${section.sectionKey}") {
+                                                SectionHeader(
+                                                    title = section.title,
+                                                    iconEmoji = section.iconEmoji,
+                                                    count = section.items.size,
+                                                    color = section.color
+                                                )
+                                            }
+                                        }
+                                        items(
+                                            items = section.items,
+                                            key = { "${section.sectionKey}_${it.id}" },
+                                            contentType = { "note_card" }
+                                        ) { note ->
+                                            val isSelected = state.selectedNoteIds.contains(note.id)
+                                            val category = state.categories.find { it.id == note.categoryId }
+                                            val isCategoryLocked = state.lockedCategoryIds.contains(note.categoryId)
+                                            val isConcealed = isNoteConcealed(note)
+                                            NoteCard(
+                                                modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
+                                                note = note,
+                                                category = category,
+                                                isCategoryLocked = isCategoryLocked,
+                                                isConcealed = isConcealed,
+                                                viewMode = state.viewMode,
+                                                searchQuery = state.searchQuery,
+                                                isSelected = isSelected,
+                                                isSelectionMode = isSelectionMode,
+                                                cornerStyle = cardCornerStyle,
+                                                elevationStyle = cardElevationStyle,
+                                                onClick = {
+                                                    if (isSelectionMode) onToggleNoteSelection(note.id)
+                                                    else handleOpenNote(note)
+                                                },
+                                                onLongClick = { onToggleNoteSelection(note.id) },
+                                                onPinClick = { onPinNote(note) },
+                                                onShareClick = { onShareNote(note) },
+                                                onArchiveClick = { onArchiveNote(note) },
+                                                onDeleteClick = { handleDeleteNote(note) },
+                                                onRestoreClick = { onRestoreNote(note) },
+                                                onDeletePermanentlyClick = { noteToDeletePermanently = note }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1584,39 +1628,51 @@ fun NotesScreen(
                                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (reserveFabSpace) 88.dp else 16.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    items(
-                                        items = filteredNotes,
-                                        key = { it.id },
-                                        contentType = { "note_card" }
-                                    ) { note ->
-                                        val isSelected = state.selectedNoteIds.contains(note.id)
-                                        val category = state.categories.find { it.id == note.categoryId }
-                                        val isCategoryLocked = state.lockedCategoryIds.contains(note.categoryId)
-                                        val isConcealed = isNoteConcealed(note)
-                                        NoteCard(
-                                            modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
-                                            note = note,
-                                            category = category,
-                                            isCategoryLocked = isCategoryLocked,
-                                            isConcealed = isConcealed,
-                                            viewMode = state.viewMode,
-                                            searchQuery = state.searchQuery,
-                                            isSelected = isSelected,
-                                            isSelectionMode = isSelectionMode,
-                                            cornerStyle = cardCornerStyle,
-                                            elevationStyle = cardElevationStyle,
-                                            onClick = {
-                                                if (isSelectionMode) onToggleNoteSelection(note.id)
-                                                else handleOpenNote(note)
-                                            },
-                                            onLongClick = { onToggleNoteSelection(note.id) },
-                                            onPinClick = { onPinNote(note) },
-                                            onShareClick = { onShareNote(note) },
-                                            onArchiveClick = { onArchiveNote(note) },
-                                            onDeleteClick = { handleDeleteNote(note) },
-                                            onRestoreClick = { onRestoreNote(note) },
-                                            onDeletePermanentlyClick = { noteToDeletePermanently = note }
-                                        )
+                                    noteSections.forEach { section ->
+                                        if (section.title.isNotEmpty()) {
+                                            item(key = "sec_${section.sectionKey}") {
+                                                SectionHeader(
+                                                    title = section.title,
+                                                    iconEmoji = section.iconEmoji,
+                                                    count = section.items.size,
+                                                    color = section.color
+                                                )
+                                            }
+                                        }
+                                        items(
+                                            items = section.items,
+                                            key = { "${section.sectionKey}_${it.id}" },
+                                            contentType = { "note_card" }
+                                        ) { note ->
+                                            val isSelected = state.selectedNoteIds.contains(note.id)
+                                            val category = state.categories.find { it.id == note.categoryId }
+                                            val isCategoryLocked = state.lockedCategoryIds.contains(note.categoryId)
+                                            val isConcealed = isNoteConcealed(note)
+                                            NoteCard(
+                                                modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
+                                                note = note,
+                                                category = category,
+                                                isCategoryLocked = isCategoryLocked,
+                                                isConcealed = isConcealed,
+                                                viewMode = state.viewMode,
+                                                searchQuery = state.searchQuery,
+                                                isSelected = isSelected,
+                                                isSelectionMode = isSelectionMode,
+                                                cornerStyle = cardCornerStyle,
+                                                elevationStyle = cardElevationStyle,
+                                                onClick = {
+                                                    if (isSelectionMode) onToggleNoteSelection(note.id)
+                                                    else handleOpenNote(note)
+                                                },
+                                                onLongClick = { onToggleNoteSelection(note.id) },
+                                                onPinClick = { onPinNote(note) },
+                                                onShareClick = { onShareNote(note) },
+                                                onArchiveClick = { onArchiveNote(note) },
+                                                onDeleteClick = { handleDeleteNote(note) },
+                                                onRestoreClick = { onRestoreNote(note) },
+                                                onDeletePermanentlyClick = { noteToDeletePermanently = note }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1628,40 +1684,52 @@ fun NotesScreen(
                                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = if (reserveFabSpace) 88.dp else 16.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    items(
-                                        items = filteredNotes,
-                                        key = { it.id },
-                                        contentType = { "compact_note" }
-                                    ) { note ->
-                                        val isSelected = state.selectedNoteIds.contains(note.id)
-                                        val category = state.categories.find { it.id == note.categoryId }
-                                        val isCategoryLocked = state.lockedCategoryIds.contains(note.categoryId)
-                                        val isConcealed = isNoteConcealed(note)
-                                        CompactNoteCard(
-                                            modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
-                                            note = note,
-                                            category = category,
-                                            categoryName = category?.name,
-                                            isCategoryLocked = isCategoryLocked,
-                                            isConcealed = isConcealed,
-                                            viewMode = state.viewMode,
-                                            searchQuery = state.searchQuery,
-                                            isSelected = isSelected,
-                                            isSelectionMode = isSelectionMode,
-                                            cornerStyle = cardCornerStyle,
-                                            elevationStyle = cardElevationStyle,
-                                            onClick = {
-                                                if (isSelectionMode) onToggleNoteSelection(note.id)
-                                                else handleOpenNote(note)
-                                            },
-                                            onLongClick = { onToggleNoteSelection(note.id) },
-                                            onPinClick = { onPinNote(note) },
-                                            onShareClick = { onShareNote(note) },
-                                            onArchiveClick = { onArchiveNote(note) },
-                                            onDeleteClick = { handleDeleteNote(note) },
-                                            onRestoreClick = { onRestoreNote(note) },
-                                            onDeletePermanentlyClick = { noteToDeletePermanently = note }
-                                        )
+                                    noteSections.forEach { section ->
+                                        if (section.title.isNotEmpty()) {
+                                            item(key = "sec_${section.sectionKey}") {
+                                                SectionHeader(
+                                                    title = section.title,
+                                                    iconEmoji = section.iconEmoji,
+                                                    count = section.items.size,
+                                                    color = section.color
+                                                )
+                                            }
+                                        }
+                                        items(
+                                            items = section.items,
+                                            key = { "${section.sectionKey}_${it.id}" },
+                                            contentType = { "compact_note" }
+                                        ) { note ->
+                                            val isSelected = state.selectedNoteIds.contains(note.id)
+                                            val category = state.categories.find { it.id == note.categoryId }
+                                            val isCategoryLocked = state.lockedCategoryIds.contains(note.categoryId)
+                                            val isConcealed = isNoteConcealed(note)
+                                            CompactNoteCard(
+                                                modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
+                                                note = note,
+                                                category = category,
+                                                categoryName = category?.name,
+                                                isCategoryLocked = isCategoryLocked,
+                                                isConcealed = isConcealed,
+                                                viewMode = state.viewMode,
+                                                searchQuery = state.searchQuery,
+                                                isSelected = isSelected,
+                                                isSelectionMode = isSelectionMode,
+                                                cornerStyle = cardCornerStyle,
+                                                elevationStyle = cardElevationStyle,
+                                                onClick = {
+                                                    if (isSelectionMode) onToggleNoteSelection(note.id)
+                                                    else handleOpenNote(note)
+                                                },
+                                                onLongClick = { onToggleNoteSelection(note.id) },
+                                                onPinClick = { onPinNote(note) },
+                                                onShareClick = { onShareNote(note) },
+                                                onArchiveClick = { onArchiveNote(note) },
+                                                onDeleteClick = { handleDeleteNote(note) },
+                                                onRestoreClick = { onRestoreNote(note) },
+                                                onDeletePermanentlyClick = { noteToDeletePermanently = note }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -3167,5 +3235,46 @@ private fun QuickFabOption(
         ) {
             Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp))
         }
+    }
+}
+
+@Composable
+private fun SectionHeader(
+    title: String,
+    iconEmoji: String,
+    count: Int,
+    color: Int? = null,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (iconEmoji.isNotEmpty()) {
+            Text(text = iconEmoji, fontSize = 16.sp)
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = if (color != null && color != 0) Color(color) else MaterialTheme.colorScheme.onSurface
+        )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        ) {
+            Text(
+                text = "$count",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+            )
+        }
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+        )
     }
 }

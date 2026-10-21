@@ -261,9 +261,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `TextMacroExpanderTest` ile makro tetikleyici tespiti, dinamik değişken yerleştirme (`{date}`, `{time}`, `{weekday}`), imleç ofset hesabı, şablon arama/kategori filtreleme ve sınır koşul testleri %100 doğrulandı.
 
 ### Aşama 43: Not Zaman Çizelgesi & Bölümlü Gruplama Motoru (Note Timeline & Sectioned Grouping Engine)
-- [ ] **Zaman Çizelgesi & Gruplama Motoru (`NoteTimelineGrouper`):** Notları oluşturulma/düzenlenme tarihlerine göre insan odaklı zaman dilimlerine ("📌 Sabitlenenler", "⚡ Bugün", "🗓️ Dün", "📅 Bu Hafta", "🗓️ Bu Ay", "🗃️ Daha Eski") ayıran veya kategori bazında gruplayan saf domain motoru; boş grupları filtreleme ve grup içi sıralama.
-- [ ] **Arayüz Entegrasyonu (`NotesScreen`):** Notlar ekranında düz liste ile bölümlü zaman çizelgesi / kategori görünümü arasında geçiş imkanı; akordiyon başlıklı modern bölüm ayraçları ve her bölüm için not adedi sayaç rozetleri.
-- [ ] **Birim Testleri:** `NoteTimelineGrouperTest` ile gece yarısı sınırları, hafta ve ay dilimleri hesaplama, sabitlenmiş not ayrımı, kategori eşleştirme ve boş grup dayanıklılık testleri.
+- [x] **Zaman Çizelgesi & Gruplama Motoru (`NoteTimelineGrouper`):** Notları oluşturulma/düzenlenme tarihlerine göre insan odaklı zaman dilimlerine ("📌 Sabitlenenler", "⚡ Bugün", "🗓️ Dün", "📅 Bu Hafta", "🗓️ Bu Ay", "🗃️ Daha Eski") ayıran veya kategori bazında gruplayan saf domain motoru; boş grupları filtreleme ve grup içi sıralama (`NoteSection`).
+- [x] **Arayüz Entegrasyonu (`NotesScreen`):** Notlar ekranında üst çubuğa eklenen hızlı gruplama modu butonu ile düz liste, bölümlü zaman çizelgesi ve kategori görünümü arasında anlık döngüsel geçiş; tüm düzen modlarında (Staggered Grid, List, Compact List) modern bölüm ayraçları (`SectionHeader`), emoji ikonları ve not adedi sayaç rozetleri.
+- [x] **Birim Testleri:** `NoteTimelineGrouperTest` ile gece yarısı sınırları, hafta ve ay dilimleri hesaplama, sabitlenmiş not ayrımı, kategori eşleştirme ve boş grup dayanıklılık testleri %100 doğrulandı.
+
+### Aşama 44: Kod Blokları Sözdizimi Renklendirici & Kopyalama Paketi (Code Block Syntax Highlighter & Quick Copy Suite)
+- [ ] **Sözdizimi Vurgulama Motoru (`CodeSyntaxHighlighter`):** Markdown kod bloklarındaki dilleri (Kotlin, Java, Python, JavaScript, JSON, SQL, HTML/XML, Bash) analiz ederek anahtar kelimeleri, dizgileri (string), yorum satırlarını, sayıları ve türleri tokenize edip estetik tema renkleriyle `AnnotatedString` üreten motor.
+- [ ] **Canlı Kod Kartı & Kopyalama Düğmesi (`MarkdownPreview`):** Markdown önizlemesinde her kod bloğunun üstünde dil etiketi rozeti ve tek dokunuşla sadece o kod bloğunu panoya kopyalayan kopyalama butonu (`Icons.Default.ContentCopy`), sözdizimi renklendirilmiş monospace metin renderı.
+- [ ] **Birim Testleri:** `CodeSyntaxHighlighterTest` ile anahtar kelime, dize, yorum satırı, sayı tespiti, dil eşleştirme ve bilinmeyen diller için güvenli geri dönüş (fallback) testleri.
 
 ---
 
@@ -307,3 +312,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 40 Tamamlandı]** Akıllı görev & yapılacaklar listesi analitiği ve eylem paneli (TaskAnalyticsEngine, ChecklistActionBottomSheet, tamamlananları aşağı taşıma, toplu tamamlama/sıfırlama, tamamlananları temizleme ve panoya aktarma) ve birim testleri tamamlandı.
 * **[Aşama 41 Tamamlandı]** Çift bölmeli canlı düzenleyici ve geniş ekran / tablet uyarlaması (SplitPaneLayoutHelper, SplitRatio, NoteDetailScreen üst çubuk ve menü entegrasyonu, eş zamanlı Markdown canlı önizleme paneli) ve birim testleri tamamlandı.
 * **[Aşama 42 Tamamlandı]** Dinamik metin genişletici & akıllı not parçacıkları motoru (TextMacroExpander, SnippetPickerBottomSheet, dinamik tarih/saat damgaları, admonition/callout blokları, araç çubuğu ⚡ butonu ve menü entegrasyonu) ve birim testleri tamamlandı.
+* **[Aşama 43 Tamamlandı]** Not zaman çizelgesi & bölümlü gruplama motoru (NoteTimelineGrouper, NoteGroupingMode, TimelineBucket, NotesScreen üst çubuk döngü butonu, Staggered Grid/List/Compact List section header entegrasyonu) ve birim testleri tamamlandı.
