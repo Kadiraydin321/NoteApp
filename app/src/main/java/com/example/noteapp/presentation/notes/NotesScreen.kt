@@ -142,6 +142,8 @@ fun NotesScreen(
     getTagUsageCounts: () -> Map<String, Int> = { emptyMap() },
     onToggleAgendaMode: () -> Unit = {},
     onSelectAgendaDate: (LocalDate?) -> Unit = {},
+    onToggleCategoryLock: (Long) -> Unit = {},
+    isNoteConcealed: (Note) -> Boolean = { false },
     onSettingsClick: () -> Unit
 ) {
     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
@@ -574,6 +576,7 @@ fun NotesScreen(
                 ) {
                     Column {
                         categoriesToShow.forEach { category ->
+                            val isCategoryLocked = state.lockedCategoryIds.contains(category.id)
                             NavigationDrawerItem(
                                 icon = {
                                     if (category.color != 0) {
@@ -587,7 +590,24 @@ fun NotesScreen(
                                         Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null)
                                     }
                                 },
-                                label = { Text(category.name) },
+                                label = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(category.name, modifier = Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        if (isCategoryLocked) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.Lock,
+                                                contentDescription = "Kilitli Kategori",
+                                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                },
                                 selected = state.viewMode == NotesViewMode.ALL &&
                                         state.filterType == NoteTypeFilter.ALL &&
                                         state.selectedTag == null && state.selectedCategory?.id == category.id,
@@ -1226,11 +1246,24 @@ fun NotesScreen(
                     ) {
                         // Seçili Kategori aktif filtresi varsa iptal butonuyla göster
                         if (state.selectedCategory != null) {
+                            val isCatLocked = state.lockedCategoryIds.contains(state.selectedCategory.id)
                             item(key = "active_category") {
                                 FilterChip(
                                     selected = true,
                                     onClick = { onCategorySelect(null) },
-                                    label = { Text(state.selectedCategory.name) },
+                                    label = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(state.selectedCategory.name)
+                                            if (isCatLocked) {
+                                                Spacer(Modifier.width(4.dp))
+                                                Icon(
+                                                    Icons.Default.Lock,
+                                                    contentDescription = "Kilitli",
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            }
+                                        }
+                                    },
                                     leadingIcon = {
                                         if (state.selectedCategory.color != 0) {
                                             Box(
@@ -1507,17 +1540,21 @@ fun NotesScreen(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalItemSpacing = 12.dp
                                 ) {
-                                items(
+                                    items(
                                         items = filteredNotes,
                                         key = { it.id },
                                         contentType = { "note_card" }
                                     ) { note ->
                                         val isSelected = state.selectedNoteIds.contains(note.id)
                                         val category = state.categories.find { it.id == note.categoryId }
+                                        val isCategoryLocked = state.lockedCategoryIds.contains(note.categoryId)
+                                        val isConcealed = isNoteConcealed(note)
                                         NoteCard(
                                             modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
                                             category = category,
+                                            isCategoryLocked = isCategoryLocked,
+                                            isConcealed = isConcealed,
                                             viewMode = state.viewMode,
                                             searchQuery = state.searchQuery,
                                             isSelected = isSelected,
@@ -1554,10 +1591,14 @@ fun NotesScreen(
                                     ) { note ->
                                         val isSelected = state.selectedNoteIds.contains(note.id)
                                         val category = state.categories.find { it.id == note.categoryId }
+                                        val isCategoryLocked = state.lockedCategoryIds.contains(note.categoryId)
+                                        val isConcealed = isNoteConcealed(note)
                                         NoteCard(
                                             modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
                                             category = category,
+                                            isCategoryLocked = isCategoryLocked,
+                                            isConcealed = isConcealed,
                                             viewMode = state.viewMode,
                                             searchQuery = state.searchQuery,
                                             isSelected = isSelected,
@@ -1594,11 +1635,15 @@ fun NotesScreen(
                                     ) { note ->
                                         val isSelected = state.selectedNoteIds.contains(note.id)
                                         val category = state.categories.find { it.id == note.categoryId }
+                                        val isCategoryLocked = state.lockedCategoryIds.contains(note.categoryId)
+                                        val isConcealed = isNoteConcealed(note)
                                         CompactNoteCard(
                                             modifier = Modifier.animateItem().then(noteEntranceModifier(note.id)),
                                             note = note,
                                             category = category,
                                             categoryName = category?.name,
+                                            isCategoryLocked = isCategoryLocked,
+                                            isConcealed = isConcealed,
                                             viewMode = state.viewMode,
                                             searchQuery = state.searchQuery,
                                             isSelected = isSelected,
@@ -1797,6 +1842,15 @@ fun NotesScreen(
                                         }
 
                                         Row(verticalAlignment = Alignment.CenterVertically) {
+                                            val isLocked = state.lockedCategoryIds.contains(category.id)
+                                            IconButton(onClick = { onToggleCategoryLock(category.id) }) {
+                                                Icon(
+                                                    imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                                    contentDescription = if (isLocked) "Kategori Kilidini Kaldır" else "Kategoriyi Kilitle",
+                                                    tint = if (isLocked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
                                             IconButton(onClick = {
                                                 categoryToEdit = category
                                                 editCategoryName = category.name
@@ -2380,6 +2434,8 @@ private fun noteEntranceModifier(noteId: Long): Modifier {
 fun NoteCard(
     note: Note,
     category: Category? = null,
+    isCategoryLocked: Boolean = false,
+    isConcealed: Boolean = false,
     viewMode: NotesViewMode,
     searchQuery: String = "",
     isSelected: Boolean = false,
@@ -2451,7 +2507,7 @@ fun NoteCard(
         )
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            if (!note.backgroundImage.isNullOrEmpty()) {
+            if (!note.backgroundImage.isNullOrEmpty() && !isConcealed) {
                 val context = LocalContext.current
                 val bgRequest = remember(note.backgroundImage) {
                     coil.request.ImageRequest.Builder(context)
@@ -2473,61 +2529,63 @@ fun NoteCard(
                 modifier = Modifier.padding(14.dp)
             ) {
                 // Görsel veya Çizim eki (Varsa) - Downsampled thumbnail
-                firstImage?.let { imgPath ->
-                    val isDrawing = remember(imgPath) { imgPath.contains("drawing", ignoreCase = true) }
-                    val context = LocalContext.current
-                    val imgRequest = remember(imgPath) {
-                        coil.request.ImageRequest.Builder(context)
-                            .data(File(imgPath))
-                            .size(coil.size.Size(360, 240))
-                            .crossfade(false)
-                            .build()
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                    ) {
-                        AsyncImage(
-                            model = imgRequest,
-                            contentDescription = if (isDrawing) "El Çizimi" else "Not Görseli",
-                            contentScale = if (isDrawing) ContentScale.Fit else ContentScale.Crop,
+                if (!isConcealed) {
+                    firstImage?.let { imgPath ->
+                        val isDrawing = remember(imgPath) { imgPath.contains("drawing", ignoreCase = true) }
+                        val context = LocalContext.current
+                        val imgRequest = remember(imgPath) {
+                            coil.request.ImageRequest.Builder(context)
+                                .data(File(imgPath))
+                                .size(coil.size.Size(360, 240))
+                                .crossfade(false)
+                                .build()
+                        }
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(115.dp)
-                                .then(
-                                    if (isDrawing) Modifier.background(Color.White.copy(alpha = 0.96f))
-                                    else Modifier
-                                )
-                        )
-                        if (isDrawing) {
-                            Surface(
-                                shape = RoundedCornerShape(bottomEnd = 8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
-                                modifier = Modifier.align(Alignment.TopStart)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                .clip(RoundedCornerShape(10.dp))
+                        ) {
+                            AsyncImage(
+                                model = imgRequest,
+                                contentDescription = if (isDrawing) "El Çizimi" else "Not Görseli",
+                                contentScale = if (isDrawing) ContentScale.Fit else ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(115.dp)
+                                    .then(
+                                        if (isDrawing) Modifier.background(Color.White.copy(alpha = 0.96f))
+                                        else Modifier
+                                    )
+                            )
+                            if (isDrawing) {
+                                Surface(
+                                    shape = RoundedCornerShape(bottomEnd = 8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
+                                    modifier = Modifier.align(Alignment.TopStart)
                                 ) {
-                                    Icon(
-                                        Icons.Default.Brush,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.size(11.dp)
-                                    )
-                                    Spacer(Modifier.width(3.dp))
-                                    Text(
-                                        text = "Çizim",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Brush,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                        Spacer(Modifier.width(3.dp))
+                                        Text(
+                                            text = "Çizim",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
                                 }
                             }
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // Başlık ve Sabitleme / Seçim
@@ -2538,7 +2596,7 @@ fun NoteCard(
                 ) {
                     if (note.title.isNotEmpty()) {
                         Text(
-                            text = if (searchQuery.isNotBlank()) com.example.noteapp.domain.util.TextHighlightHelper.highlightQuery(
+                            text = if (isConcealed) androidx.compose.ui.text.AnnotatedString(note.title) else if (searchQuery.isNotBlank()) com.example.noteapp.domain.util.TextHighlightHelper.highlightQuery(
                                 text = note.title,
                                 query = searchQuery,
                                 highlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
@@ -2614,6 +2672,32 @@ fun NoteCard(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
+                } else if (isConcealed) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = colorSpec.contentColor.copy(alpha = 0.08f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Kilitli Kategori",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "Kilitli Kategori: Açmak için dokunun",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colorSpec.contentColor.copy(alpha = 0.85f),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 } else if (displayContent.text.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
@@ -2630,7 +2714,7 @@ fun NoteCard(
                     )
                 }
 
-                if (checklistStats != null && !note.isLocked) {
+                if (checklistStats != null && !note.isLocked && !isConcealed) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Column(
                         modifier = Modifier
@@ -2713,7 +2797,8 @@ fun NoteCard(
                         if (category != null) {
                             CategoryBadge(
                                 category = category,
-                                contentColorHint = colorSpec.contentColor
+                                contentColorHint = colorSpec.contentColor,
+                                isLocked = isCategoryLocked
                             )
                         }
                     }
@@ -2749,6 +2834,8 @@ fun CompactNoteCard(
     note: Note,
     category: Category? = null,
     categoryName: String? = null,
+    isCategoryLocked: Boolean = false,
+    isConcealed: Boolean = false,
     viewMode: NotesViewMode,
     searchQuery: String = "",
     isSelected: Boolean = false,
@@ -2833,20 +2920,24 @@ fun CompactNoteCard(
                     Spacer(Modifier.width(8.dp))
                 }
 
-                if (note.isLocked) {
+                if (note.isLocked || isConcealed) {
                     Icon(
-                        Icons.Default.Lock,
-                        contentDescription = null,
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = if (note.isLocked) "Kilitli Not" else "Kilitli Kategori",
                         modifier = Modifier.size(14.dp),
-                        tint = colorSpec.contentColor
+                        tint = if (isConcealed) MaterialTheme.colorScheme.primary else colorSpec.contentColor
                     )
                     Spacer(Modifier.width(6.dp))
                 }
 
                 // Başlık ve Kısa Özeti
-                val titleSnippet = remember(note.title, note.content, note.isLocked, searchQuery) {
-                    val rawTitle = note.title.ifBlank { "Başlıksız Not" }
-                    val highlightedTitle = if (searchQuery.isNotBlank()) {
+                val titleSnippet = remember(note.title, note.content, note.isLocked, isConcealed, searchQuery) {
+                    val rawTitle = if (isConcealed) {
+                        if (note.title.isNotBlank()) note.title else "Kilitli Kategori Notu"
+                    } else {
+                        note.title.ifBlank { "Başlıksız Not" }
+                    }
+                    val highlightedTitle = if (searchQuery.isNotBlank() && !isConcealed) {
                         com.example.noteapp.domain.util.TextHighlightHelper.highlightQuery(
                             text = rawTitle,
                             query = searchQuery,
@@ -2854,7 +2945,7 @@ fun CompactNoteCard(
                         )
                     } else androidx.compose.ui.text.AnnotatedString(rawTitle)
 
-                    val preview = if (!note.isLocked && note.content.isNotBlank()) {
+                    val preview = if (!note.isLocked && !isConcealed && note.content.isNotBlank()) {
                         val parsed = parseMarkdownCardPreview(note.content, lineLimit = 1)
                         if (searchQuery.isNotBlank()) {
                             com.example.noteapp.domain.util.TextHighlightHelper.highlightQuery(
@@ -2863,6 +2954,8 @@ fun CompactNoteCard(
                                 highlightColor = colorSpec.contentColor.copy(alpha = 0.22f)
                             )
                         } else parsed
+                    } else if (isConcealed) {
+                        androidx.compose.ui.text.AnnotatedString("Gizli İçerik")
                     } else androidx.compose.ui.text.AnnotatedString("")
 
                     Pair(highlightedTitle, preview)
@@ -2911,7 +3004,8 @@ fun CompactNoteCard(
                     if (category != null) {
                         CategoryBadge(
                             category = category,
-                            contentColorHint = colorSpec.contentColor
+                            contentColorHint = colorSpec.contentColor,
+                            isLocked = isCategoryLocked
                         )
                     } else if (!categoryName.isNullOrBlank()) {
                         Surface(
@@ -2928,7 +3022,7 @@ fun CompactNoteCard(
                             )
                         }
                     }
-                    if (checklistStats != null && !note.isLocked) {
+                    if (checklistStats != null && !note.isLocked && !isConcealed) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = if (checklistStats.isAllCompleted) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else colorSpec.contentColor.copy(alpha = 0.08f)

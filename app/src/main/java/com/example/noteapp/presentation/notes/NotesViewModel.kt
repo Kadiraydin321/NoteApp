@@ -10,6 +10,7 @@ import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.domain.util.CalendarNoteGrouper
+import com.example.noteapp.domain.util.CategoryLockManager
 import com.example.noteapp.domain.util.TagSuggestionEngine
 import java.time.LocalDate
 import com.example.noteapp.widget.NotesWidgetProvider
@@ -85,7 +86,9 @@ data class NotesState(
     val trashRetentionPolicy: com.example.noteapp.data.settings.TrashRetentionPolicy = com.example.noteapp.data.settings.TrashRetentionPolicy.DAYS_30,
     val recentSearches: List<String> = emptyList(),
     val isAgendaModeEnabled: Boolean = false,
-    val selectedAgendaDate: LocalDate? = null
+    val selectedAgendaDate: LocalDate? = null,
+    val lockedCategoryIds: Set<Long> = emptySet(),
+    val sessionUnlockedCategoryIds: Set<Long> = emptySet()
 )
 
 @HiltViewModel
@@ -105,6 +108,7 @@ class NotesViewModel @Inject constructor(
     val state: StateFlow<NotesState> = _state.asStateFlow()
 
     private val searchPrefs = app.getSharedPreferences("app_search_history", android.content.Context.MODE_PRIVATE)
+    private val categoryLockManager = CategoryLockManager.create(app)
 
     private var notesJob: Job? = null
     private var derivedNotesJob: Job? = null
@@ -118,7 +122,10 @@ class NotesViewModel @Inject constructor(
         loadCategories()
         loadHashtags()
         observeSettings()
-        _state.value = _state.value.copy(recentSearches = loadRecentSearches())
+        _state.value = _state.value.copy(
+            recentSearches = loadRecentSearches(),
+            lockedCategoryIds = categoryLockManager.getLockedCategoryIds()
+        )
     }
 
     private fun loadRecentSearches(): List<String> {
@@ -642,7 +649,40 @@ class NotesViewModel @Inject constructor(
     fun onDeleteCategory(category: Category) {
         viewModelScope.launch {
             repository.deleteCategory(category)
+            categoryLockManager.removeCategory(category.id)
+            _state.value = _state.value.copy(
+                lockedCategoryIds = categoryLockManager.getLockedCategoryIds()
+            )
         }
+    }
+
+    fun toggleCategoryLock(categoryId: Long) {
+        val currentLocked = categoryLockManager.isCategoryLocked(categoryId)
+        categoryLockManager.setCategoryLocked(categoryId, !currentLocked)
+        _state.value = _state.value.copy(
+            lockedCategoryIds = categoryLockManager.getLockedCategoryIds()
+        )
+    }
+
+    fun unlockCategoryInSession(categoryId: Long) {
+        categoryLockManager.markCategoryUnlockedInSession(categoryId)
+        _state.value = _state.value.copy(
+            sessionUnlockedCategoryIds = _state.value.sessionUnlockedCategoryIds + categoryId
+        )
+    }
+
+    fun isCategoryLocked(categoryId: Long?): Boolean {
+        return categoryLockManager.isCategoryLocked(categoryId)
+    }
+
+    fun isCategoryUnlockedInSession(categoryId: Long): Boolean {
+        val policy = settings.value.lockTimeoutPolicy
+        return categoryLockManager.isCategoryUnlockedInSession(categoryId, policy.timeoutMs)
+    }
+
+    fun isNoteConcealed(note: Note): Boolean {
+        val policy = settings.value.lockTimeoutPolicy
+        return categoryLockManager.isNoteConcealed(note, policy.timeoutMs)
     }
 
     /**

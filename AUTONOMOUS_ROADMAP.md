@@ -231,9 +231,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `DraftRecoveryManagerTest` ile taslak kaydetme, kurtarma uygunluğu tespiti, yeni/mevcut not ayrımı, zaman aşımı ve temizleme testleri %100 doğrulandı.
 
 ### Aşama 37: Kategori Bazlı Biyometrik Kilit & Gizlilik Koruması (Category-Level Biometric Lock & Privacy)
-- [ ] **Kategori Kilit Yöneticisi (`CategoryLockManager`):** Belirli kategorileri (örneğin "Kişisel", "Finans", "Günlük") kategori düzeyinde şifre veya biyometrik parmak izi ile kilitleme, kilit durumunu güvenli yerel hafızada yönetme.
-- [ ] **Korumalı Liste ve Çekmece Görünümü:** Kilitli kategorideki notların ana listede içerik gizleme maskesiyle korunması, kategori seçildiğinde biyometrik/PIN doğrulama penceresi açılması ve kilit rozeti (🔒) gösterimi.
-- [ ] **Birim Testleri:** `CategoryLockManagerTest` ile kategori kilitleme/kilit açma, oturum doğrulama, geçici kilit açma süreleri ve silinme durumları testleri.
+- [x] **Kategori Kilit Yöneticisi (`CategoryLockManager`):** Belirli kategorileri (örneğin "Kişisel", "Finans", "Günlük") kategori düzeyinde şifre veya biyometrik parmak izi ile kilitleme, kilit durumunu güvenli yerel hafızada yönetme (`CategoryLockStorage` / `SharedPreferencesCategoryLockStorage`), oturum süre aşımı yönetimi (`isCategoryUnlockedInSession`) ve not içerik gizleme kuralı (`isNoteConcealed`).
+- [x] **Korumalı Liste ve Çekmece Görünümü:** Kilitli kategorideki notların ana listede içerik gizleme maskesiyle (`Surface` gizlilik kalkanı) korunması, ilk görsel ve önizlemenin saklanması; çekmece ve filtre çipinde kilit rozeti (🔒); kategorileri yönet penceresinde tek tıkla kilit açma/kapama; kilitli not tıklandığında anında Biyometrik / Master PIN istemcisi.
+- [x] **Birim Testleri:** `CategoryLockManagerTest` ile kategori kilitleme/kilit açma, oturum doğrulama, geçici kilit açma süreleri, otomatik kilitlenme ve silinme durumları testleri %100 doğrulandı.
+
+### Aşama 38: Akıllı Not İçi Okuma Metrikleri & Metin Analiz Paneli (Smart In-Note Insights & Reading Metrics)
+- [ ] **Metin İnceleme & Analitik Motoru (`NoteMetricsEngine`):** Kelime, boşluklu/boşluksuz karakter, paragraf, cümle ve hece sayısı hesaplayıcı; tahmini sessiz ve sesli okuma süresi (dakika/saniye); Türkçe hece/cümle uyarlamalı okunabilirlik indeksi (Flesch / Kolay, Orta, İleri Düzey); Türkçe ve İngilizce stop-words filtrelenmiş en sık kullanılan anahtar kelime frekans dağılımı.
+- [ ] **Etkileşimli Not İnceleme Paneli (`NoteInsightsBottomSheet`):** Not detay ekranında sağ üst menüden tek tıkla açılan zarif analiz paneli; görsel metrik sayaçları (kartlar), okunabilirlik göstergesi rozeti, en çok geçen 5 anahtar kelime çipleri, oluşturulma/düzenlenme tarih damgaları ve kelime hedefi ilerlemesi.
+- [ ] **Birim Testleri:** `NoteMetricsEngineTest` ile hece sayımı, kelime ve cümle ayrımı, stop words ayıklama, en sık geçen kelimeler sıralaması ve okunabilirlik skoru testleri.
 
 ---
 
@@ -271,3 +276,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 34 Tamamlandı]** Takvim & not ajandası görünümü (CalendarNoteGrouper, CalendarAgendaBar), haftalık/aylık etkinlik haritası, güne göre filtreleme ve birim testleri tamamlandı.
 * **[Aşama 35 Tamamlandı]** Not versiyon karşılaştırma ve görsel diff inceleyici (NoteDiffEngine, NoteDiffDialog), satır bazlı ekleme/silme vurgulaması, istatistik rozetleri ve birim testleri tamamlandı.
 * **[Aşama 36 Tamamlandı]** Akıllı otomatik kaydetme ve taslak kurtarma motoru (DraftRecoveryManager, DraftRecoveryBanner), güvenli yerel taslak döngüsü ve birim testleri tamamlandı.
+* **[Aşama 37 Tamamlandı]** Kategori bazlı biyometrik kilit ve gizlilik koruması (CategoryLockManager, SharedPreferencesCategoryLockStorage, gizlilik kalkanı kartları, kategori yönetimi kilit anahtarı, çekmece/filtre rozetleri) ve birim testleri tamamlandı.

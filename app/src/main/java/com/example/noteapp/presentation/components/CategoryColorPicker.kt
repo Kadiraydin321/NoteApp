@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -99,6 +100,7 @@ fun CategoryBadge(
     category: Category,
     modifier: Modifier = Modifier,
     contentColorHint: Color? = null,
+    isLocked: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     val hasColor = category.color != 0
@@ -125,7 +127,14 @@ fun CategoryBadge(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            if (hasColor) {
+            if (isLocked) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Kilitli Kategori",
+                    tint = catColor.copy(alpha = 0.9f),
+                    modifier = Modifier.size(11.dp)
+                )
+            } else if (hasColor) {
                 Box(
                     modifier = Modifier
                         .size(6.dp)

@@ -303,22 +303,35 @@ class MainActivity : FragmentActivity() {
                             onDismissQuickSyncMessage = viewModel::dismissQuickSyncMessage,
                             onSearchChange = viewModel::onSearchQueryChanged,
                             onNoteClick = { note ->
-                                if (note.isLocked) {
+                                val isCategoryConcealed = viewModel.isNoteConcealed(note)
+                                if (note.isLocked || isCategoryConcealed) {
                                     val policy = appSettings.lockTimeoutPolicy
                                     val isGraceActive = policy != com.example.noteapp.data.settings.LockTimeoutPolicy.IMMEDIATE &&
                                             lastUnlockTimestamp > 0L &&
                                             (System.currentTimeMillis() - lastUnlockTimestamp <= policy.timeoutMs)
 
                                     if (isGraceActive) {
+                                        if (isCategoryConcealed && note.categoryId != null) {
+                                            viewModel.unlockCategoryInSession(note.categoryId)
+                                        }
                                         navController.navigate("note_detail_screen?noteId=${note.id}")
                                     } else {
+                                        val titleText = if (note.isLocked) "Kilitli Not" else "Kilitli Kategori"
+                                        val descText = if (note.isLocked) {
+                                            "'${note.title}' notunu açmak için parmak izinizi veya PIN'inizi kullanın"
+                                        } else {
+                                            "Bu kategori kilitlidir. '${note.title.ifBlank { "Not" }}' içeriğini açmak için parmak izinizi veya PIN'inizi kullanın"
+                                        }
                                         biometricPromptManager.showBiometricPrompt(
-                                            title = "Kilitli Not",
-                                            description = "'${note.title}' notunu açmak için parmak izinizi veya PIN'inizi kullanın",
+                                            title = titleText,
+                                            description = descText,
                                             onResult = { result ->
                                                 when (result) {
                                                     is BiometricResult.AuthenticationSuccess -> {
                                                         lastUnlockTimestamp = System.currentTimeMillis()
+                                                        if (note.categoryId != null) {
+                                                            viewModel.unlockCategoryInSession(note.categoryId)
+                                                        }
                                                         navController.navigate("note_detail_screen?noteId=${note.id}")
                                                     }
                                                     is BiometricResult.AuthenticationError -> {
@@ -400,6 +413,37 @@ class MainActivity : FragmentActivity() {
                             getTagUsageCounts = viewModel::getTagUsageCounts,
                             onToggleAgendaMode = viewModel::onToggleAgendaMode,
                             onSelectAgendaDate = viewModel::onSelectAgendaDate,
+                            onToggleCategoryLock = { categoryId ->
+                                val isCurrentlyLocked = viewModel.isCategoryLocked(categoryId)
+                                if (isCurrentlyLocked) {
+                                    biometricPromptManager.showBiometricPrompt(
+                                        title = "Kategori Kilidini Kaldır",
+                                        description = "Kategori kilidini kaldırmak için kimliğinizi doğrulayın",
+                                        onResult = { result ->
+                                            when (result) {
+                                                is BiometricResult.AuthenticationSuccess -> {
+                                                    viewModel.toggleCategoryLock(categoryId)
+                                                    Toast.makeText(this@MainActivity, "Kategori kilidi kaldırıldı", Toast.LENGTH_SHORT).show()
+                                                }
+                                                is BiometricResult.AuthenticationError -> {
+                                                    Toast.makeText(this@MainActivity, result.error, Toast.LENGTH_SHORT).show()
+                                                }
+                                                is BiometricResult.AuthenticationFailed -> {
+                                                    Toast.makeText(this@MainActivity, "Kimlik doğrulama başarısız", Toast.LENGTH_SHORT).show()
+                                                }
+                                                else -> {
+                                                    viewModel.toggleCategoryLock(categoryId)
+                                                    Toast.makeText(this@MainActivity, "Kategori kilidi kaldırıldı", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    viewModel.toggleCategoryLock(categoryId)
+                                    Toast.makeText(this@MainActivity, "Kategori kilitlendi", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            isNoteConcealed = viewModel::isNoteConcealed,
                             onSettingsClick = {
                                 navController.navigate("settings_screen")
                             }
