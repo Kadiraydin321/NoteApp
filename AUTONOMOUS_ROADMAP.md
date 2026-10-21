@@ -241,9 +241,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `NoteMetricsEngineTest` ile hece sayımı, kelime ve cümle ayrımı, stop words ayıklama, en sık geçen kelimeler sıralaması ve okunabilirlik skoru testleri %100 doğrulandı.
 
 ### Aşama 39: İki Yönlü Not Bağlantı Haritası & Ters Bağlantı Gezgini (Bidirectional Wikilink Graph & Backlinks Explorer)
-- [ ] **İki Yönlü Not Bağlantı Motoru (`NoteLinkGraphEngine`):** Not metinlerindeki `[[Not Başlığı]]` ve `[[note:id]]` wikilink referanslarını tarayarak giden bağlantıları (outbound links) ve geri referansları (backlinks / inbound references) tam indeksleme; bağlantısız yetim notları (orphan notes) ve en çok atıf alan kök notları belirleme; BFS algoritması ile iki not arasındaki bağlantı yolunu çıkarma.
-- [ ] **Görsel Ters Bağlantı & İlgili Notlar Paneli (`NoteBacklinksBottomSheet`):** Not detayında "Ters Bağlantılar (Backlinks)" butonu; bu nota referans veren diğer notların başlığı ve referans cümlesi önizlemesi; doğrudan hedef nota zıplama yeteneği.
-- [ ] **Birim Testleri:** `NoteLinkGraphEngineTest` ile iki yönlü graf inşası, ters bağlantı çıkarımı, döngüsel referanslar, yetim not tespiti ve BFS bağlantı yolu testleri.
+- [x] **İki Yönlü Not Bağlantı Motoru (`NoteLinkGraphEngine`):** Not metinlerindeki `[[Not Başlığı]]` ve `[[note:id]]` wikilink referanslarını tarayarak giden bağlantıları (outbound links) ve geri referansları (backlinks / inbound references) tam indeksleme; bağlantısız yetim notları (orphan notes) ve en çok atıf alan kök notları belirleme; BFS algoritması ile iki not arasındaki bağlantı yolunu çıkarma; 2. derece ilişkili notları (friends-of-friends) keşfetme.
+- [x] **Görsel Ters Bağlantı & İlgili Notlar Paneli (`NoteLinkGraphBottomSheet`):** Not detayında "Graf Görünümü" butonu ve More menü seçeneği; Geri Referanslar sekmesi (vurgulanmış referans bağlamı cümlesiyle), Giden Bağlantılar sekmesi (mevcut notlar + tek tıkla oluşturulabilen hayalet bağlantılar) ve 2. Derece İlgili Notlar sekmesi; doğrudan tek dokunuşla hedef nota gitme veya hayalet notu oluşturma.
+- [x] **Birim Testleri:** `NoteLinkGraphEngineTest` ile iki yönlü graf inşası, ters bağlantı çıkarımı, döngüsel referanslar, yetim not tespiti ve BFS bağlantı yolu testleri %100 doğrulandı.
+
+### Aşama 40: Akıllı Görev & Yapılacaklar Listesi Analitiği ve Hızlı Düzenleme Paneli (Checklist Task Suite & Action Hub)
+- [ ] **Görev Analitik & Dönüştürme Motoru (`TaskAnalyticsEngine`):** Not içeriğindeki açık (`- [ ]`) ve tamamlanan (`- [x]`) maddeleri analiz etme; tamamlanan tüm maddeleri listenin en altına taşıma (`sortCompletedToBottom`); tüm görevleri tek işlemde tamamlama veya sıfırlama (`setAllTaskStates`); tamamlanan maddeleri temizleme veya arşivleme (`stripCompletedTasks`).
+- [ ] **Etkileşimli Görev Eylem Paneli (`ChecklistActionBottomSheet`):** Not detayında kontrol listesi bulunduğunda tek tıkla açılan görev kontrol merkezi; tamamlanma oranı göstergesi, "Kalan Görevleri Başa Al", "Tamamlananları Aşağı Taşı", "Tümünü Tamamla / Sıfırla" ve "Tamamlananları Sil" hızlı işlem butonları.
+- [ ] **Birim Testleri:** `TaskAnalyticsEngineTest` ile görev ayıklama, toplu durum değiştirme, sona taşıma, boş maddeleri filtreleme ve metin format koruma testleri.
 
 ---
 
@@ -283,3 +288,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 36 Tamamlandı]** Akıllı otomatik kaydetme ve taslak kurtarma motoru (DraftRecoveryManager, DraftRecoveryBanner), güvenli yerel taslak döngüsü ve birim testleri tamamlandı.
 * **[Aşama 37 Tamamlandı]** Kategori bazlı biyometrik kilit ve gizlilik koruması (CategoryLockManager, SharedPreferencesCategoryLockStorage, gizlilik kalkanı kartları, kategori yönetimi kilit anahtarı, çekmece/filtre rozetleri) ve birim testleri tamamlandı.
 * **[Aşama 38 Tamamlandı]** Akıllı not içi okuma metrikleri ve metin analiz paneli (NoteMetricsEngine, NoteInsightsBottomSheet, okunabilirlik dereceleri, sesli/sessiz okuma süreleri, kelime zenginliği, anahtar kelime frekans analizi) ve birim testleri tamamlandı.
+* **[Aşama 39 Tamamlandı]** İki yönlü not bağlantı haritası ve ters bağlantı gezgini (NoteLinkGraphEngine, NoteLinkGraphBottomSheet, geri referanslar, hayalet bağlantı tespiti, 2. derece ilişkili notlar ve BFS en kısa yol analizi) ve birim testleri tamamlandı.

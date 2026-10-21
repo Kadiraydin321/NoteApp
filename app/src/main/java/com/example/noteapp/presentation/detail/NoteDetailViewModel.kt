@@ -90,7 +90,8 @@ data class NoteDetailState(
     val audioDurationMs: Int = 0,
     val wordGoal: Int? = null,
     val availableTags: List<String> = emptyList(),
-    val recoverableDraft: NoteDraft? = null
+    val recoverableDraft: NoteDraft? = null,
+    val allActiveNotes: List<Note> = emptyList()
 )
 
 @HiltViewModel
@@ -202,6 +203,11 @@ class NoteDetailViewModel @Inject constructor(
             }
         }
         _state.value = _state.value.copy(noteFontSize = settingsManager.settings.value.noteFontSize)
+        viewModelScope.launch {
+            repository.getActiveNotes().collect { notes ->
+                _state.value = _state.value.copy(allActiveNotes = notes)
+            }
+        }
         viewModelScope.launch {
             val allNotes = repository.getAllNotes()
             val tags = allNotes.flatMap { note ->

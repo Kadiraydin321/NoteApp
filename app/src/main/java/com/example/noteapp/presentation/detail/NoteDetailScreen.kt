@@ -79,6 +79,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import com.example.noteapp.domain.model.Category
+import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.model.NoteTemplate
 import com.example.noteapp.domain.util.AppShortcutManager
@@ -115,6 +116,7 @@ import com.example.noteapp.domain.util.NoteDraft
 import com.example.noteapp.domain.util.NoteMetricsEngine
 import com.example.noteapp.presentation.components.DraftRecoveryBanner
 import com.example.noteapp.presentation.components.NoteInsightsBottomSheet
+import com.example.noteapp.presentation.components.NoteLinkGraphBottomSheet
 import com.example.noteapp.presentation.components.SmartCopyBottomSheet
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
@@ -388,6 +390,7 @@ fun NoteDetailScreen(
     var showWordGoalDialog by remember { mutableStateOf(false) }
     var showSmartCopySheet by remember { mutableStateOf(false) }
     var showInsightsSheet by remember { mutableStateOf(false) }
+    var showGraphSheet by remember { mutableStateOf(false) }
 
     // Düzenleme sırasında periyodik karalama taslağı kaydetme (1.2 saniye gecikmeli)
     LaunchedEffect(state.title, state.contentValue.text) {
@@ -1313,6 +1316,22 @@ fun NoteDetailScreen(
                                     onClick = {
                                         showMoreMenu = false
                                         showInsightsSheet = true
+                                    }
+                                )
+
+                                // Not Bağlantı Haritası (Graf)
+                                DropdownMenuItem(
+                                    text = { Text("🕸️ Not Bağlantı Haritası (Graf)") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Hub,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.secondary
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showGraphSheet = true
                                     }
                                 )
 
@@ -3240,6 +3259,46 @@ fun NoteDetailScreen(
                 }
 
                 // 2. Obsidian & Logseq Stili Çift Yönlü Bağlantılar (`[[Wikilinks]]`)
+                if (state.extractedWikilinks.isNotEmpty() || state.backlinks.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Bağlantı Haritası",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                            modifier = Modifier.clickable { showGraphSheet = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Hub,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = "Graf Görünümü",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
                 if (state.extractedWikilinks.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyRow(
@@ -3799,6 +3858,47 @@ fun NoteDetailScreen(
             categoryColor = currentCategory?.color,
             timestamp = if (state.createdAt > 0L) state.createdAt else state.updatedAt,
             onDismiss = { showInsightsSheet = false }
+        )
+    }
+
+    // Not Bağlantı Haritası (Graf) BottomSheet
+    if (showGraphSheet) {
+        val currentNoteModel = remember(
+            state.currentNoteId,
+            state.title,
+            state.contentValue.text,
+            state.color,
+            state.categoryId,
+            state.isPinned,
+            state.isArchived,
+            state.isLocked,
+            state.createdAt,
+            state.updatedAt
+        ) {
+            Note(
+                id = state.currentNoteId ?: 0L,
+                title = state.title,
+                content = state.contentValue.text,
+                timestamp = if (state.updatedAt > 0L) state.updatedAt else state.createdAt,
+                color = state.color,
+                categoryId = state.categoryId,
+                isPinned = state.isPinned,
+                isArchived = state.isArchived,
+                isLocked = state.isLocked,
+                createdAt = state.createdAt,
+                updatedAt = state.updatedAt
+            )
+        }
+        NoteLinkGraphBottomSheet(
+            currentNote = currentNoteModel,
+            allNotes = state.allActiveNotes,
+            onNavigateToNote = { targetNoteId ->
+                onNavigateToNote(targetNoteId)
+            },
+            onCreatePhantomNote = { phantomTitle ->
+                onLinkClick(phantomTitle)
+            },
+            onDismiss = { showGraphSheet = false }
         )
     }
 }
