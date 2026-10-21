@@ -195,9 +195,15 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `WordGoalCalculatorTest` ile kelime sayımı, hedef yüzdesi, kalan kelime sayısı ve tamamlama eşikleri testleri %100 doğrulandı.
 
 ### Aşama 30: Görsel Üzerine Çizim & İşaretleme (Image Annotation & Marker Sketch on Attached Images)
-- [ ] **Görsel Üzerine Çizim & İşaretleme:** Ekler listesinde (`AttachmentList`) her görsel için "🎨 Çizim & İşaretleme Yap" seçeneği sunma.
-- [ ] **Tuval Zeminine Görsel Aktarımı:** Çizim ekranında (`DrawingScreen`) arka plan olarak seçilen fotoğrafı yükleme ve üzerine kalem/fırça/vurgulayıcı ile serbest çizim yapabilme.
-- [ ] **Birim Testleri & Derleme:** Çizim ve ek yönetimi akışlarının test edilmesi ve doğrulanması.
+- [x] **Görsel Üzerine Çizim & İşaretleme:** Ekler listesinde (`AttachmentList`) her görsel için "🎨 Çizim & İşaretleme Yap" ve tam ekran görsel önizleme diyaloğunda "İşaretle & Çiz" seçeneği.
+- [x] **Tuval Zeminine Görsel Aktarımı:** Çizim ekranında (`DrawingScreen`) arka plan olarak seçilen fotoğrafı yükleme, en-boy oranını kusursuz koruyarak ortalama (`DrawingScaleHelper.calculateAspectFit`) ve üzerine fırça, fosforlu kalem, ok veya şekillerle serbest çizim yapabilme.
+- [x] **Korumalı Kaydetme & Geri Alma Desteği:** İşaretlenen görseli yeni kopya olarak nota ekleme (`edited_image_pair`), orijinal fotoğrafı güvenle saklama ve istendiğinde tek dokunuşla geri alabilme (`revertImageEdit`).
+- [x] **Birim Testleri:** `DrawingScaleHelperTest` ile en-boy oranı koruma, dikey/yatay ortalama ve sınır hesaplamaları testleri %100 doğrulandı.
+
+### Aşama 31: Akıllı Etiket Otomatik Tamamlama & Etiket Yönetim Sayfası (Smart Tag Autocomplete & Tag Manager)
+- [ ] **İçerik İçi `#etiket` Otomatik Tamamlama:** Not düzenleme ekranında kullanıcı `#` yazdığında mevcut kullanılan etiketleri açılır dinamik çip/öneri menüsünde listeleme ve tek dokunuşla tamamlama.
+- [ ] **Etiketleri Yönet BottomSheet / Paneli:** Kullanılan tüm `#etiketleri` sayılarıyla listeleme, etiket adını tüm notlarda toplu değiştirme (rename/refactor) veya silme yeteneği.
+- [ ] **Birim Testleri:** Etiket arama, refaktör ve çıkarma motoru testleri (`TagManagerTest`).
 
 ---
 
@@ -228,3 +234,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 27 Tamamlandı]** Kontrol listesi canlı ilerleme halkası (ChecklistProgressRing), akıllı checklist sıralayıcı ve temizleyici (ChecklistSorter) ve birim testleri tamamlandı.
 * **[Aşama 28 Tamamlandı]** Markdown tablo otomatik hizalayıcı motoru (prettifyTable, formatAllTablesInText), görsel sütun hizalama seçicisi ve silme eylemleri tamamlandı.
 * **[Aşama 29 Tamamlandı]** Not başına özel kelime hedefi motoru (WordGoalCalculator, NoteGoalManager), canlı ilerleme rozeti (WordGoalProgressBadge), SetWordGoalDialog ve birim testleri tamamlandı.
+* **[Aşama 30 Tamamlandı]** Görsel üzerine serbest çizim ve işaretleme (DrawingScaleHelper, DrawingScreen background canvas, AttachmentList ve tam ekran entegrasyonu) ve birim testleri tamamlandı.

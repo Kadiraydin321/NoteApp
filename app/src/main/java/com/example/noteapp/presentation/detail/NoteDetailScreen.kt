@@ -335,6 +335,7 @@ fun NoteDetailScreen(
     onToggleAudioPlayback: (String) -> Unit,
     onDeleteAttachment: (String) -> Unit,
     onImageEditClick: (String) -> Unit,
+    onAnnotateImage: (String) -> Unit = {},
     onRevertImageEdit: (String) -> Unit,
     canRevertImage: (String) -> Boolean,
     onDeleteNoteClick: () -> Unit,
@@ -530,13 +531,23 @@ fun NoteDetailScreen(
                     FilledTonalIconButton(onClick = { imageViewerPath = null }) {
                         Icon(Icons.Default.Close, contentDescription = "Görseli kapat")
                     }
-                    FilledTonalButton(onClick = {
-                        imageViewerPath = null
-                        onImageEditClick(path)
-                    }) {
-                        Icon(Icons.Default.Edit, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Düzenle")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(onClick = {
+                            imageViewerPath = null
+                            onAnnotateImage(path)
+                        }) {
+                            Icon(Icons.Default.Brush, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("İşaretle & Çiz")
+                        }
+                        FilledTonalButton(onClick = {
+                            imageViewerPath = null
+                            onImageEditClick(path)
+                        }) {
+                            Icon(Icons.Default.Edit, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Düzenle")
+                        }
                     }
                 }
             }
@@ -2456,6 +2467,7 @@ fun NoteDetailScreen(
                         onSeekAudio = onSeekAudio,
                         onCycleSpeed = onCycleAudioPlaybackSpeed,
                         onImageClick = { imageViewerPath = it },
+                        onAnnotateImage = onAnnotateImage,
                         onRevertImage = { revertConfirmPath = it },
                         canRevertImage = canRevertImage,
                         onExtractText = onExtractText,

@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -46,8 +47,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.example.noteapp.domain.util.DrawingScaleHelper
 import com.example.noteapp.media.FileStorageHelper
 import org.json.JSONArray
 import org.json.JSONObject
@@ -155,12 +158,25 @@ val HighlighterPalette = listOf(
 fun DrawingScreen(
     onDrawingSaved: (String) -> Unit,
     onBackClick: () -> Unit,
-    drawingPath: String? = null
+    drawingPath: String? = null,
+    backgroundImagePath: String? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val isCompactScreen = configuration.screenWidthDp < 400
+
+    val rawBgBitmap = remember(backgroundImagePath) {
+        if (!backgroundImagePath.isNullOrBlank()) {
+            runCatching {
+                android.graphics.BitmapFactory.decodeFile(backgroundImagePath)
+            }.getOrNull()
+        } else null
+    }
+
+    val bgImageBitmap = remember(rawBgBitmap) {
+        rawBgBitmap?.asImageBitmap()
+    }
 
     // Tuval Elemanları ve Geçmiş (Undo/Redo)
     var elements by remember { mutableStateOf(listOf<DrawElement>()) }
@@ -248,7 +264,7 @@ fun DrawingScreen(
     var shapeCurrent by remember { mutableStateOf<Offset?>(null) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
-    val canvasBgColor = if (canvasPattern == CanvasPattern.CHALKBOARD) Color(0xFF1E1E1E) else Color.White
+    val canvasBgColor = if (rawBgBitmap != null) Color(0xFF1E1E1E) else if (canvasPattern == CanvasPattern.CHALKBOARD) Color(0xFF1E1E1E) else Color.White
 
     // Kağıt değiştiğinde varsayılan rengi akıllıca ayarla
     LaunchedEffect(canvasPattern) {
@@ -273,64 +289,78 @@ fun DrawingScreen(
         } else {
             android.graphics.Color.WHITE
         }
-        canvas.drawColor(bgArgb)
 
-        // Şablon Deseni Çizimi (Eğer dahil edilmek isteniyorsa)
-        if (includePatternInExport && canvasPattern != CanvasPattern.BLANK) {
-            val patternPaint = Paint().apply {
-                isAntiAlias = true
-                strokeWidth = 2f
-            }
-            when (canvasPattern) {
-                CanvasPattern.LINED -> {
-                    patternPaint.color = if (canvasPattern == CanvasPattern.CHALKBOARD) {
-                        android.graphics.Color.argb(50, 255, 255, 255)
-                    } else {
-                        android.graphics.Color.argb(50, 30, 136, 229)
-                    }
-                    val stepPx = 100f
-                    var y = stepPx
-                    while (y < height) {
-                        canvas.drawLine(0f, y, width.toFloat(), y, patternPaint)
-                        y += stepPx
-                    }
+        if (rawBgBitmap != null) {
+            canvas.drawColor(android.graphics.Color.WHITE)
+            val fit = DrawingScaleHelper.calculateAspectFit(
+                containerWidth = width.toFloat(),
+                containerHeight = height.toFloat(),
+                contentWidth = rawBgBitmap.width.toFloat(),
+                contentHeight = rawBgBitmap.height.toFloat()
+            )
+            val srcRect = android.graphics.Rect(0, 0, rawBgBitmap.width, rawBgBitmap.height)
+            val dstRect = RectF(fit.left, fit.top, fit.right, fit.bottom)
+            canvas.drawBitmap(rawBgBitmap, srcRect, dstRect, Paint(Paint.FILTER_BITMAP_FLAG))
+        } else {
+            canvas.drawColor(bgArgb)
+
+            // Şablon Deseni Çizimi (Eğer dahil edilmek isteniyorsa)
+            if (includePatternInExport && canvasPattern != CanvasPattern.BLANK) {
+                val patternPaint = Paint().apply {
+                    isAntiAlias = true
+                    strokeWidth = 2f
                 }
-                CanvasPattern.GRID -> {
-                    patternPaint.color = if (canvasPattern == CanvasPattern.CHALKBOARD) {
-                        android.graphics.Color.argb(40, 255, 255, 255)
-                    } else {
-                        android.graphics.Color.argb(40, 0, 0, 0)
-                    }
-                    val stepPx = 80f
-                    var x = stepPx
-                    while (x < width) {
-                        canvas.drawLine(x, 0f, x, height.toFloat(), patternPaint)
-                        x += stepPx
-                    }
-                    var y = stepPx
-                    while (y < height) {
-                        canvas.drawLine(0f, y, width.toFloat(), y, patternPaint)
-                        y += stepPx
-                    }
-                }
-                CanvasPattern.DOTS -> {
-                    patternPaint.color = if (canvasPattern == CanvasPattern.CHALKBOARD) {
-                        android.graphics.Color.argb(70, 255, 255, 255)
-                    } else {
-                        android.graphics.Color.argb(60, 0, 0, 0)
-                    }
-                    val stepPx = 80f
-                    var x = stepPx
-                    while (x < width) {
+                when (canvasPattern) {
+                    CanvasPattern.LINED -> {
+                        patternPaint.color = if (canvasPattern == CanvasPattern.CHALKBOARD) {
+                            android.graphics.Color.argb(50, 255, 255, 255)
+                        } else {
+                            android.graphics.Color.argb(50, 30, 136, 229)
+                        }
+                        val stepPx = 100f
                         var y = stepPx
                         while (y < height) {
-                            canvas.drawCircle(x, y, 3f, patternPaint)
+                            canvas.drawLine(0f, y, width.toFloat(), y, patternPaint)
                             y += stepPx
                         }
-                        x += stepPx
                     }
+                    CanvasPattern.GRID -> {
+                        patternPaint.color = if (canvasPattern == CanvasPattern.CHALKBOARD) {
+                            android.graphics.Color.argb(40, 255, 255, 255)
+                        } else {
+                            android.graphics.Color.argb(40, 0, 0, 0)
+                        }
+                        val stepPx = 80f
+                        var x = stepPx
+                        while (x < width) {
+                            canvas.drawLine(x, 0f, x, height.toFloat(), patternPaint)
+                            x += stepPx
+                        }
+                        var y = stepPx
+                        while (y < height) {
+                            canvas.drawLine(0f, y, width.toFloat(), y, patternPaint)
+                            y += stepPx
+                        }
+                    }
+                    CanvasPattern.DOTS -> {
+                        patternPaint.color = if (canvasPattern == CanvasPattern.CHALKBOARD) {
+                            android.graphics.Color.argb(70, 255, 255, 255)
+                        } else {
+                            android.graphics.Color.argb(60, 0, 0, 0)
+                        }
+                        val stepPx = 80f
+                        var x = stepPx
+                        while (x < width) {
+                            var y = stepPx
+                            while (y < height) {
+                                canvas.drawCircle(x, y, 3f, patternPaint)
+                                y += stepPx
+                            }
+                            x += stepPx
+                        }
+                    }
+                    else -> {}
                 }
-                else -> {}
             }
         }
 
@@ -443,7 +473,11 @@ fun DrawingScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Çizim", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        if (rawBgBitmap != null) "Görseli İşaretle" else "Çizim",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = exitDrawing) {
@@ -451,9 +485,11 @@ fun DrawingScreen(
                     }
                 },
                 actions = {
-                    // Kağıt Deseni Seçici
-                    IconButton(onClick = { showPatternDialog = true }) {
-                        Icon(Icons.Default.GridOn, contentDescription = "Kağıt Deseni")
+                    // Kağıt Deseni Seçici (Yalnızca arka plan görseli yoksa)
+                    if (rawBgBitmap == null) {
+                        IconButton(onClick = { showPatternDialog = true }) {
+                            Icon(Icons.Default.GridOn, contentDescription = "Kağıt Deseni")
+                        }
                     }
 
                     // Geri / İleri Al Kapsülü (Animated Capsule)
@@ -526,9 +562,16 @@ fun DrawingScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(2.dp))
+                    // Kaydet / Onayla Butonu
+                    IconButton(onClick = exitDrawing) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = "Kaydet",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
 
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                 }
             )
         },
@@ -755,8 +798,23 @@ fun DrawingScreen(
                         )
                     }
             ) {
-                // 1. Kağıt Desenini Çiz (Lined, Grid, Dots)
-                drawCanvasPattern(canvasPattern, canvasBgColor)
+                // Arka Plan: Görsel varsa en-boy oranı korunarak çizilir, yoksa kağıt deseni çizilir
+                if (bgImageBitmap != null && rawBgBitmap != null) {
+                    val fit = DrawingScaleHelper.calculateAspectFit(
+                        containerWidth = size.width,
+                        containerHeight = size.height,
+                        contentWidth = rawBgBitmap.width.toFloat(),
+                        contentHeight = rawBgBitmap.height.toFloat()
+                    )
+                    drawImage(
+                        image = bgImageBitmap,
+                        dstOffset = IntOffset(fit.left.roundToInt(), fit.top.roundToInt()),
+                        dstSize = IntSize(fit.width.roundToInt(), fit.height.roundToInt())
+                    )
+                } else {
+                    // 1. Kağıt Desenini Çiz (Lined, Grid, Dots)
+                    drawCanvasPattern(canvasPattern, canvasBgColor)
+                }
 
                 // 2. Kaydedilmiş Tüm Çizim Elemanlarını Çiz
                 for (el in elements) {

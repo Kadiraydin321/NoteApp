@@ -510,6 +510,10 @@ class MainActivity : FragmentActivity() {
                                     navController.navigate("image_edit_screen?imagePath=$encodedPath")
                                 }
                             },
+                            onAnnotateImage = { imagePath ->
+                                val encodedPath = java.net.URLEncoder.encode(imagePath, java.nio.charset.StandardCharsets.UTF_8.toString())
+                                navController.navigate("drawing_screen?imagePath=$encodedPath")
+                            },
                             onRevertImageEdit = { path ->
                                 viewModel.revertImageEdit(path)
                             },
@@ -623,20 +627,34 @@ class MainActivity : FragmentActivity() {
                     }
 
                     composable(
-                        route = "drawing_screen?drawingPath={drawingPath}",
-                        arguments = listOf(navArgument("drawingPath") { type = NavType.StringType; defaultValue = "" })
+                        route = "drawing_screen?drawingPath={drawingPath}&imagePath={imagePath}",
+                        arguments = listOf(
+                            navArgument("drawingPath") { type = NavType.StringType; defaultValue = "" },
+                            navArgument("imagePath") { type = NavType.StringType; defaultValue = "" }
+                        )
                     ) { drawingBackStack ->
+                        val rawDrawingPath = drawingBackStack.arguments?.getString("drawingPath")?.takeIf { it.isNotBlank() }
+                        val decodedDrawingPath = rawDrawingPath?.let {
+                            try { java.net.URLDecoder.decode(it, java.nio.charset.StandardCharsets.UTF_8.toString()) } catch (_: Exception) { it }
+                        }
+                        val rawImagePath = drawingBackStack.arguments?.getString("imagePath")?.takeIf { it.isNotBlank() }
+                        val decodedImagePath = rawImagePath?.let {
+                            try { java.net.URLDecoder.decode(it, java.nio.charset.StandardCharsets.UTF_8.toString()) } catch (_: Exception) { it }
+                        }
+
                         DrawingScreen(
-                            onDrawingSaved = { drawingPath ->
-                                val sourcePath = drawingBackStack.arguments?.getString("drawingPath")
+                            drawingPath = decodedDrawingPath,
+                            backgroundImagePath = decodedImagePath,
+                            onDrawingSaved = { savedPath ->
+                                val sourcePath = decodedImagePath ?: decodedDrawingPath
                                 if (sourcePath.isNullOrBlank()) {
                                     navController.previousBackStackEntry
                                         ?.savedStateHandle
-                                        ?.set("drawing_path", drawingPath)
+                                        ?.set("drawing_path", savedPath)
                                 } else {
                                     navController.previousBackStackEntry
                                         ?.savedStateHandle
-                                        ?.set("edited_image_pair", Pair(sourcePath, drawingPath))
+                                        ?.set("edited_image_pair", Pair(sourcePath, savedPath))
                                 }
                                 if (!navController.popBackStack()) {
                                     navController.navigate("notes_screen") {
@@ -650,9 +668,6 @@ class MainActivity : FragmentActivity() {
                                         popUpTo(0) { inclusive = true }
                                     }
                                 }
-                            },
-                            drawingPath = drawingBackStack.arguments?.getString("drawingPath")?.takeIf { it.isNotBlank() }?.let {
-                                try { java.net.URLDecoder.decode(it, java.nio.charset.StandardCharsets.UTF_8.toString()) } catch (_: Exception) { it }
                             }
                         )
                     }

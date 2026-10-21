@@ -37,6 +37,7 @@ fun AttachmentList(
     onSeekAudio: ((Int) -> Unit)? = null,
     onCycleSpeed: (() -> Unit)? = null,
     onImageClick: (String) -> Unit = {},
+    onAnnotateImage: ((String) -> Unit)? = null,
     onRevertImage: ((String) -> Unit)? = null,
     canRevertImage: ((String) -> Boolean)? = null,
     onExtractText: ((String) -> Unit)? = null,
@@ -218,6 +219,27 @@ fun AttachmentList(
                             .padding(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        if (onAnnotateImage != null && !isDrawing) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                shape = CircleShape,
+                                shadowElevation = 2.dp,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { onAnnotateImage(path) },
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    Icon(
+                                        Icons.Default.Brush,
+                                        contentDescription = "Üzerine Çiz & İşaretle",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
                         if (onExtractText != null) {
                             Surface(
                                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
