@@ -127,6 +127,7 @@ import com.example.noteapp.presentation.components.NoteOutlineBottomSheet
 import com.example.noteapp.presentation.components.SnippetPickerBottomSheet
 import com.example.noteapp.presentation.components.MathFormulaBottomSheet
 import com.example.noteapp.presentation.components.TaskBoardBottomSheet
+import com.example.noteapp.presentation.components.NoteSummaryBottomSheet
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
@@ -404,6 +405,7 @@ fun NoteDetailScreen(
     var showSnippetPickerSheet by remember { mutableStateOf(false) }
     var showMathFormulaSheet by remember { mutableStateOf(false) }
     var showTaskBoardSheet by remember { mutableStateOf(false) }
+    var showSummarySheet by remember { mutableStateOf(false) }
     var trimmingAudioPath by remember { mutableStateOf<String?>(null) }
 
     // Düzenleme sırasında periyodik karalama taslağı kaydetme (1.2 saniye gecikmeli)
@@ -1428,6 +1430,21 @@ fun NoteDetailScreen(
                                     onClick = {
                                         showMoreMenu = false
                                         showTaskBoardSheet = true
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text("Akıllı Not Özeti & Çıkarımlar") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showSummarySheet = true
                                     }
                                 )
 
@@ -4177,6 +4194,24 @@ fun NoteDetailScreen(
             onDismissRequest = { showTaskBoardSheet = false },
             onContentChange = { newContent ->
                 onContentValueChange(TextFieldValue(newContent))
+            }
+        )
+    }
+
+    // Akıllı Not Özeti & Çıkarımlar Alt Sayfası
+    if (showSummarySheet) {
+        NoteSummaryBottomSheet(
+            content = state.contentValue.text,
+            onDismissRequest = { showSummarySheet = false },
+            onPrependSummary = { calloutSummary ->
+                showSummarySheet = false
+                val currentText = state.contentValue.text
+                val combinedText = if (currentText.isBlank()) {
+                    calloutSummary
+                } else {
+                    "$calloutSummary\n\n$currentText"
+                }
+                onContentValueChange(TextFieldValue(combinedText, TextRange(calloutSummary.length + 2)))
             }
         )
     }
