@@ -206,9 +206,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `TagSuggestionEngineTest` ile imleç sorgu algılama, akıllı etiket yerleştirme, alt dizgi korumalı regex refaktör ve etiket silme testleri %100 doğrulandı.
 
 ### Aşama 32: Çoklu Görsel Galeri Izgarası & Tam Ekran Kaydırmalı Görüntüleyici (Multi-Image Gallery & Swipeable Viewer)
-- [ ] **Galeri Izgarası (Collage / Photo Grid):** Notta 2 veya daha fazla görsel olduğunda ekleri tek alt alta uzun liste yerine estetik 2'li / 3'lü masonry fotoğraf galerisi ızgarasında sunma (`GalleryGridCalculator`).
-- [ ] **Tam Ekran Sağa/Sola Kaydırmalı Görüntüleyici (Horizontal Pager Photo Viewer):** Tam ekran görsel görüntüleyicide notun tüm fotoğrafları arasında parmakla sağa/sola kaydırarak (`HorizontalPager`) geçiş yapabilme, sayaç rozeti (`2 / 5`), yakınlaştırma (pinch-zoom) ve alt eylem çubuğu.
-- [ ] **Birim Testleri & Derleme:** Galeri ızgara matrisi ve sayfalama indeks testleri.
+- [x] **Galeri Izgarası (Collage / Photo Grid):** Notta birden fazla görsel olduğunda ekleri tek tek dikey liste yerine estetik 1x2, 1+2 veya 2x2 collage ızgarasında sunma (`GalleryGridCalculator`). 4'ten fazla görselde 4. görsel üzerine şık `+X` taşma rozeti ekleme.
+- [x] **Tam Ekran Sağa/Sola Kaydırmalı Görüntüleyici (Horizontal Pager Photo Viewer):** Tam ekran görsel görüntüleyicide notun tüm fotoğrafları arasında kesintisiz parmakla sağa/sola kaydırma (`HorizontalPager`), sayfa sayaç rozeti (`2 / 5`), yakınlaştırma (pinch-zoom) ve fotoğraf bazlı dinamik eylemler ("İşaretle & Çiz", "Düzenle").
+- [x] **Birim Testleri:** `GalleryGridCalculatorTest` ile 1'li, 2'li, 3'lü, 4'lü ve 5+ görsel taşma matrisi ve ses/görsel ayrıştırma testleri %100 doğrulandı.
+
+### Aşama 33: Akıllı Not Kopyalama & Markdown Panoya Kopyalama Araçları (Smart Copy & Markdown Clipboard Suite)
+- [ ] **Zengin Kopyalama Seçenekleri (Copy Suite):** Not detay ekranında veya kart üzerinde: "Başlığı Kopyala", "Yalnızca Metni Kopyala", "Formatlı Markdown Olarak Kopyala", "Özetini Kopyala (İlk 3 cümle)" seçenekleri (`ClipboardHelper`).
+- [ ] **Hızlı Kopyalama Toast & Haptic Geri Bildirim:** Kullanıcı kopyaladığında kelime sayısı ve kopyalama tipini belirten şık haptik titreşimli bilgilendirme.
+- [ ] **Birim Testleri:** `ClipboardHelperTest` ile markdown temizleme, özet çıkarma ve formatlama testleri.
 
 ---
 

@@ -73,6 +73,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
@@ -84,6 +86,7 @@ import com.example.noteapp.domain.util.ChecklistParser
 import com.example.noteapp.domain.util.ChecklistSorter
 import com.example.noteapp.domain.util.FindMatch
 import com.example.noteapp.domain.util.FindReplaceEngine
+import com.example.noteapp.domain.util.GalleryGridCalculator
 import com.example.noteapp.domain.util.ReadingColumnSplitter
 import com.example.noteapp.domain.util.TagSuggestionEngine
 import com.example.noteapp.domain.util.VaultExportEngine
@@ -493,12 +496,15 @@ fun NoteDetailScreen(
     var isBacklinksExpanded by rememberSaveable { mutableStateOf(true) }
     var moveCheckedToBottom by rememberSaveable { mutableStateOf(false) }
     var isCompletedSectionExpanded by rememberSaveable { mutableStateOf(true) }
-    var imageViewerPath by rememberSaveable { mutableStateOf<String?>(null) }
+    val allImageAttachments = remember(state.attachments) {
+        state.attachments.filter { GalleryGridCalculator.isImageAttachment(it) }
+    }
+    var fullScreenViewerInitialIndex by rememberSaveable { mutableStateOf<Int?>(null) }
 
     // Donanımsal veya jest ile geri tuşuna basıldığında
     BackHandler {
-        if (imageViewerPath != null) {
-            imageViewerPath = null
+        if (fullScreenViewerInitialIndex != null) {
+            fullScreenViewerInitialIndex = null
         } else if (isPresentationMode) {
             isPresentationMode = false
         } else {
@@ -506,65 +512,112 @@ fun NoteDetailScreen(
         }
     }
 
-    imageViewerPath?.let { path ->
-        var zoom by remember(path) { mutableFloatStateOf(1f) }
-        var panX by remember(path) { mutableFloatStateOf(0f) }
-        var panY by remember(path) { mutableFloatStateOf(0f) }
-        val transformState = rememberTransformableState { zoomChange, panChange, _ ->
-            zoom = (zoom * zoomChange).coerceIn(1f, 5f)
-            panX += panChange.x
-            panY += panChange.y
-        }
-        Dialog(
-            onDismissRequest = { imageViewerPath = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
-        ) {
-            val dialogView = LocalView.current
-            SideEffect {
-                (dialogView.parent as? DialogWindowProvider)?.window?.let { window ->
-                    window.statusBarColor = android.graphics.Color.BLACK
-                    window.navigationBarColor = android.graphics.Color.BLACK
-                }
-            }
-            Box(
-                modifier = Modifier.fillMaxSize().background(Color.Black),
-                contentAlignment = Alignment.Center
+    fullScreenViewerInitialIndex?.let { startIdx ->
+        if (allImageAttachments.isNotEmpty()) {
+            val safeStart = startIdx.coerceIn(0, allImageAttachments.lastIndex)
+            val pagerState = rememberPagerState(initialPage = safeStart, pageCount = { allImageAttachments.size })
+            val currentPath = allImageAttachments.getOrElse(pagerState.currentPage) { allImageAttachments[0] }
+
+            Dialog(
+                onDismissRequest = { fullScreenViewerInitialIndex = null },
+                properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
             ) {
-                AsyncImage(
-                    model = File(path),
-                    contentDescription = "Tam ekran görsel",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize().transformable(transformState).graphicsLayer {
-                        scaleX = zoom
-                        scaleY = zoom
-                        translationX = panX
-                        translationY = panY
+                val dialogView = LocalView.current
+                SideEffect {
+                    (dialogView.parent as? DialogWindowProvider)?.window?.let { window ->
+                        window.statusBarColor = android.graphics.Color.BLACK
+                        window.navigationBarColor = android.graphics.Color.BLACK
                     }
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).statusBarsPadding().padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                }
+                Box(
+                    modifier = Modifier.fillMaxSize().background(Color.Black),
+                    contentAlignment = Alignment.Center
                 ) {
-                    FilledTonalIconButton(onClick = { imageViewerPath = null }) {
-                        Icon(Icons.Default.Close, contentDescription = "Görseli kapat")
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick = {
-                            imageViewerPath = null
-                            onAnnotateImage(path)
-                        }) {
-                            Icon(Icons.Default.Brush, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("İşaretle & Çiz")
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize()
+                    ) { page ->
+                        val path = allImageAttachments[page]
+                        var zoom by remember(path) { mutableFloatStateOf(1f) }
+                        var panX by remember(path) { mutableFloatStateOf(0f) }
+                        var panY by remember(path) { mutableFloatStateOf(0f) }
+                        val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+                            zoom = (zoom * zoomChange).coerceIn(1f, 5f)
+                            panX += panChange.x
+                            panY += panChange.y
                         }
-                        FilledTonalButton(onClick = {
-                            imageViewerPath = null
-                            onImageEditClick(path)
-                        }) {
-                            Icon(Icons.Default.Edit, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Düzenle")
+
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AsyncImage(
+                                model = File(path),
+                                contentDescription = "Tam ekran görsel ${page + 1}",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .transformable(transformState)
+                                    .graphicsLayer {
+                                        scaleX = zoom
+                                        scaleY = zoom
+                                        translationX = panX
+                                        translationY = panY
+                                    }
+                            )
+                        }
+                    }
+
+                    // Üst Araç Çubuğu
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
+                            .statusBarsPadding()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            FilledTonalIconButton(onClick = { fullScreenViewerInitialIndex = null }) {
+                                Icon(Icons.Default.Close, contentDescription = "Görseli kapat")
+                            }
+
+                            if (allImageAttachments.size > 1) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color.White.copy(alpha = 0.22f)
+                                ) {
+                                    Text(
+                                        text = "${pagerState.currentPage + 1} / ${allImageAttachments.size}",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilledTonalButton(onClick = {
+                                fullScreenViewerInitialIndex = null
+                                onAnnotateImage(currentPath)
+                            }) {
+                                Icon(Icons.Default.Brush, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("İşaretle & Çiz")
+                            }
+                            FilledTonalButton(onClick = {
+                                fullScreenViewerInitialIndex = null
+                                onImageEditClick(currentPath)
+                            }) {
+                                Icon(Icons.Default.Edit, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Düzenle")
+                            }
                         }
                     }
                 }
@@ -2507,7 +2560,9 @@ fun NoteDetailScreen(
                         playbackSpeed = state.audioPlaybackSpeed,
                         onSeekAudio = onSeekAudio,
                         onCycleSpeed = onCycleAudioPlaybackSpeed,
-                        onImageClick = { imageViewerPath = it },
+                        onImageClick = { path ->
+                            fullScreenViewerInitialIndex = allImageAttachments.indexOf(path).coerceAtLeast(0)
+                        },
                         onAnnotateImage = onAnnotateImage,
                         onRevertImage = { revertConfirmPath = it },
                         canRevertImage = canRevertImage,
