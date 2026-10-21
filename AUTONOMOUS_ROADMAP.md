@@ -236,9 +236,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `CategoryLockManagerTest` ile kategori kilitleme/kilit açma, oturum doğrulama, geçici kilit açma süreleri, otomatik kilitlenme ve silinme durumları testleri %100 doğrulandı.
 
 ### Aşama 38: Akıllı Not İçi Okuma Metrikleri & Metin Analiz Paneli (Smart In-Note Insights & Reading Metrics)
-- [ ] **Metin İnceleme & Analitik Motoru (`NoteMetricsEngine`):** Kelime, boşluklu/boşluksuz karakter, paragraf, cümle ve hece sayısı hesaplayıcı; tahmini sessiz ve sesli okuma süresi (dakika/saniye); Türkçe hece/cümle uyarlamalı okunabilirlik indeksi (Flesch / Kolay, Orta, İleri Düzey); Türkçe ve İngilizce stop-words filtrelenmiş en sık kullanılan anahtar kelime frekans dağılımı.
-- [ ] **Etkileşimli Not İnceleme Paneli (`NoteInsightsBottomSheet`):** Not detay ekranında sağ üst menüden tek tıkla açılan zarif analiz paneli; görsel metrik sayaçları (kartlar), okunabilirlik göstergesi rozeti, en çok geçen 5 anahtar kelime çipleri, oluşturulma/düzenlenme tarih damgaları ve kelime hedefi ilerlemesi.
-- [ ] **Birim Testleri:** `NoteMetricsEngineTest` ile hece sayımı, kelime ve cümle ayrımı, stop words ayıklama, en sık geçen kelimeler sıralaması ve okunabilirlik skoru testleri.
+- [x] **Metin İnceleme & Analitik Motoru (`NoteMetricsEngine`):** Kelime, boşluklu/boşluksuz karakter, paragraf, cümle ve hece sayısı hesaplayıcı; tahmini sessiz ve sesli okuma süresi (dakika/saniye); Türkçe hece/cümle uyarlamalı okunabilirlik indeksi (Flesch / Kolay, Orta, İleri Düzey); Türkçe ve İngilizce stop-words filtrelenmiş en sık kullanılan anahtar kelime frekans dağılımı.
+- [x] **Etkileşimli Not İnceleme Paneli (`NoteInsightsBottomSheet`):** Not detay ekranında sağ üst menüden tek tıkla açılan zarif analiz paneli; görsel metrik sayaçları (kartlar), okunabilirlik göstergesi rozeti, en çok geçen 5 anahtar kelime çipleri, oluşturulma/düzenlenme tarih damgaları ve kelime hedefi ilerlemesi; hızlı istatistikler penceresinden doğrudan geçiş.
+- [x] **Birim Testleri:** `NoteMetricsEngineTest` ile hece sayımı, kelime ve cümle ayrımı, stop words ayıklama, en sık geçen kelimeler sıralaması ve okunabilirlik skoru testleri %100 doğrulandı.
+
+### Aşama 39: İki Yönlü Not Bağlantı Haritası & Ters Bağlantı Gezgini (Bidirectional Wikilink Graph & Backlinks Explorer)
+- [ ] **İki Yönlü Not Bağlantı Motoru (`NoteLinkGraphEngine`):** Not metinlerindeki `[[Not Başlığı]]` ve `[[note:id]]` wikilink referanslarını tarayarak giden bağlantıları (outbound links) ve geri referansları (backlinks / inbound references) tam indeksleme; bağlantısız yetim notları (orphan notes) ve en çok atıf alan kök notları belirleme; BFS algoritması ile iki not arasındaki bağlantı yolunu çıkarma.
+- [ ] **Görsel Ters Bağlantı & İlgili Notlar Paneli (`NoteBacklinksBottomSheet`):** Not detayında "Ters Bağlantılar (Backlinks)" butonu; bu nota referans veren diğer notların başlığı ve referans cümlesi önizlemesi; doğrudan hedef nota zıplama yeteneği.
+- [ ] **Birim Testleri:** `NoteLinkGraphEngineTest` ile iki yönlü graf inşası, ters bağlantı çıkarımı, döngüsel referanslar, yetim not tespiti ve BFS bağlantı yolu testleri.
 
 ---
 
@@ -277,3 +282,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 35 Tamamlandı]** Not versiyon karşılaştırma ve görsel diff inceleyici (NoteDiffEngine, NoteDiffDialog), satır bazlı ekleme/silme vurgulaması, istatistik rozetleri ve birim testleri tamamlandı.
 * **[Aşama 36 Tamamlandı]** Akıllı otomatik kaydetme ve taslak kurtarma motoru (DraftRecoveryManager, DraftRecoveryBanner), güvenli yerel taslak döngüsü ve birim testleri tamamlandı.
 * **[Aşama 37 Tamamlandı]** Kategori bazlı biyometrik kilit ve gizlilik koruması (CategoryLockManager, SharedPreferencesCategoryLockStorage, gizlilik kalkanı kartları, kategori yönetimi kilit anahtarı, çekmece/filtre rozetleri) ve birim testleri tamamlandı.
+* **[Aşama 38 Tamamlandı]** Akıllı not içi okuma metrikleri ve metin analiz paneli (NoteMetricsEngine, NoteInsightsBottomSheet, okunabilirlik dereceleri, sesli/sessiz okuma süreleri, kelime zenginliği, anahtar kelime frekans analizi) ve birim testleri tamamlandı.

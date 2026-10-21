@@ -112,7 +112,9 @@ import com.example.noteapp.presentation.components.TagAutocompleteBar
 import com.example.noteapp.presentation.components.TemplatePickerBottomSheet
 import com.example.noteapp.domain.util.ClipboardHelper
 import com.example.noteapp.domain.util.NoteDraft
+import com.example.noteapp.domain.util.NoteMetricsEngine
 import com.example.noteapp.presentation.components.DraftRecoveryBanner
+import com.example.noteapp.presentation.components.NoteInsightsBottomSheet
 import com.example.noteapp.presentation.components.SmartCopyBottomSheet
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
@@ -385,6 +387,7 @@ fun NoteDetailScreen(
     var showExportVaultDialog by remember { mutableStateOf(false) }
     var showWordGoalDialog by remember { mutableStateOf(false) }
     var showSmartCopySheet by remember { mutableStateOf(false) }
+    var showInsightsSheet by remember { mutableStateOf(false) }
 
     // Düzenleme sırasında periyodik karalama taslağı kaydetme (1.2 saniye gecikmeli)
     LaunchedEffect(state.title, state.contentValue.text) {
@@ -1294,6 +1297,22 @@ fun NoteDetailScreen(
                                     onClick = {
                                         showMoreMenu = false
                                         showWordGoalDialog = true
+                                    }
+                                )
+
+                                // Not Analizi & Metrikler
+                                DropdownMenuItem(
+                                    text = { Text("📊 Not Analizi & Metrikler") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Analytics,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showInsightsSheet = true
                                     }
                                 )
 
@@ -3563,6 +3582,16 @@ fun NoteDetailScreen(
                 }
             },
             confirmButton = {
+                Button(onClick = {
+                    showStatsDialog = false
+                    showInsightsSheet = true
+                }) {
+                    Icon(Icons.Default.Analytics, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Detaylı Analiz")
+                }
+            },
+            dismissButton = {
                 TextButton(onClick = { showStatsDialog = false }) {
                     Text("Kapat")
                 }
@@ -3751,6 +3780,25 @@ fun NoteDetailScreen(
             content = state.contentValue.text,
             timestamp = if (state.updatedAt > 0) state.updatedAt else state.createdAt,
             onDismiss = { showSmartCopySheet = false }
+        )
+    }
+
+    // Not Analizi & Metrikler BottomSheet
+    if (showInsightsSheet) {
+        val noteMetrics = remember(state.title, state.contentValue.text) {
+            NoteMetricsEngine.calculateMetrics(
+                title = state.title,
+                content = state.contentValue.text
+            )
+        }
+        val currentCategory = categories.find { it.id == state.categoryId }
+        NoteInsightsBottomSheet(
+            metrics = noteMetrics,
+            title = state.title,
+            categoryName = currentCategory?.name,
+            categoryColor = currentCategory?.color,
+            timestamp = if (state.createdAt > 0L) state.createdAt else state.updatedAt,
+            onDismiss = { showInsightsSheet = false }
         )
     }
 }
