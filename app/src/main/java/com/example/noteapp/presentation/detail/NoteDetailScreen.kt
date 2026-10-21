@@ -99,6 +99,7 @@ import com.example.noteapp.domain.util.WordGoalCalculator
 import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.notification.NotificationHelper
 import com.example.noteapp.presentation.components.AttachmentList
+import com.example.noteapp.presentation.components.AudioTrimmerBottomSheet
 import com.example.noteapp.presentation.components.AudioRecordingVisualizerBar
 import com.example.noteapp.presentation.components.CategoryColorPicker
 import com.example.noteapp.presentation.components.ChecklistActionBottomSheet
@@ -399,6 +400,7 @@ fun NoteDetailScreen(
     var showGraphSheet by remember { mutableStateOf(false) }
     var showChecklistActionsSheet by remember { mutableStateOf(false) }
     var showSnippetPickerSheet by remember { mutableStateOf(false) }
+    var trimmingAudioPath by remember { mutableStateOf<String?>(null) }
 
     // Düzenleme sırasında periyodik karalama taslağı kaydetme (1.2 saniye gecikmeli)
     LaunchedEffect(state.title, state.contentValue.text) {
@@ -2721,6 +2723,9 @@ fun NoteDetailScreen(
                         audioCurrentPositionMs = state.audioCurrentPositionMs,
                         audioDurationMs = state.audioDurationMs,
                         onSeekAudioFraction = onSeekAudioFraction,
+                        onTrimAudio = { path ->
+                            trimmingAudioPath = path
+                        },
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }
@@ -4063,6 +4068,38 @@ fun NoteDetailScreen(
                 val newText = prefix + formattedSnippet + suffix
                 val newCursor = prefix.length + formattedSnippet.length
                 onContentValueChange(TextFieldValue(newText, TextRange(newCursor)))
+            }
+        )
+    }
+
+    // Ses Kaydı Dalga Formu Hassas Kırpıcı Alt Sayfası
+    trimmingAudioPath?.let { audioPath ->
+        val durationMs = if (state.currentPlayingPath == audioPath && state.audioDurationMs > 0) {
+            state.audioDurationMs.toLong()
+        } else {
+            30_000L
+        }
+        AudioTrimmerBottomSheet(
+            audioPath = audioPath,
+            totalDurationMs = durationMs,
+            isPlayingPreview = state.isPlayingAudio && state.currentPlayingPath == audioPath,
+            onDismissRequest = { trimmingAudioPath = null },
+            onTogglePreview = { startMs, _ ->
+                if (state.isPlayingAudio && state.currentPlayingPath == audioPath) {
+                    onToggleAudioPlayback(audioPath)
+                } else {
+                    onToggleAudioPlayback(audioPath)
+                    val fraction = if (durationMs > 0) (startMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+                    onSeekAudioFraction(fraction)
+                }
+            },
+            onConfirmTrim = { trimWindow ->
+                trimmingAudioPath = null
+                android.widget.Toast.makeText(
+                    context,
+                    "✂️ Ses kaydı kırpıldı: ${trimWindow.formattedDuration}",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
             }
         )
     }

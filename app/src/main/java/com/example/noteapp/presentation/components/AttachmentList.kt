@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -50,6 +51,7 @@ fun AttachmentList(
     audioCurrentPositionMs: Int = 0,
     audioDurationMs: Int = 0,
     onSeekAudioFraction: ((Float) -> Unit)? = null,
+    onTrimAudio: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (attachments.isEmpty()) return
@@ -149,6 +151,20 @@ fun AttachmentList(
                                     )
                                 }
                                 Spacer(Modifier.width(2.dp))
+                            }
+
+                            if (onTrimAudio != null) {
+                                IconButton(
+                                    onClick = { onTrimAudio(path) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCut,
+                                        contentDescription = "Sesi Kırp",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
 
                             IconButton(onClick = { onDeleteAttachment(path) }) {
