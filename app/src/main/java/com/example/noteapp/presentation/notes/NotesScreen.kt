@@ -50,8 +50,10 @@ import com.example.noteapp.data.settings.CardElevationStyle
 import com.example.noteapp.data.settings.DrawerCollapseMode
 import com.example.noteapp.data.settings.QuickActionLocation
 import com.example.noteapp.data.settings.SearchBarShape
+import com.example.noteapp.domain.util.BatchNoteOperationEngine
 import com.example.noteapp.domain.util.VaultExportEngine
 import com.example.noteapp.domain.util.VaultNote
+import com.example.noteapp.presentation.components.BatchActionsBottomBar
 import com.example.noteapp.presentation.components.CalendarAgendaBar
 import com.example.noteapp.presentation.components.ExportVaultDialog
 import com.example.noteapp.presentation.components.SmartCopyBottomSheet
@@ -800,10 +802,21 @@ fun NotesScreen(
                     // ==========================================
                     TopAppBar(
                         title = {
-                            Text(
-                                text = "${state.selectedNoteIds.size} not seçildi",
-                                fontWeight = FontWeight.Bold
-                            )
+                            val summary = remember(selectedNotes) {
+                                BatchNoteOperationEngine.formatBatchSummary(selectedNotes)
+                            }
+                            Column {
+                                Text(
+                                    text = "${state.selectedNoteIds.size} not seçildi",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = summary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         },
                         navigationIcon = {
                             IconButton(onClick = onClearSelection) {
@@ -872,15 +885,6 @@ fun NotesScreen(
                                                 onClearSelection()
                                             }
                                         )
-
-                                        DropdownMenuItem(
-                                            text = { Text("🔒 Seçilenleri Şifreli Kasa (.notevault) Olarak Aktar") },
-                                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                            onClick = {
-                                                showSelectionActionsMenu = false
-                                                showBatchVaultExportDialog = true
-                                            }
-                                        )
                                     }
                                     if (state.selectedNoteIds.isNotEmpty()) {
                                         DropdownMenuItem(
@@ -941,15 +945,6 @@ fun NotesScreen(
                                                 selectedNotes.forEach(onArchiveNote)
                                                 showSelectionActionsMenu = false
                                                 onClearSelection()
-                                            }
-                                        )
-
-                                        DropdownMenuItem(
-                                            text = { Text("🔒 Seçilenleri Şifreli Kasa (.notevault) Olarak Aktar") },
-                                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                            onClick = {
-                                                showSelectionActionsMenu = false
-                                                showBatchVaultExportDialog = true
                                             }
                                         )
                                     }
@@ -1174,6 +1169,56 @@ fun NotesScreen(
                             )
                         }
                     }
+                }
+            },
+            bottomBar = {
+                if (isSelectionMode) {
+                    val isAllPinned = remember(selectedNotes) {
+                        selectedNotes.isNotEmpty() && selectedNotes.all { it.isPinned }
+                    }
+                    BatchActionsBottomBar(
+                        selectedCount = state.selectedNoteIds.size,
+                        isAllPinned = isAllPinned,
+                        canMerge = state.selectedNoteIds.size >= 2 && state.viewMode != NotesViewMode.TRASH,
+                        isTrashMode = state.viewMode == NotesViewMode.TRASH,
+                        onTogglePin = onTogglePinForSelected,
+                        onChangeColor = { showBatchColorDialog = true },
+                        onAssignCategory = { showBatchCategoryDialog = true },
+                        onMergeNotes = { showMergeNotesConfirm = true },
+                        onDeleteNotes = { showBatchDeleteConfirm = true },
+                        onExportVault = { showBatchVaultExportDialog = true },
+                        onExportPdf = {
+                            val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                            val tagRegex = Regex("#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-]+)")
+                            val exportItems = selectedNotes.map { n ->
+                                val catName = state.categories.find { it.id == n.categoryId }?.name
+                                val dateStr = sdf.format(Date(if (n.updatedAt > 0) n.updatedAt else n.timestamp))
+                                val noteTags = tagRegex.findAll("${n.title} ${n.content}").map { it.groupValues[1] }.distinct().toList()
+                                com.example.noteapp.util.BatchNoteExportItem(
+                                    title = n.title,
+                                    content = n.content,
+                                    categoryName = catName,
+                                    dateFormatted = dateStr,
+                                    tags = noteTags
+                                )
+                            }
+                            try {
+                                val batchPdf = com.example.noteapp.util.NoteExporter.exportMultipleToPdf(
+                                    context = context,
+                                    notes = exportItems,
+                                    documentTitle = "Toplu_Notlar_${selectedNotes.size}_Adet"
+                                )
+                                com.example.noteapp.util.NoteExporter.shareFile(context, batchPdf, "application/pdf", "Seçili Notları Paylaş")
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(context, "PDF oluşturulamadı: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                            onClearSelection()
+                        },
+                        onArchiveNotes = {
+                            selectedNotes.forEach(onArchiveNote)
+                            onClearSelection()
+                        }
+                    )
                 }
             }
         ) { padding ->
