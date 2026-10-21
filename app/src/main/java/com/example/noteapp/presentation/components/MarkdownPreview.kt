@@ -1,13 +1,23 @@
 package com.example.noteapp.presentation.components
 
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -17,6 +27,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.noteapp.domain.util.ClipboardHelper
+import com.example.noteapp.domain.util.CodeSyntaxHighlighter
 import com.example.noteapp.domain.util.MarkdownTableParser
 
 @Composable
@@ -52,35 +64,103 @@ fun MarkdownPreview(
                     codeEnd++
                 }
                 val code = lines.subList(codeStart, codeEnd).joinToString("\n")
+                val isDark = contentColor.luminance() > 0.5f
+                val normLang = remember(language) { CodeSyntaxHighlighter.normalizeLanguageName(language) }
+                val highlightedCode = remember(code, language, isDark, contentColor) {
+                    CodeSyntaxHighlighter.highlightToAnnotatedString(code, language, isDarkTheme = isDark, defaultContentColor = contentColor)
+                }
+
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
                         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        if (language.isNotEmpty()) {
-                            Text(
-                                text = language,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                    )
+                                    Text(
+                                        text = normLang,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        ),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            val ctx = LocalContext.current
+                            IconButton(
+                                onClick = {
+                                    ClipboardHelper.copyToClipboard(
+                                        context = ctx,
+                                        label = "Kod",
+                                        text = code,
+                                        option = ClipboardHelper.CopyOption.PLAIN_TEXT,
+                                        showToast = true
+                                    )
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Kodu Kopyala",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
-                        MarkdownText(
-                            text = parseInlineMarkdown(code),
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = fontSize.sp,
-                                lineHeight = computedLineHeight,
-                                letterSpacing = computedLetterSpacing,
-                                color = contentColor
-                            ),
-                            onLinkClick = onLinkClick
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                         )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                        ) {
+                            Text(
+                                text = highlightedCode,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = fontSize.sp,
+                                    lineHeight = computedLineHeight,
+                                    letterSpacing = computedLetterSpacing
+                                )
+                            )
+                        }
                     }
                 }
                 index = if (codeEnd < lines.size) codeEnd + 1 else lines.size

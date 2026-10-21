@@ -266,9 +266,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `NoteTimelineGrouperTest` ile gece yarısı sınırları, hafta ve ay dilimleri hesaplama, sabitlenmiş not ayrımı, kategori eşleştirme ve boş grup dayanıklılık testleri %100 doğrulandı.
 
 ### Aşama 44: Kod Blokları Sözdizimi Renklendirici & Kopyalama Paketi (Code Block Syntax Highlighter & Quick Copy Suite)
-- [ ] **Sözdizimi Vurgulama Motoru (`CodeSyntaxHighlighter`):** Markdown kod bloklarındaki dilleri (Kotlin, Java, Python, JavaScript, JSON, SQL, HTML/XML, Bash) analiz ederek anahtar kelimeleri, dizgileri (string), yorum satırlarını, sayıları ve türleri tokenize edip estetik tema renkleriyle `AnnotatedString` üreten motor.
-- [ ] **Canlı Kod Kartı & Kopyalama Düğmesi (`MarkdownPreview`):** Markdown önizlemesinde her kod bloğunun üstünde dil etiketi rozeti ve tek dokunuşla sadece o kod bloğunu panoya kopyalayan kopyalama butonu (`Icons.Default.ContentCopy`), sözdizimi renklendirilmiş monospace metin renderı.
-- [ ] **Birim Testleri:** `CodeSyntaxHighlighterTest` ile anahtar kelime, dize, yorum satırı, sayı tespiti, dil eşleştirme ve bilinmeyen diller için güvenli geri dönüş (fallback) testleri.
+- [x] **Sözdizimi Vurgulama Motoru (`CodeSyntaxHighlighter`):** Markdown kod bloklarındaki dilleri (Kotlin, Java, Python, JavaScript, TypeScript, JSON, SQL, HTML/XML, Bash) analiz ederek anahtar kelimeleri, dizgileri (string), yorum satırlarını, sayıları ve türleri tokenize edip estetik tema renkleriyle `AnnotatedString` üreten motor.
+- [x] **Canlı Kod Kartı & Kopyalama Düğmesi (`MarkdownPreview`):** Markdown önizlemesinde her kod bloğunun üstünde dil etiketi rozeti, tek dokunuşla sadece o kod bloğunu haptik titreşimle panoya kopyalayan kopyalama butonu (`Icons.Default.ContentCopy`), sözdizimi renklendirilmiş monospace metin renderı ve yatay kaydırma desteği.
+- [x] **Birim Testleri:** `CodeSyntaxHighlighterTest` ile anahtar kelime, dize, yorum satırı, sayı tespiti, dil eşleştirme ve bilinmeyen diller için güvenli geri dönüş (fallback) testleri %100 doğrulandı.
+
+### Aşama 45: Not Detayı İçindekiler Tablosu & Başlık Gezgini (Table of Contents & Headings Outline Drawer)
+- [ ] **Başlık Ayrıştırma & İçindekiler Motoru (`NoteOutlineEngine`):** Not içeriğindeki H1, H2, H3 (`#`, `##`, `###`) başlıklarını kod bloklarından izole ederek ağaç hiyerarşisi şeklinde ayrıştıran, her bölümün kelime sayısını ve satır ofsetini hesaplayan saf domain motoru (`HeadingItem`).
+- [ ] **Etkileşimli İçindekiler Paneli (`NoteOutlineBottomSheet`):** Not detayında araç çubuğundan tek tıkla açılan içindekiler gezgini; H1/H2/H3 girintili modern ağaç görünümü, bölüm kelime sayaçları ve tıklandığında imleci doğrudan o başlığa odaklayıp kaydıran hızlı atlama mekanizması.
+- [ ] **Birim Testleri:** `NoteOutlineEngineTest` ile H1/H2/H3 seviye ayrımı, kod blokları içindeki sahte başlıkları filtreleme, özel karakterler ve boş başlık dayanıklılık testleri.
 
 ---
 
@@ -313,3 +318,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 41 Tamamlandı]** Çift bölmeli canlı düzenleyici ve geniş ekran / tablet uyarlaması (SplitPaneLayoutHelper, SplitRatio, NoteDetailScreen üst çubuk ve menü entegrasyonu, eş zamanlı Markdown canlı önizleme paneli) ve birim testleri tamamlandı.
 * **[Aşama 42 Tamamlandı]** Dinamik metin genişletici & akıllı not parçacıkları motoru (TextMacroExpander, SnippetPickerBottomSheet, dinamik tarih/saat damgaları, admonition/callout blokları, araç çubuğu ⚡ butonu ve menü entegrasyonu) ve birim testleri tamamlandı.
 * **[Aşama 43 Tamamlandı]** Not zaman çizelgesi & bölümlü gruplama motoru (NoteTimelineGrouper, NoteGroupingMode, TimelineBucket, NotesScreen üst çubuk döngü butonu, Staggered Grid/List/Compact List section header entegrasyonu) ve birim testleri tamamlandı.
+* **[Aşama 44 Tamamlandı]** Kod blokları sözdizimi renklendirici & kopyalama paketi (CodeSyntaxHighlighter, MarkdownPreview dil rozeti, yatay kaydırmalı monospace render ve tek dokunuşla kod kopyalama düğmesi) ve birim testleri tamamlandı.
