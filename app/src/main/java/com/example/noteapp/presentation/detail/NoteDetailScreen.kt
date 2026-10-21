@@ -126,6 +126,7 @@ import com.example.noteapp.presentation.components.SmartCopyBottomSheet
 import com.example.noteapp.presentation.components.NoteOutlineBottomSheet
 import com.example.noteapp.presentation.components.SnippetPickerBottomSheet
 import com.example.noteapp.presentation.components.MathFormulaBottomSheet
+import com.example.noteapp.presentation.components.TaskBoardBottomSheet
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
@@ -402,6 +403,7 @@ fun NoteDetailScreen(
     var showChecklistActionsSheet by remember { mutableStateOf(false) }
     var showSnippetPickerSheet by remember { mutableStateOf(false) }
     var showMathFormulaSheet by remember { mutableStateOf(false) }
+    var showTaskBoardSheet by remember { mutableStateOf(false) }
     var trimmingAudioPath by remember { mutableStateOf<String?>(null) }
 
     // Düzenleme sırasında periyodik karalama taslağı kaydetme (1.2 saniye gecikmeli)
@@ -1411,6 +1413,21 @@ fun NoteDetailScreen(
                                     onClick = {
                                         showMoreMenu = false
                                         showMathFormulaSheet = true
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text("Görev Panosu (Kanban)") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.PendingActions,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showTaskBoardSheet = true
                                     }
                                 )
 
@@ -4149,6 +4166,17 @@ fun NoteDetailScreen(
                 val newText = prefix + formattedFormula + suffix
                 val newCursor = prefix.length + formattedFormula.length
                 onContentValueChange(TextFieldValue(newText, TextRange(newCursor)))
+            }
+        )
+    }
+
+    // Görev Panosu (Kanban) Alt Sayfası
+    if (showTaskBoardSheet) {
+        TaskBoardBottomSheet(
+            content = state.contentValue.text,
+            onDismissRequest = { showTaskBoardSheet = false },
+            onContentChange = { newContent ->
+                onContentValueChange(TextFieldValue(newContent))
             }
         )
     }
