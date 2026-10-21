@@ -85,6 +85,7 @@ import com.example.noteapp.domain.util.ChecklistSorter
 import com.example.noteapp.domain.util.FindMatch
 import com.example.noteapp.domain.util.FindReplaceEngine
 import com.example.noteapp.domain.util.ReadingColumnSplitter
+import com.example.noteapp.domain.util.TagSuggestionEngine
 import com.example.noteapp.domain.util.VaultExportEngine
 import com.example.noteapp.domain.util.VaultNote
 import com.example.noteapp.domain.util.WordGoalCalculator
@@ -103,6 +104,7 @@ import com.example.noteapp.presentation.components.MarkdownVisualTransformation
 import com.example.noteapp.presentation.components.NoteHistoryBottomSheet
 import com.example.noteapp.presentation.components.SaveTemplateDialog
 import com.example.noteapp.presentation.components.SetWordGoalDialog
+import com.example.noteapp.presentation.components.TagAutocompleteBar
 import com.example.noteapp.presentation.components.TemplatePickerBottomSheet
 import com.example.noteapp.presentation.components.WordGoalProgressBadge
 import com.example.noteapp.presentation.components.applyCodeBlock
@@ -379,6 +381,22 @@ fun NoteDetailScreen(
     }
     val currentCharCount = remember(state.contentValue.text) {
         state.contentValue.text.length
+    }
+
+    val activeTagQuery = remember(state.contentValue) {
+        val sel = state.contentValue.selection
+        if (sel.collapsed) {
+            TagSuggestionEngine.findActiveTagQuery(state.contentValue.text, sel.start)
+        } else null
+    }
+
+    val tagSuggestions = remember(activeTagQuery, state.availableTags) {
+        if (activeTagQuery == null) emptyList()
+        else {
+            val q = activeTagQuery.query.lowercase()
+            if (q.isBlank()) state.availableTags
+            else state.availableTags.filter { it.lowercase().startsWith(q) }
+        }
     }
 
     val focusRequester = remember { FocusRequester() }
@@ -1647,6 +1665,29 @@ fun NoteDetailScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Akıllı #etiket Otomatik Tamamlama Çubuğu (Tag Autocomplete)
+                    AnimatedVisibility(
+                        visible = activeTagQuery != null && (tagSuggestions.isNotEmpty() || activeTagQuery.query.isNotBlank()),
+                        enter = slideInVertically { it } + fadeIn(),
+                        exit = slideOutVertically { it } + fadeOut()
+                    ) {
+                        if (activeTagQuery != null) {
+                            TagAutocompleteBar(
+                                query = activeTagQuery.query,
+                                suggestions = tagSuggestions,
+                                onSelectTag = { selectedTag ->
+                                    val (newText, newCursor) = TagSuggestionEngine.applyTagSuggestion(
+                                        text = state.contentValue.text,
+                                        activeQuery = activeTagQuery,
+                                        selectedTag = selectedTag
+                                    )
+                                    onContentValueChange(TextFieldValue(newText, TextRange(newCursor)))
+                                },
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        }
+                    }
+
                     // Canlı Ses Kaydı Görselleştirici Barı (Live Audio Recording Visualizer)
                     AnimatedVisibility(
                         visible = state.isRecordingAudio,

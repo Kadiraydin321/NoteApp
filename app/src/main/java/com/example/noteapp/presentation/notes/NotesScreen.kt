@@ -49,6 +49,7 @@ import com.example.noteapp.data.settings.SearchBarShape
 import com.example.noteapp.domain.util.VaultExportEngine
 import com.example.noteapp.domain.util.VaultNote
 import com.example.noteapp.presentation.components.ExportVaultDialog
+import com.example.noteapp.presentation.components.TagManagerBottomSheet
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -133,6 +134,9 @@ fun NotesScreen(
     onRemoveRecentSearch: (String) -> Unit = {},
     onClearRecentSearches: () -> Unit = {},
     onMergeSelectedNotes: (Boolean) -> Unit = {},
+    onRenameTag: (oldTag: String, newTag: String) -> Unit = { _, _ -> },
+    onDeleteTag: (String) -> Unit = {},
+    getTagUsageCounts: () -> Map<String, Int> = { emptyMap() },
     onSettingsClick: () -> Unit
 ) {
     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
@@ -141,6 +145,7 @@ fun NotesScreen(
     val context = LocalContext.current
     val screenDensity = LocalDensity.current
     val homeGlowColor = MaterialTheme.colorScheme.primary
+    var showTagManagerSheet by remember { mutableStateOf(false) }
 
     // Ekran açıldığında veya nota girip geri dönüldüğünde menünün donup gri ekran yapmasını önle
     LaunchedEffect(Unit) {
@@ -660,17 +665,34 @@ fun NotesScreen(
                             }
                         }
 
-                        if (isTagAccordion) {
-                            val tagRotation by animateFloatAsState(
-                                targetValue = if (isTagsAccordionExpanded) 180f else 0f,
-                                label = "tag_arrow_rotation"
-                            )
-                            IconButton(onClick = { isTagsAccordionExpanded = !isTagsAccordionExpanded }) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    scope.launch { drawerState.snapTo(DrawerValue.Closed) }
+                                    showTagManagerSheet = true
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = if (isTagsAccordionExpanded) "Daralt" else "Genişlet",
-                                    modifier = Modifier.rotate(tagRotation)
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = "Etiketleri Yönet",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
                                 )
+                            }
+
+                            if (isTagAccordion) {
+                                val tagRotation by animateFloatAsState(
+                                    targetValue = if (isTagsAccordionExpanded) 180f else 0f,
+                                    label = "tag_arrow_rotation"
+                                )
+                                IconButton(onClick = { isTagsAccordionExpanded = !isTagsAccordionExpanded }) {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = if (isTagsAccordionExpanded) "Daralt" else "Genişlet",
+                                        modifier = Modifier.rotate(tagRotation)
+                                    )
+                                }
                             }
                         }
                     }
@@ -2226,6 +2248,21 @@ fun NotesScreen(
                 }
             )
         }
+    }
+
+    // Etiketleri Yönet Bottom Sheet
+    if (showTagManagerSheet) {
+        val counts = remember(showTagManagerSheet, allHashtags) {
+            getTagUsageCounts()
+        }
+        TagManagerBottomSheet(
+            allTags = allHashtags,
+            tagCounts = counts,
+            onDismiss = { showTagManagerSheet = false },
+            onSelectTag = { tag -> onSelectTag(tag) },
+            onRenameTag = onRenameTag,
+            onDeleteTag = onDeleteTag
+        )
     }
 }
 

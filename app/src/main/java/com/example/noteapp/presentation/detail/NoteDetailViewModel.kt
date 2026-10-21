@@ -86,7 +86,8 @@ data class NoteDetailState(
     val audioProgressFraction: Float = 0f,
     val audioCurrentPositionMs: Int = 0,
     val audioDurationMs: Int = 0,
-    val wordGoal: Int? = null
+    val wordGoal: Int? = null,
+    val availableTags: List<String> = emptyList()
 )
 
 @HiltViewModel
@@ -179,6 +180,13 @@ class NoteDetailViewModel @Inject constructor(
             }
         }
         _state.value = _state.value.copy(noteFontSize = settingsManager.settings.value.noteFontSize)
+        viewModelScope.launch {
+            val allNotes = repository.getAllNotes()
+            val tags = allNotes.flatMap { note ->
+                HASHTAG_REGEX.findAll("${note.title} ${note.content}").map { it.groupValues[1].trim() }
+            }.filter { it.isNotBlank() }.distinct().sorted()
+            _state.value = _state.value.copy(availableTags = tags)
+        }
     }
 
     fun onFontSizeChange(size: Float) {

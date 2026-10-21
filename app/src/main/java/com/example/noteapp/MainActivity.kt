@@ -387,6 +387,17 @@ class MainActivity : FragmentActivity() {
                                     android.widget.Toast.makeText(this@MainActivity, "Seçilen notlar başarıyla birleştirildi", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             },
+                            onRenameTag = { oldTag, newTag ->
+                                viewModel.renameTagAcrossNotes(oldTag, newTag) {
+                                    android.widget.Toast.makeText(this@MainActivity, "'#$oldTag' etiketi '#$newTag' olarak güncellendi", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onDeleteTag = { tag ->
+                                viewModel.deleteTagAcrossNotes(tag) {
+                                    android.widget.Toast.makeText(this@MainActivity, "'#$tag' etiketi tüm notlardan silindi", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            getTagUsageCounts = viewModel::getTagUsageCounts,
                             onSettingsClick = {
                                 navController.navigate("settings_screen")
                             }

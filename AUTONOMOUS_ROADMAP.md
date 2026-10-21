@@ -201,9 +201,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `DrawingScaleHelperTest` ile en-boy oranı koruma, dikey/yatay ortalama ve sınır hesaplamaları testleri %100 doğrulandı.
 
 ### Aşama 31: Akıllı Etiket Otomatik Tamamlama & Etiket Yönetim Sayfası (Smart Tag Autocomplete & Tag Manager)
-- [ ] **İçerik İçi `#etiket` Otomatik Tamamlama:** Not düzenleme ekranında kullanıcı `#` yazdığında mevcut kullanılan etiketleri açılır dinamik çip/öneri menüsünde listeleme ve tek dokunuşla tamamlama.
-- [ ] **Etiketleri Yönet BottomSheet / Paneli:** Kullanılan tüm `#etiketleri` sayılarıyla listeleme, etiket adını tüm notlarda toplu değiştirme (rename/refactor) veya silme yeteneği.
-- [ ] **Birim Testleri:** Etiket arama, refaktör ve çıkarma motoru testleri (`TagManagerTest`).
+- [x] **İçerik İçi `#etiket` Otomatik Tamamlama:** Not düzenleme ekranında kullanıcı `#` yazdığında mevcut kullanılan etiketleri açılır dinamik çip/öneri menüsünde listeleme (`TagAutocompleteBar`) ve tek dokunuşla akıllı boşluk korumalı tamamlama (`TagSuggestionEngine.applyTagSuggestion`).
+- [x] **Etiketleri Yönet BottomSheet Paneli:** `TagManagerBottomSheet` ile kullanılan tüm `#etiketleri` sayılarıyla listeleme, etiket adını tüm notlarda toplu değiştirme (rename/refactor: `renameTagAcrossNotes`) veya silme yeteneği (`deleteTagAcrossNotes`).
+- [x] **Birim Testleri:** `TagSuggestionEngineTest` ile imleç sorgu algılama, akıllı etiket yerleştirme, alt dizgi korumalı regex refaktör ve etiket silme testleri %100 doğrulandı.
+
+### Aşama 32: Çoklu Görsel Galeri Izgarası & Tam Ekran Kaydırmalı Görüntüleyici (Multi-Image Gallery & Swipeable Viewer)
+- [ ] **Galeri Izgarası (Collage / Photo Grid):** Notta 2 veya daha fazla görsel olduğunda ekleri tek alt alta uzun liste yerine estetik 2'li / 3'lü masonry fotoğraf galerisi ızgarasında sunma (`GalleryGridCalculator`).
+- [ ] **Tam Ekran Sağa/Sola Kaydırmalı Görüntüleyici (Horizontal Pager Photo Viewer):** Tam ekran görsel görüntüleyicide notun tüm fotoğrafları arasında parmakla sağa/sola kaydırarak (`HorizontalPager`) geçiş yapabilme, sayaç rozeti (`2 / 5`), yakınlaştırma (pinch-zoom) ve alt eylem çubuğu.
+- [ ] **Birim Testleri & Derleme:** Galeri ızgara matrisi ve sayfalama indeks testleri.
 
 ---
 
@@ -235,3 +240,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 28 Tamamlandı]** Markdown tablo otomatik hizalayıcı motoru (prettifyTable, formatAllTablesInText), görsel sütun hizalama seçicisi ve silme eylemleri tamamlandı.
 * **[Aşama 29 Tamamlandı]** Not başına özel kelime hedefi motoru (WordGoalCalculator, NoteGoalManager), canlı ilerleme rozeti (WordGoalProgressBadge), SetWordGoalDialog ve birim testleri tamamlandı.
 * **[Aşama 30 Tamamlandı]** Görsel üzerine serbest çizim ve işaretleme (DrawingScaleHelper, DrawingScreen background canvas, AttachmentList ve tam ekran entegrasyonu) ve birim testleri tamamlandı.
+* **[Aşama 31 Tamamlandı]** Akıllı etiket otomatik tamamlama (TagSuggestionEngine, TagAutocompleteBar), etiket yönetim alt sayfası (TagManagerBottomSheet), toplu etiket refaktörü/silme ve birim testleri tamamlandı.

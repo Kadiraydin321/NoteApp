@@ -9,6 +9,7 @@ import com.example.noteapp.data.settings.NotesLayoutMode
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.repository.NoteRepository
+import com.example.noteapp.domain.util.TagSuggestionEngine
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -401,6 +402,45 @@ class NotesViewModel @Inject constructor(
         return _state.value.notes.flatMap { note ->
             hashtagRegex.findAll("${note.title} ${note.content}").map { it.groupValues[1].trim() }
         }.filter { it.isNotEmpty() }.distinct().sortedWith(turkishCollator)
+    }
+
+    fun getTagUsageCounts(): Map<String, Int> {
+        val counts = mutableMapOf<String, Int>()
+        val notes = _state.value.notes
+        for (tag in _state.value.allHashtags) {
+            val pattern = Regex("#(?i)${Regex.escape(tag)}(?![a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-])")
+            val count = notes.count { pattern.containsMatchIn("${it.title} ${it.content}") }
+            counts[tag] = count
+        }
+        return counts
+    }
+
+    fun renameTagAcrossNotes(oldTag: String, newTag: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            val notes = repository.getAllNotes()
+            for (note in notes) {
+                val updatedTitle = TagSuggestionEngine.replaceTagInText(note.title, oldTag, newTag)
+                val updatedContent = TagSuggestionEngine.replaceTagInText(note.content, oldTag, newTag)
+                if (updatedTitle != note.title || updatedContent != note.content) {
+                    repository.updateNote(note.copy(title = updatedTitle, content = updatedContent, updatedAt = System.currentTimeMillis()))
+                }
+            }
+            onDone()
+        }
+    }
+
+    fun deleteTagAcrossNotes(tagToDelete: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            val notes = repository.getAllNotes()
+            for (note in notes) {
+                val updatedTitle = TagSuggestionEngine.removeTagFromText(note.title, tagToDelete)
+                val updatedContent = TagSuggestionEngine.removeTagFromText(note.content, tagToDelete)
+                if (updatedTitle != note.title || updatedContent != note.content) {
+                    repository.updateNote(note.copy(title = updatedTitle, content = updatedContent, updatedAt = System.currentTimeMillis()))
+                }
+            }
+            onDone()
+        }
     }
 
     // Çoklu Seçim Fonksiyonları
