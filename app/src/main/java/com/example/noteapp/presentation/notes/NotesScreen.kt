@@ -49,6 +49,7 @@ import com.example.noteapp.data.settings.SearchBarShape
 import com.example.noteapp.domain.util.VaultExportEngine
 import com.example.noteapp.domain.util.VaultNote
 import com.example.noteapp.presentation.components.ExportVaultDialog
+import com.example.noteapp.presentation.components.SmartCopyBottomSheet
 import com.example.noteapp.presentation.components.TagManagerBottomSheet
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -221,6 +222,7 @@ fun NotesScreen(
     var moveToTrashOriginalsOnMerge by remember { mutableStateOf(true) }
     var showSelectionActionsMenu by remember { mutableStateOf(false) }
     var showBatchVaultExportDialog by remember { mutableStateOf(false) }
+    var showSmartCopyNote by remember { mutableStateOf<Note?>(null) }
     var showEmptyTrashConfirm by remember { mutableStateOf(false) }
     var noteToDeletePermanently by remember { mutableStateOf<Note?>(null) }
     var showSortMenu by remember { mutableStateOf(false) }
@@ -815,6 +817,15 @@ fun NotesScreen(
                                         )
                                     }
                                     if (state.viewMode == NotesViewMode.ALL && state.selectedNoteIds.size == 1) {
+                                        DropdownMenuItem(
+                                            text = { Text("📋 Akıllı Panoya Kopyala") },
+                                            leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                            onClick = {
+                                                showSmartCopyNote = selectedNotes.singleOrNull()
+                                                showSelectionActionsMenu = false
+                                            }
+                                        )
+
                                         DropdownMenuItem(
                                             text = { Text("Paylaş") },
                                             leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
@@ -2262,6 +2273,19 @@ fun NotesScreen(
             onSelectTag = { tag -> onSelectTag(tag) },
             onRenameTag = onRenameTag,
             onDeleteTag = onDeleteTag
+        )
+    }
+
+    // Akıllı Panoya Kopyalama BottomSheet (Seçili Not İçin)
+    showSmartCopyNote?.let { note ->
+        SmartCopyBottomSheet(
+            title = note.title,
+            content = note.content,
+            timestamp = if (note.updatedAt > 0) note.updatedAt else note.timestamp,
+            onDismiss = {
+                showSmartCopyNote = null
+                onClearSelection()
+            }
         )
     }
 }

@@ -211,9 +211,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `GalleryGridCalculatorTest` ile 1'li, 2'li, 3'lü, 4'lü ve 5+ görsel taşma matrisi ve ses/görsel ayrıştırma testleri %100 doğrulandı.
 
 ### Aşama 33: Akıllı Not Kopyalama & Markdown Panoya Kopyalama Araçları (Smart Copy & Markdown Clipboard Suite)
-- [ ] **Zengin Kopyalama Seçenekleri (Copy Suite):** Not detay ekranında veya kart üzerinde: "Başlığı Kopyala", "Yalnızca Metni Kopyala", "Formatlı Markdown Olarak Kopyala", "Özetini Kopyala (İlk 3 cümle)" seçenekleri (`ClipboardHelper`).
-- [ ] **Hızlı Kopyalama Toast & Haptic Geri Bildirim:** Kullanıcı kopyaladığında kelime sayısı ve kopyalama tipini belirten şık haptik titreşimli bilgilendirme.
-- [ ] **Birim Testleri:** `ClipboardHelperTest` ile markdown temizleme, özet çıkarma ve formatlama testleri.
+- [x] **Zengin Kopyalama Seçenekleri (Copy Suite):** Not detay ekranında ve ana ekranda seçili notta tek dokunuşla açılan `SmartCopyBottomSheet`: "Düz Metin Olarak Kopyala", "Formatlı Markdown Olarak Kopyala", "Yalnızca Başlığı Kopyala", "Hızlı Özet Kopyala (İlk 3 Cümle)", "Kalan Görevleri Kopyala ([ ])", "Tamamlanan Görevleri Kopyala ([x])" (`ClipboardHelper`).
+- [x] **Hızlı Kopyalama Toast & Haptik Geri Bildirim:** Kopyalama işlemi sonrasında kelime/madde sayısını belirten zarif toast ve titreşimli haptik geri bildirim (`ClipboardHelper.copyToClipboard`).
+- [x] **Birim Testleri:** `ClipboardHelperTest` ile markdown temizleme, başlık/içerik birleştirme, özet sınırlaması, checklist ayıklama ve kelime sayım testleri %100 doğrulandı.
+
+### Aşama 34: Takvim & Tarih Bazlı Not Ajandası Görünümü (Calendar & Note Agenda View)
+- [ ] **Ajanda & Takvim Gruplayıcı Motoru (`CalendarNoteGrouper`):** Notları oluşturulma, güncellenme ve hatırlatıcı tarihlerine göre `LocalDate` (Yıl-Ay-Gün) bazında gruplama, her gün için not yoğunluk haritası (activity dot count) ve aktif gün istatistikleri çıkarma.
+- [ ] **İnteraktif Aylık / Haftalık Takvim Çubuğu (`CalendarAgendaBar`):** Ana ekranda takvim modu açıldığında günleri gösteren, üzerinde not olan günleri renkli noktalarla belirten, "Bugüne Dön" butonlu ve seçilen güne ait notları anında listeleyen ajanda görünümü.
+- [ ] **Birim Testleri:** `CalendarNoteGrouperTest` ile tarih eşleştirme, gün bazlı gruplama, sınır tarihleri ve yoğunluk haritası testleri.
 
 ---
 
@@ -246,3 +251,5 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 29 Tamamlandı]** Not başına özel kelime hedefi motoru (WordGoalCalculator, NoteGoalManager), canlı ilerleme rozeti (WordGoalProgressBadge), SetWordGoalDialog ve birim testleri tamamlandı.
 * **[Aşama 30 Tamamlandı]** Görsel üzerine serbest çizim ve işaretleme (DrawingScaleHelper, DrawingScreen background canvas, AttachmentList ve tam ekran entegrasyonu) ve birim testleri tamamlandı.
 * **[Aşama 31 Tamamlandı]** Akıllı etiket otomatik tamamlama (TagSuggestionEngine, TagAutocompleteBar), etiket yönetim alt sayfası (TagManagerBottomSheet), toplu etiket refaktörü/silme ve birim testleri tamamlandı.
+* **[Aşama 32 Tamamlandı]** Çoklu görsel kolaj ızgarası (GalleryGridCalculator, AttachmentList), +X taşma rozeti, tam ekran sağa/sola kaydırmalı fotoğraf görüntüleyici (HorizontalPager) ve birim testleri tamamlandı.
+* **[Aşama 33 Tamamlandı]** Akıllı not kopyalama paketi (ClipboardHelper, SmartCopyBottomSheet), düz metin, markdown, özet, görev listesi kopyalama, haptik titreşim ve birim testleri tamamlandı.

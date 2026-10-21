@@ -107,9 +107,11 @@ import com.example.noteapp.presentation.components.MarkdownVisualTransformation
 import com.example.noteapp.presentation.components.NoteHistoryBottomSheet
 import com.example.noteapp.presentation.components.SaveTemplateDialog
 import com.example.noteapp.presentation.components.SetWordGoalDialog
+import com.example.noteapp.presentation.components.WordGoalProgressBadge
 import com.example.noteapp.presentation.components.TagAutocompleteBar
 import com.example.noteapp.presentation.components.TemplatePickerBottomSheet
-import com.example.noteapp.presentation.components.WordGoalProgressBadge
+import com.example.noteapp.domain.util.ClipboardHelper
+import com.example.noteapp.presentation.components.SmartCopyBottomSheet
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
@@ -377,6 +379,7 @@ fun NoteDetailScreen(
     var showSaveTemplateDialog by remember { mutableStateOf(false) }
     var showExportVaultDialog by remember { mutableStateOf(false) }
     var showWordGoalDialog by remember { mutableStateOf(false) }
+    var showSmartCopySheet by remember { mutableStateOf(false) }
 
     val currentWordCount = remember(state.contentValue.text) {
         if (state.contentValue.text.isBlank()) 0
@@ -829,7 +832,6 @@ fun NoteDetailScreen(
 
     // Notu Panoya Kopyalama
     fun copyNoteToClipboard() {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val fullText = buildString {
             if (state.title.isNotBlank()) {
                 appendLine(state.title)
@@ -837,9 +839,12 @@ fun NoteDetailScreen(
             }
             append(state.contentValue.text)
         }
-        val clip = ClipData.newPlainText("Not İçeriği", fullText)
-        clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Not panoya kopyalandı", Toast.LENGTH_SHORT).show()
+        ClipboardHelper.copyToClipboard(
+            context = context,
+            label = "Not İçeriği",
+            text = fullText,
+            option = ClipboardHelper.CopyOption.FULL_NOTE
+        )
     }
 
     // Notu Paylaşma (Düz Metin veya Markdown Formatında)
@@ -1586,12 +1591,12 @@ fun NoteDetailScreen(
                                     }
                                 )
 
-                                // Panoya Kopyala
+                                // Akıllı Panoya Kopyala
                                 DropdownMenuItem(
-                                    text = { Text("Panoya Kopyala") },
+                                    text = { Text("Akıllı Panoya Kopyala") },
                                     leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
                                     onClick = {
-                                        copyNoteToClipboard()
+                                        showSmartCopySheet = true
                                         showMoreMenu = false
                                     }
                                 )
@@ -3713,6 +3718,16 @@ fun NoteDetailScreen(
                 val msg = if (newGoal != null) "🎯 Kelime hedefi belirlendi: $newGoal kelime" else "Kelime hedefi kaldırıldı"
                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             }
+        )
+    }
+
+    // Akıllı Panoya Kopyalama BottomSheet
+    if (showSmartCopySheet) {
+        SmartCopyBottomSheet(
+            title = state.title,
+            content = state.contentValue.text,
+            timestamp = if (state.updatedAt > 0) state.updatedAt else state.createdAt,
+            onDismiss = { showSmartCopySheet = false }
         )
     }
 }
