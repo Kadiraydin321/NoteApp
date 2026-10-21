@@ -3640,6 +3640,8 @@ fun NoteDetailScreen(
     if (showHistorySheet) {
         NoteHistoryBottomSheet(
             historyList = state.noteHistoryList,
+            currentTitle = state.title,
+            currentContent = state.contentValue.text,
             onDismiss = { showHistorySheet = false },
             onRestoreVersion = { history ->
                 onRestoreVersion(history)

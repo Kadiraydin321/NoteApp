@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Restore
@@ -31,11 +32,14 @@ import java.util.Locale
 @Composable
 fun NoteHistoryBottomSheet(
     historyList: List<NoteHistory>,
+    currentTitle: String = "",
+    currentContent: String = "",
     onDismiss: () -> Unit,
     onRestoreVersion: (NoteHistory) -> Unit
 ) {
     var selectedForPreview by remember { mutableStateOf<NoteHistory?>(null) }
     var versionToRestore by remember { mutableStateOf<NoteHistory?>(null) }
+    var versionToDiff by remember { mutableStateOf<NoteHistory?>(null) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -218,6 +222,27 @@ fun NoteHistoryBottomSheet(
                                                 modifier = Modifier.padding(10.dp)
                                             )
                                         }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = { versionToDiff = history },
+                                                shape = RoundedCornerShape(10.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                modifier = Modifier.height(34.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.CompareArrows,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Farkı İncele (Diff)", style = MaterialTheme.typography.labelMedium)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -256,6 +281,22 @@ fun NoteHistoryBottomSheet(
                 TextButton(onClick = { versionToRestore = null }) {
                     Text("İptal")
                 }
+            }
+        )
+    }
+
+    // Versiyon Karşılaştırma Diff Dialogu
+    if (versionToDiff != null) {
+        NoteDiffDialog(
+            historyVersion = versionToDiff!!,
+            currentTitle = currentTitle,
+            currentContent = currentContent,
+            onDismiss = { versionToDiff = null },
+            onRestore = {
+                val target = versionToDiff!!
+                versionToDiff = null
+                onRestoreVersion(target)
+                onDismiss()
             }
         )
     }

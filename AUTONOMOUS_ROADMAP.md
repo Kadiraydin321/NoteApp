@@ -221,9 +221,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `CalendarNoteGrouperTest` ile tarih eşleştirme, gün bazlı gruplama, sınır tarihleri, hafta başlangıç/bitiş günleri ve etkinlik yoğunluk testleri %100 doğrulandı.
 
 ### Aşama 35: Not Versiyon Karşılaştırma & Görsel Diff İnceleyici (Note Version Diff & Change Visualizer)
-- [ ] **Görsel Metin Fark Motoru (`NoteDiffEngine`):** İki not versiyonu veya mevcut içerik ile geçmiş versiyon arasındaki satır/kelime bazlı farkları (eklenen `+`, silinen `-`, korunan satırlar) hesaplama, LCS algoritması ve değişim istatistiği çıkarma (+X ekleme, -Y silme).
-- [ ] **Görsel Değişiklik İnceleme Penceresi (`NoteDiffDialog`):** `NoteHistoryBottomSheet` geçmiş listesinde her versiyon için "Değişiklikleri Gör" butonu; yeşil/kırmızı zeminle vurgulanmış satır bazlı karşılaştırma ekranı ve tek tıkla geri yükleme.
-- [ ] **Birim Testleri:** `NoteDiffEngineTest` ile ekleme, silme, değiştirme, boşluk koruma ve satır hizalama testleri.
+- [x] **Görsel Metin Fark Motoru (`NoteDiffEngine`):** İki not versiyonu veya mevcut içerik ile geçmiş versiyon arasındaki satır/kelime bazlı farkları (eklenen `+`, silinen `-`, korunan satırlar) hesaplama, LCS algoritması ve değişim istatistiği çıkarma (+X ekleme, -Y silme).
+- [x] **Görsel Değişiklik İnceleme Penceresi (`NoteDiffDialog`):** `NoteHistoryBottomSheet` geçmiş listesinde her versiyon için "Farkı İncele (Diff)" butonu; yeşil/kırmızı zemin ve satır numaralarıyla vurgulanmış satır bazlı karşılaştırma ekranı, başlık farkı tespiti ve tek tıkla geri yükleme.
+- [x] **Birim Testleri:** `NoteDiffEngineTest` ile ekleme, silme, değiştirme, başlık değişimi, boşluk koruma ve satır hizalama testleri %100 doğrulandı.
+
+### Aşama 36: Akıllı Otomatik Kaydetme & Taslak Kurtarma Motoru (Auto-Save Resilience & Draft Recovery)
+- [ ] **Korumalı Taslak Kurtarma Motoru (`DraftRecoveryManager`):** Kullanıcı not düzenlerken her değişiklikte güvenli yerel taslak oluşturma (`note_draft_recovery`), kaza eseri çıkış veya uygulama kapanması durumunda not açıldığında "Kaydedilmemiş taslak bulundu" uyarısı ve tek tıkla kurtarma seçeneği sunma.
+- [ ] **Temizleme ve Güvenli Taslak Döngüsü:** Not başarıyla kaydedildiğinde veya kullanıcı taslağı bilinçli sildiğinde taslak önbelleğini otomatik temizleme.
+- [ ] **Birim Testleri:** `DraftRecoveryManagerTest` ile taslak kaydetme, kurtarma uygunluğu, zaman aşımı ve temizleme testleri.
 
 ---
 
@@ -259,3 +264,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 32 Tamamlandı]** Çoklu görsel kolaj ızgarası (GalleryGridCalculator, AttachmentList), +X taşma rozeti, tam ekran sağa/sola kaydırmalı fotoğraf görüntüleyici (HorizontalPager) ve birim testleri tamamlandı.
 * **[Aşama 33 Tamamlandı]** Akıllı not kopyalama paketi (ClipboardHelper, SmartCopyBottomSheet), düz metin, markdown, özet, görev listesi kopyalama, haptik titreşim ve birim testleri tamamlandı.
 * **[Aşama 34 Tamamlandı]** Takvim & not ajandası görünümü (CalendarNoteGrouper, CalendarAgendaBar), haftalık/aylık etkinlik haritası, güne göre filtreleme ve birim testleri tamamlandı.
+* **[Aşama 35 Tamamlandı]** Not versiyon karşılaştırma ve görsel diff inceleyici (NoteDiffEngine, NoteDiffDialog), satır bazlı ekleme/silme vurgulaması, istatistik rozetleri ve birim testleri tamamlandı.
