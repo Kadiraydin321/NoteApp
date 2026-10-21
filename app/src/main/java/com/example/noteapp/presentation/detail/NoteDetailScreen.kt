@@ -87,6 +87,7 @@ import com.example.noteapp.domain.util.FindReplaceEngine
 import com.example.noteapp.domain.util.ReadingColumnSplitter
 import com.example.noteapp.domain.util.VaultExportEngine
 import com.example.noteapp.domain.util.VaultNote
+import com.example.noteapp.domain.util.WordGoalCalculator
 import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.notification.NotificationHelper
 import com.example.noteapp.presentation.components.AttachmentList
@@ -101,7 +102,9 @@ import com.example.noteapp.presentation.components.MarkdownPreview
 import com.example.noteapp.presentation.components.MarkdownVisualTransformation
 import com.example.noteapp.presentation.components.NoteHistoryBottomSheet
 import com.example.noteapp.presentation.components.SaveTemplateDialog
+import com.example.noteapp.presentation.components.SetWordGoalDialog
 import com.example.noteapp.presentation.components.TemplatePickerBottomSheet
+import com.example.noteapp.presentation.components.WordGoalProgressBadge
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
@@ -359,13 +362,15 @@ fun NoteDetailScreen(
     onSeekAudio: (Int) -> Unit = {},
     onCycleAudioPlaybackSpeed: () -> Unit = {},
     onSeekAudioFraction: (Float) -> Unit = {},
-    onCancelAudioRecording: () -> Unit = {}
+    onCancelAudioRecording: () -> Unit = {},
+    onSetWordGoal: (Int?) -> Unit = {}
 ) {
     val context = LocalContext.current
     var showHistorySheet by remember { mutableStateOf(false) }
     var showTemplateSheet by remember { mutableStateOf(false) }
     var showSaveTemplateDialog by remember { mutableStateOf(false) }
     var showExportVaultDialog by remember { mutableStateOf(false) }
+    var showWordGoalDialog by remember { mutableStateOf(false) }
 
     val currentWordCount = remember(state.contentValue.text) {
         if (state.contentValue.text.isBlank()) 0
@@ -1168,6 +1173,27 @@ fun NoteDetailScreen(
                                     onClick = {
                                         showMoreMenu = false
                                         showSaveTemplateDialog = true
+                                    }
+                                )
+
+                                // Kelime Hedefi Belirle
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (state.wordGoal != null) "🎯 Kelime Hedefi (${state.wordGoal} kelime)"
+                                            else "🎯 Kelime Hedefi Belirle"
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.TrackChanges,
+                                            contentDescription = null,
+                                            tint = if (state.wordGoal != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showWordGoalDialog = true
                                     }
                                 )
 
@@ -2195,6 +2221,20 @@ fun NoteDetailScreen(
                                                 val cleaned = ChecklistSorter.removeCompletedItems(state.contentValue.text)
                                                 onContentValueChange(TextFieldValue(cleaned))
                                             }
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                    }
+
+                                    val wordGoal = state.wordGoal
+                                    if (wordGoal != null && wordGoal > 0) {
+                                        val goalStatus = remember(currentWordCount, wordGoal) {
+                                            WordGoalCalculator.calculateStatus(currentWordCount, wordGoal)
+                                        }
+                                        WordGoalProgressBadge(
+                                            status = goalStatus,
+                                            contentColor = dockIconColor,
+                                            onEditGoal = { showWordGoalDialog = true },
+                                            onRemoveGoal = { onSetWordGoal(null) }
                                         )
                                         Spacer(Modifier.width(6.dp))
                                     }
@@ -3551,6 +3591,19 @@ fun NoteDetailScreen(
                 } catch (e: Exception) {
                     Toast.makeText(context, "Hata: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                 }
+            }
+        )
+    }
+
+    // Kelime Hedefi Belirleme Dialogu
+    if (showWordGoalDialog) {
+        SetWordGoalDialog(
+            initialGoal = state.wordGoal,
+            onDismiss = { showWordGoalDialog = false },
+            onSaveGoal = { newGoal ->
+                onSetWordGoal(newGoal)
+                val msg = if (newGoal != null) "🎯 Kelime hedefi belirlendi: $newGoal kelime" else "Kelime hedefi kaldırıldı"
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             }
         )
     }

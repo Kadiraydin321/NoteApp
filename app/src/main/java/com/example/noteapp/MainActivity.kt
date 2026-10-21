@@ -578,7 +578,8 @@ class MainActivity : FragmentActivity() {
                             onSeekAudio = viewModel::seekAudioBy,
                             onCycleAudioPlaybackSpeed = viewModel::cycleAudioPlaybackSpeed,
                             onSeekAudioFraction = viewModel::seekAudioToFraction,
-                            onCancelAudioRecording = viewModel::cancelAudioRecording
+                            onCancelAudioRecording = viewModel::cancelAudioRecording,
+                            onSetWordGoal = viewModel::setWordGoal
                         )
                     }
 

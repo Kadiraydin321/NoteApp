@@ -20,6 +20,7 @@ import com.example.noteapp.media.FocusAudioSynthesizer
 import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.notification.AlarmScheduler
 import com.example.noteapp.data.settings.AppSettingsManager
+import com.example.noteapp.data.settings.NoteGoalManager
 import com.example.noteapp.data.security.NoteCryptoManager
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -84,7 +85,8 @@ data class NoteDetailState(
     val recordingAmplitudes: List<Float> = emptyList(),
     val audioProgressFraction: Float = 0f,
     val audioCurrentPositionMs: Int = 0,
-    val audioDurationMs: Int = 0
+    val audioDurationMs: Int = 0,
+    val wordGoal: Int? = null
 )
 
 @HiltViewModel
@@ -98,6 +100,7 @@ class NoteDetailViewModel @Inject constructor(
     private val cryptoManager: NoteCryptoManager,
     private val templateManager: TemplateManager,
     private val focusAudioSynthesizer: FocusAudioSynthesizer,
+    private val noteGoalManager: NoteGoalManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -131,6 +134,7 @@ class NoteDetailViewModel @Inject constructor(
             viewModelScope.launch {
                 repository.getNoteById(noteId)?.let { note ->
                     val initialContent = TextFieldValue(note.content)
+                    val goal = noteGoalManager.getWordGoal(note.id)
                     _state.value = _state.value.copy(
                         currentNoteId = note.id,
                         title = note.title,
@@ -146,7 +150,8 @@ class NoteDetailViewModel @Inject constructor(
                         updatedAt = if (note.updatedAt != 0L) note.updatedAt else note.timestamp,
                         backgroundImage = note.backgroundImage,
                         extractedWikilinks = extractWikilinks(note.content),
-                        extractedTags = extractHashtags(note.content)
+                        extractedTags = extractHashtags(note.content),
+                        wordGoal = goal
                     )
                     refreshBacklinks()
                     lastCommittedSnapshot = NoteHistorySnapshot(note.title, initialContent)
@@ -180,6 +185,14 @@ class NoteDetailViewModel @Inject constructor(
         val clamped = size.coerceIn(12f, 24f)
         _state.value = _state.value.copy(noteFontSize = clamped)
         settingsManager.setNoteFontSize(clamped)
+    }
+
+    fun setWordGoal(goal: Int?) {
+        _state.value = _state.value.copy(wordGoal = goal)
+        val noteId = _state.value.currentNoteId
+        if (noteId != null && noteId > 0L) {
+            noteGoalManager.setWordGoal(noteId, goal)
+        }
     }
 
     fun onTitleChange(title: String) {
@@ -868,6 +881,10 @@ class NoteDetailViewModel @Inject constructor(
             val savedId = repository.insertNote(note)
             if (_state.value.currentNoteId == null || _state.value.currentNoteId == 0L) {
                 _state.value = _state.value.copy(currentNoteId = savedId)
+            }
+            val finalGoalId = if (noteId != 0L) noteId else savedId
+            _state.value.wordGoal?.let { goal ->
+                noteGoalManager.setWordGoal(finalGoalId, goal)
             }
             if (noteId == 0L) {
                 editHistoryFile("draft_$draftHistoryId").delete()

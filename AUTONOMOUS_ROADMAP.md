@@ -190,9 +190,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `MarkdownTableParserTest` ile sütun genişlik hesaplamaları, prettify serileştirme ve hizalama döngü testleri %100 doğrulandı.
 
 ### Aşama 29: Not Başına Özel Kelime Hedefi & İlerleme Rozeti (In-Note Word Goal & Circular Progress HUD)
-- [ ] **Not Başına Özel Kelime Hedefi:** Her not için isteğe bağlı olarak özel kelime hedefi (örn: 250, 500, 1000 kelime) belirleyebilme (`Note.wordGoal`).
-- [ ] **Canlı Hedef İlerleme Rozeti:** Not detay ekranında hedefe ne kadar yaklaşıldığını gösteren canlı animasyonlu dairesel ilerleme rozeti (`WordGoalProgressBadge`), kalan kelime göstergesi ve hedef tamamlandığında parıldayan başarı durumu.
-- [ ] **Birim Testleri:** `WordGoalCalculatorTest` ile hedef yüzdesi, kalan kelime sayısı ve tamamlama eşikleri testleri.
+- [x] **Not Başına Özel Kelime Hedefi:** Her not için isteğe bağlı olarak özel kelime hedefi (örn: 100, 250, 500, 1000, 2000 kelime veya özel sayı) belirleyebilme (`NoteGoalManager` & `SetWordGoalDialog`).
+- [x] **Canlı Hedef İlerleme Rozeti:** Not detay ekranında hedefe ne kadar yaklaşıldığını gösteren canlı animasyonlu dairesel ilerleme rozeti (`WordGoalProgressBadge`), kalan kelime göstergesi ve hedef tamamlandığında parıldayan başarı durumu.
+- [x] **Birim Testleri:** `WordGoalCalculatorTest` ile kelime sayımı, hedef yüzdesi, kalan kelime sayısı ve tamamlama eşikleri testleri %100 doğrulandı.
+
+### Aşama 30: Görsel Üzerine Çizim & İşaretleme (Image Annotation & Marker Sketch on Attached Images)
+- [ ] **Görsel Üzerine Çizim & İşaretleme:** Ekler listesinde (`AttachmentList`) her görsel için "🎨 Çizim & İşaretleme Yap" seçeneği sunma.
+- [ ] **Tuval Zeminine Görsel Aktarımı:** Çizim ekranında (`DrawingScreen`) arka plan olarak seçilen fotoğrafı yükleme ve üzerine kalem/fırça/vurgulayıcı ile serbest çizim yapabilme.
+- [ ] **Birim Testleri & Derleme:** Çizim ve ek yönetimi akışlarının test edilmesi ve doğrulanması.
 
 ---
 
@@ -222,3 +227,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 26 Tamamlandı]** AES-256-GCM şifreli taşınabilir not kasası motoru (.notevault), dışa/içe aktarım diyalogları (ExportVaultDialog, ImportVaultDialog), BackupManager entegrasyonu ve birim testleri tamamlandı.
 * **[Aşama 27 Tamamlandı]** Kontrol listesi canlı ilerleme halkası (ChecklistProgressRing), akıllı checklist sıralayıcı ve temizleyici (ChecklistSorter) ve birim testleri tamamlandı.
 * **[Aşama 28 Tamamlandı]** Markdown tablo otomatik hizalayıcı motoru (prettifyTable, formatAllTablesInText), görsel sütun hizalama seçicisi ve silme eylemleri tamamlandı.
+* **[Aşama 29 Tamamlandı]** Not başına özel kelime hedefi motoru (WordGoalCalculator, NoteGoalManager), canlı ilerleme rozeti (WordGoalProgressBadge), SetWordGoalDialog ve birim testleri tamamlandı.
