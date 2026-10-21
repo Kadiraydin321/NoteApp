@@ -596,7 +596,10 @@ class MainActivity : FragmentActivity() {
                             onCycleAudioPlaybackSpeed = viewModel::cycleAudioPlaybackSpeed,
                             onSeekAudioFraction = viewModel::seekAudioToFraction,
                             onCancelAudioRecording = viewModel::cancelAudioRecording,
-                            onSetWordGoal = viewModel::setWordGoal
+                            onSetWordGoal = viewModel::setWordGoal,
+                            onRestoreDraft = viewModel::restoreDraft,
+                            onDiscardDraft = { viewModel.discardDraft(viewModel.state.value.currentNoteId) },
+                            onSaveDraftPeriodically = viewModel::saveDraftPeriodically
                         )
                     }
 

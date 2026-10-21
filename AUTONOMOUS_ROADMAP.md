@@ -226,9 +226,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `NoteDiffEngineTest` ile ekleme, silme, değiştirme, başlık değişimi, boşluk koruma ve satır hizalama testleri %100 doğrulandı.
 
 ### Aşama 36: Akıllı Otomatik Kaydetme & Taslak Kurtarma Motoru (Auto-Save Resilience & Draft Recovery)
-- [ ] **Korumalı Taslak Kurtarma Motoru (`DraftRecoveryManager`):** Kullanıcı not düzenlerken her değişiklikte güvenli yerel taslak oluşturma (`note_draft_recovery`), kaza eseri çıkış veya uygulama kapanması durumunda not açıldığında "Kaydedilmemiş taslak bulundu" uyarısı ve tek tıkla kurtarma seçeneği sunma.
-- [ ] **Temizleme ve Güvenli Taslak Döngüsü:** Not başarıyla kaydedildiğinde veya kullanıcı taslağı bilinçli sildiğinde taslak önbelleğini otomatik temizleme.
-- [ ] **Birim Testleri:** `DraftRecoveryManagerTest` ile taslak kaydetme, kurtarma uygunluğu, zaman aşımı ve temizleme testleri.
+- [x] **Korumalı Taslak Kurtarma Motoru (`DraftRecoveryManager`):** Kullanıcı not düzenlerken her değişiklikte arka planda yerel gecikmeli taslak oluşturma (`SharedPreferencesDraftStorage`), kaza eseri çıkış veya arka planda sonlandırılma durumunda not tekrar açıldığında üstte şık `DraftRecoveryBanner` uyarısı ile tek dokunuşla taslağı geri yükleme veya yoksayma.
+- [x] **Temizleme ve Güvenli Taslak Döngüsü:** Not başarıyla kaydedildiğinde veya boş bırakılıp iptal edildiğinde taslak önbelleğini otomatik temizleme, veritabanı sürümüyle metin farkı olmayan eski taslakları filtreleme.
+- [x] **Birim Testleri:** `DraftRecoveryManagerTest` ile taslak kaydetme, kurtarma uygunluğu tespiti, yeni/mevcut not ayrımı, zaman aşımı ve temizleme testleri %100 doğrulandı.
+
+### Aşama 37: Kategori Bazlı Biyometrik Kilit & Gizlilik Koruması (Category-Level Biometric Lock & Privacy)
+- [ ] **Kategori Kilit Yöneticisi (`CategoryLockManager`):** Belirli kategorileri (örneğin "Kişisel", "Finans", "Günlük") kategori düzeyinde şifre veya biyometrik parmak izi ile kilitleme, kilit durumunu güvenli yerel hafızada yönetme.
+- [ ] **Korumalı Liste ve Çekmece Görünümü:** Kilitli kategorideki notların ana listede içerik gizleme maskesiyle korunması, kategori seçildiğinde biyometrik/PIN doğrulama penceresi açılması ve kilit rozeti (🔒) gösterimi.
+- [ ] **Birim Testleri:** `CategoryLockManagerTest` ile kategori kilitleme/kilit açma, oturum doğrulama, geçici kilit açma süreleri ve silinme durumları testleri.
 
 ---
 
@@ -265,3 +270,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 33 Tamamlandı]** Akıllı not kopyalama paketi (ClipboardHelper, SmartCopyBottomSheet), düz metin, markdown, özet, görev listesi kopyalama, haptik titreşim ve birim testleri tamamlandı.
 * **[Aşama 34 Tamamlandı]** Takvim & not ajandası görünümü (CalendarNoteGrouper, CalendarAgendaBar), haftalık/aylık etkinlik haritası, güne göre filtreleme ve birim testleri tamamlandı.
 * **[Aşama 35 Tamamlandı]** Not versiyon karşılaştırma ve görsel diff inceleyici (NoteDiffEngine, NoteDiffDialog), satır bazlı ekleme/silme vurgulaması, istatistik rozetleri ve birim testleri tamamlandı.
+* **[Aşama 36 Tamamlandı]** Akıllı otomatik kaydetme ve taslak kurtarma motoru (DraftRecoveryManager, DraftRecoveryBanner), güvenli yerel taslak döngüsü ve birim testleri tamamlandı.

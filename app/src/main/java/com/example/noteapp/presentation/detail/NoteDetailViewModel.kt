@@ -11,6 +11,8 @@ import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.model.NoteTemplate
 import com.example.noteapp.domain.repository.NoteRepository
+import com.example.noteapp.domain.util.DraftRecoveryManager
+import com.example.noteapp.domain.util.NoteDraft
 import com.example.noteapp.domain.util.WaveformHelper
 import com.example.noteapp.data.template.TemplateManager
 import com.example.noteapp.media.AudioPlayer
@@ -87,7 +89,8 @@ data class NoteDetailState(
     val audioCurrentPositionMs: Int = 0,
     val audioDurationMs: Int = 0,
     val wordGoal: Int? = null,
-    val availableTags: List<String> = emptyList()
+    val availableTags: List<String> = emptyList(),
+    val recoverableDraft: NoteDraft? = null
 )
 
 @HiltViewModel
@@ -128,6 +131,7 @@ class NoteDetailViewModel @Inject constructor(
     private var currentRecordingFile: File? = null
     private var recordingJob: Job? = null
     private var playbackJob: Job? = null
+    private val draftRecoveryManager = DraftRecoveryManager.create(app)
 
     init {
         val noteId = savedStateHandle.get<Long>("noteId") ?: -1L
@@ -136,6 +140,15 @@ class NoteDetailViewModel @Inject constructor(
                 repository.getNoteById(noteId)?.let { note ->
                     val initialContent = TextFieldValue(note.content)
                     val goal = noteGoalManager.getWordGoal(note.id)
+                    val noteTimestamp = if (note.updatedAt != 0L) note.updatedAt else note.timestamp
+                    val hasDraft = draftRecoveryManager.hasRecoverableDraft(
+                        noteId = note.id,
+                        currentDbTitle = note.title,
+                        currentDbContent = note.content,
+                        currentDbTimestamp = noteTimestamp
+                    )
+                    val recoverableDraft = if (hasDraft) draftRecoveryManager.getDraft(note.id) else null
+
                     _state.value = _state.value.copy(
                         currentNoteId = note.id,
                         title = note.title,
@@ -148,11 +161,12 @@ class NoteDetailViewModel @Inject constructor(
                         reminderTime = note.reminderTime,
                         attachments = note.attachments,
                         createdAt = if (note.createdAt != 0L) note.createdAt else note.timestamp,
-                        updatedAt = if (note.updatedAt != 0L) note.updatedAt else note.timestamp,
+                        updatedAt = noteTimestamp,
                         backgroundImage = note.backgroundImage,
                         extractedWikilinks = extractWikilinks(note.content),
                         extractedTags = extractHashtags(note.content),
-                        wordGoal = goal
+                        wordGoal = goal,
+                        recoverableDraft = recoverableDraft
                     )
                     refreshBacklinks()
                     lastCommittedSnapshot = NoteHistorySnapshot(note.title, initialContent)
@@ -165,10 +179,18 @@ class NoteDetailViewModel @Inject constructor(
                 }
             }
         } else {
+            // Yeni not için kaydedilmemiş taslak kontrolü
+            val newNoteDraft = draftRecoveryManager.getDraft(null)
+            val recoverableDraft = if (newNoteDraft != null && (newNoteDraft.title.isNotBlank() || newNoteDraft.content.isNotBlank())) {
+                newNoteDraft
+            } else null
+
             // Yeni not için ayarlardaki varsayılan rengi ata
             val defaultColor = settingsManager.settings.value.defaultNoteColor
             if (defaultColor != 0) {
-                _state.value = _state.value.copy(color = defaultColor)
+                _state.value = _state.value.copy(color = defaultColor, recoverableDraft = recoverableDraft)
+            } else {
+                _state.value = _state.value.copy(recoverableDraft = recoverableDraft)
             }
             lastCommittedSnapshot = NoteHistorySnapshot("", TextFieldValue(""))
 
@@ -835,6 +857,8 @@ class NoteDetailViewModel @Inject constructor(
 
         val noteId = currentState.currentNoteId ?: 0L
         if (isBlankNote) {
+            draftRecoveryManager.clearDraft(noteId)
+            draftRecoveryManager.clearDraft(null)
             if (noteId != 0L && noteId != -1L) {
                 viewModelScope.launch {
                     repository.deleteNotesPermanently(listOf(noteId))
@@ -917,8 +941,39 @@ class NoteDetailViewModel @Inject constructor(
 
             recordVersionSnapshot(finalId, currentState.title, currentState.contentValue.text)
 
+            draftRecoveryManager.clearDraft(noteId)
+            if (savedId != noteId) {
+                draftRecoveryManager.clearDraft(null)
+                draftRecoveryManager.clearDraft(savedId)
+            }
+
             _state.value = _state.value.copy(isSaved = true, updatedAt = now)
         }
+    }
+
+    fun restoreDraft(draft: NoteDraft) {
+        commitCurrentStateToUndo()
+        val newContent = TextFieldValue(draft.content, TextRange(draft.content.length))
+        _state.value = _state.value.copy(
+            title = draft.title,
+            contentValue = newContent,
+            recoverableDraft = null
+        )
+        commitCurrentStateToUndo()
+    }
+
+    fun discardDraft(noteId: Long?) {
+        draftRecoveryManager.clearDraft(noteId)
+        _state.value = _state.value.copy(recoverableDraft = null)
+    }
+
+    fun saveDraftPeriodically(title: String, content: String) {
+        if (_state.value.isSaved) return
+        draftRecoveryManager.saveDraft(
+            noteId = _state.value.currentNoteId,
+            title = title,
+            content = content
+        )
     }
 
     private var lastRecordedVersionContent: String? = null

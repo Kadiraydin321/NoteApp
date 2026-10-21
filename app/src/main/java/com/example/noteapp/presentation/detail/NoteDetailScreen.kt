@@ -111,6 +111,8 @@ import com.example.noteapp.presentation.components.WordGoalProgressBadge
 import com.example.noteapp.presentation.components.TagAutocompleteBar
 import com.example.noteapp.presentation.components.TemplatePickerBottomSheet
 import com.example.noteapp.domain.util.ClipboardHelper
+import com.example.noteapp.domain.util.NoteDraft
+import com.example.noteapp.presentation.components.DraftRecoveryBanner
 import com.example.noteapp.presentation.components.SmartCopyBottomSheet
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
@@ -371,7 +373,10 @@ fun NoteDetailScreen(
     onCycleAudioPlaybackSpeed: () -> Unit = {},
     onSeekAudioFraction: (Float) -> Unit = {},
     onCancelAudioRecording: () -> Unit = {},
-    onSetWordGoal: (Int?) -> Unit = {}
+    onSetWordGoal: (Int?) -> Unit = {},
+    onRestoreDraft: (NoteDraft) -> Unit = {},
+    onDiscardDraft: () -> Unit = {},
+    onSaveDraftPeriodically: (title: String, content: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     var showHistorySheet by remember { mutableStateOf(false) }
@@ -380,6 +385,14 @@ fun NoteDetailScreen(
     var showExportVaultDialog by remember { mutableStateOf(false) }
     var showWordGoalDialog by remember { mutableStateOf(false) }
     var showSmartCopySheet by remember { mutableStateOf(false) }
+
+    // Düzenleme sırasında periyodik karalama taslağı kaydetme (1.2 saniye gecikmeli)
+    LaunchedEffect(state.title, state.contentValue.text) {
+        if (state.title.isNotBlank() || state.contentValue.text.isNotBlank()) {
+            kotlinx.coroutines.delay(1200)
+            onSaveDraftPeriodically(state.title, state.contentValue.text)
+        }
+    }
 
     val currentWordCount = remember(state.contentValue.text) {
         if (state.contentValue.text.isBlank()) 0
@@ -2580,6 +2593,14 @@ fun NoteDetailScreen(
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }
+
+                // Kaydedilmemiş Taslak Bildirimi
+                DraftRecoveryBanner(
+                    draft = state.recoverableDraft,
+                    onRestore = onRestoreDraft,
+                    onDiscard = onDiscardDraft,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
 
                 // Başlık Alanı
                 if (isPresentationMode || isPreviewMode) {
