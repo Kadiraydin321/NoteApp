@@ -122,6 +122,7 @@ import com.example.noteapp.presentation.components.DraftRecoveryBanner
 import com.example.noteapp.presentation.components.NoteInsightsBottomSheet
 import com.example.noteapp.presentation.components.NoteLinkGraphBottomSheet
 import com.example.noteapp.presentation.components.SmartCopyBottomSheet
+import com.example.noteapp.presentation.components.SnippetPickerBottomSheet
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
@@ -396,6 +397,7 @@ fun NoteDetailScreen(
     var showInsightsSheet by remember { mutableStateOf(false) }
     var showGraphSheet by remember { mutableStateOf(false) }
     var showChecklistActionsSheet by remember { mutableStateOf(false) }
+    var showSnippetPickerSheet by remember { mutableStateOf(false) }
 
     // Düzenleme sırasında periyodik karalama taslağı kaydetme (1.2 saniye gecikmeli)
     LaunchedEffect(state.title, state.contentValue.text) {
@@ -1376,6 +1378,22 @@ fun NoteDetailScreen(
                                     }
                                 )
 
+                                // Hızlı Metin Parçacıkları & Makrolar
+                                DropdownMenuItem(
+                                    text = { Text("⚡ Metin Parçacıkları (Makrolar)") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Bolt,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showSnippetPickerSheet = true
+                                    }
+                                )
+
                                 HorizontalDivider()
 
                                 // Önizleme / Düzenleme Modu
@@ -2140,6 +2158,10 @@ fun NoteDetailScreen(
                                                 // Bilgi Kutusu (> [!NOTE])
                                                 IconButton(onClick = { applyPrefix("> [!NOTE] ") }) {
                                                     Icon(Icons.Default.Lightbulb, contentDescription = "Bilgi Kutusu", tint = MaterialTheme.colorScheme.secondary)
+                                                }
+                                                // Hızlı Metin Parçacıkları & Makrolar (⚡)
+                                                IconButton(onClick = { showSnippetPickerSheet = true }) {
+                                                    Icon(Icons.Default.Bolt, contentDescription = "Metin Parçacıkları (Makrolar)", tint = MaterialTheme.colorScheme.primary)
                                                 }
                                             }
                                         }
@@ -4082,6 +4104,34 @@ fun NoteDetailScreen(
                 onContentValueChange(TextFieldValue(newText))
             },
             onDismiss = { showChecklistActionsSheet = false }
+        )
+    }
+
+    // Hızlı Metin Parçacıkları & Dinamik Makrolar (Snippet Picker) BottomSheet
+    if (showSnippetPickerSheet) {
+        SnippetPickerBottomSheet(
+            noteTitle = state.title,
+            onDismissRequest = { showSnippetPickerSheet = false },
+            onSnippetSelected = { expandedText ->
+                val currentTfv = state.contentValue
+                val text = currentTfv.text
+                val selStart = currentTfv.selection.start.coerceIn(0, text.length)
+                val selEnd = currentTfv.selection.end.coerceIn(0, text.length)
+                val start = minOf(selStart, selEnd)
+                val end = maxOf(selStart, selEnd)
+
+                val prefix = text.substring(0, start)
+                val suffix = text.substring(end)
+                val needsNewline = prefix.isNotEmpty() && !prefix.endsWith("\n")
+                val formattedSnippet = if (needsNewline && (expandedText.startsWith("#") || expandedText.startsWith(">") || expandedText.startsWith("|") || expandedText.startsWith("```"))) {
+                    "\n\n$expandedText"
+                } else {
+                    expandedText
+                }
+                val newText = prefix + formattedSnippet + suffix
+                val newCursor = prefix.length + formattedSnippet.length
+                onContentValueChange(TextFieldValue(newText, TextRange(newCursor)))
+            }
         )
     }
 }

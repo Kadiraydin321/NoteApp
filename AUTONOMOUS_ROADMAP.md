@@ -256,9 +256,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `SplitPaneLayoutHelperTest` ile ekran genişliği sınıfı hesaplama, yatay/dikey bölme optimizasyonu, scroll sync yüzdesi ve çift bölme uygunluk testleri %100 doğrulandı.
 
 ### Aşama 42: Dinamik Metin Genişletici & Akıllı Not Parçacıkları (Text Snippet & Macro Expansion Engine)
-- [ ] **Metin Makro & Parçacık Motoru (`TextMacroExpander`):** Not düzenleyicide sık kullanılan metin kalıplarını, dinamik tarih/saat damgalarını, çağrı kutularını (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`), toplantı özetlerini ve markdown kod bloklarını kısa tetikleyicilerle (`:date`, `:time`, `:todo`, `:callout`, `:table`, vb.) anında genişleten motor; imleç konumu hesaplama ve değişken yerleştirme.
-- [ ] **Etkileşimli Parçacık Seçici & Kısayol Menüsü (`SnippetPickerBottomSheet`):** Not detayında araç çubuğundan veya klavyeden tetiklenen hızlı makro menüsü, kategorize edilmiş parçacıklar, anında önizleme ve tek dokunuşla imleç konumuna yapıştırma.
-- [ ] **Birim Testleri:** `TextMacroExpanderTest` ile makro tetikleyici tespiti, dinamik değişken yerleştirme (`{date}`, `{time}`, `{weekday}`), imleç ofset hesabı ve geçersiz girdi dayanıklılık testleri.
+- [x] **Metin Makro & Parçacık Motoru (`TextMacroExpander`):** Not düzenleyicide sık kullanılan metin kalıplarını, dinamik tarih/saat damgalarını (`:bugun`, `:date`, `:saat`, `:zaman`, `:gun`), çağrı kutularını (`:not` -> `> [!NOTE]`, `:ipucu` -> `> [!TIP]`, `:uyari` -> `> [!WARNING]`, `:onemli`, `:dikkat`), toplantı özetlerini (`:toplanti`, `:standup`), karar tablolarını ve markdown kod bloklarını (`:kod`, `:tablo`, `:alinti`, `:ayrac`) kısa tetikleyicilerle anında genişleten motor; imleç konumu hesaplama ve dinamik değişken yerleştirme (`{date}`, `{time}`, `{weekday}`, `{title}`).
+- [x] **Etkileşimli Parçacık Seçici & Kısayol Menüsü (`SnippetPickerBottomSheet`):** Not detayında araç çubuğundan (`⚡`) veya üç nokta menüsünden tetiklenen hızlı makro menüsü, kategorize edilmiş parçacıklar, canlı arama çubuğu, anında genişletilmiş önizleme kutusu ve tek dokunuşla imleç konumuna yapıştırma.
+- [x] **Birim Testleri:** `TextMacroExpanderTest` ile makro tetikleyici tespiti, dinamik değişken yerleştirme (`{date}`, `{time}`, `{weekday}`), imleç ofset hesabı, şablon arama/kategori filtreleme ve sınır koşul testleri %100 doğrulandı.
+
+### Aşama 43: Not Zaman Çizelgesi & Bölümlü Gruplama Motoru (Note Timeline & Sectioned Grouping Engine)
+- [ ] **Zaman Çizelgesi & Gruplama Motoru (`NoteTimelineGrouper`):** Notları oluşturulma/düzenlenme tarihlerine göre insan odaklı zaman dilimlerine ("📌 Sabitlenenler", "⚡ Bugün", "🗓️ Dün", "📅 Bu Hafta", "🗓️ Bu Ay", "🗃️ Daha Eski") ayıran veya kategori bazında gruplayan saf domain motoru; boş grupları filtreleme ve grup içi sıralama.
+- [ ] **Arayüz Entegrasyonu (`NotesScreen`):** Notlar ekranında düz liste ile bölümlü zaman çizelgesi / kategori görünümü arasında geçiş imkanı; akordiyon başlıklı modern bölüm ayraçları ve her bölüm için not adedi sayaç rozetleri.
+- [ ] **Birim Testleri:** `NoteTimelineGrouperTest` ile gece yarısı sınırları, hafta ve ay dilimleri hesaplama, sabitlenmiş not ayrımı, kategori eşleştirme ve boş grup dayanıklılık testleri.
 
 ---
 
@@ -301,3 +306,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 39 Tamamlandı]** İki yönlü not bağlantı haritası ve ters bağlantı gezgini (NoteLinkGraphEngine, NoteLinkGraphBottomSheet, geri referanslar, hayalet bağlantı tespiti, 2. derece ilişkili notlar ve BFS en kısa yol analizi) ve birim testleri tamamlandı.
 * **[Aşama 40 Tamamlandı]** Akıllı görev & yapılacaklar listesi analitiği ve eylem paneli (TaskAnalyticsEngine, ChecklistActionBottomSheet, tamamlananları aşağı taşıma, toplu tamamlama/sıfırlama, tamamlananları temizleme ve panoya aktarma) ve birim testleri tamamlandı.
 * **[Aşama 41 Tamamlandı]** Çift bölmeli canlı düzenleyici ve geniş ekran / tablet uyarlaması (SplitPaneLayoutHelper, SplitRatio, NoteDetailScreen üst çubuk ve menü entegrasyonu, eş zamanlı Markdown canlı önizleme paneli) ve birim testleri tamamlandı.
+* **[Aşama 42 Tamamlandı]** Dinamik metin genişletici & akıllı not parçacıkları motoru (TextMacroExpander, SnippetPickerBottomSheet, dinamik tarih/saat damgaları, admonition/callout blokları, araç çubuğu ⚡ butonu ve menü entegrasyonu) ve birim testleri tamamlandı.
