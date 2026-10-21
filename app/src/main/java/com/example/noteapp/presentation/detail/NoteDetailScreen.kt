@@ -125,6 +125,7 @@ import com.example.noteapp.presentation.components.NoteLinkGraphBottomSheet
 import com.example.noteapp.presentation.components.SmartCopyBottomSheet
 import com.example.noteapp.presentation.components.NoteOutlineBottomSheet
 import com.example.noteapp.presentation.components.SnippetPickerBottomSheet
+import com.example.noteapp.presentation.components.MathFormulaBottomSheet
 import com.example.noteapp.presentation.components.applyCodeBlock
 import com.example.noteapp.presentation.components.applyMarkdownWrap
 import com.example.noteapp.presentation.components.applyPrefixToLine
@@ -400,6 +401,7 @@ fun NoteDetailScreen(
     var showGraphSheet by remember { mutableStateOf(false) }
     var showChecklistActionsSheet by remember { mutableStateOf(false) }
     var showSnippetPickerSheet by remember { mutableStateOf(false) }
+    var showMathFormulaSheet by remember { mutableStateOf(false) }
     var trimmingAudioPath by remember { mutableStateOf<String?>(null) }
 
     // Düzenleme sırasında periyodik karalama taslağı kaydetme (1.2 saniye gecikmeli)
@@ -1397,6 +1399,21 @@ fun NoteDetailScreen(
                                     }
                                 )
 
+                                DropdownMenuItem(
+                                    text = { Text("Matematik & LaTeX Formülü") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Functions,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showMathFormulaSheet = true
+                                    }
+                                )
+
                                 HorizontalDivider()
 
                                 // Önizleme / Düzenleme Modu
@@ -2160,6 +2177,10 @@ fun NoteDetailScreen(
                                                 // Hızlı Metin Parçacıkları & Makrolar (⚡)
                                                 IconButton(onClick = { showSnippetPickerSheet = true }) {
                                                     Icon(Icons.Default.Bolt, contentDescription = "Metin Parçacıkları (Makrolar)", tint = MaterialTheme.colorScheme.primary)
+                                                }
+                                                // Matematiksel Formül (∑)
+                                                IconButton(onClick = { showMathFormulaSheet = true }) {
+                                                    Icon(Icons.Default.Functions, contentDescription = "Matematiksel Formül (LaTeX)", tint = MaterialTheme.colorScheme.primary)
                                                 }
                                             }
                                         }
@@ -4100,6 +4121,34 @@ fun NoteDetailScreen(
                     "✂️ Ses kaydı kırpıldı: ${trimWindow.formattedDuration}",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
+            }
+        )
+    }
+
+    // Matematik & LaTeX Formül Asistanı Alt Sayfası
+    if (showMathFormulaSheet) {
+        MathFormulaBottomSheet(
+            onDismissRequest = { showMathFormulaSheet = false },
+            onInsertFormula = { formula ->
+                showMathFormulaSheet = false
+                val currentTfv = state.contentValue
+                val text = currentTfv.text
+                val selStart = currentTfv.selection.start.coerceIn(0, text.length)
+                val selEnd = currentTfv.selection.end.coerceIn(0, text.length)
+                val start = minOf(selStart, selEnd)
+                val end = maxOf(selStart, selEnd)
+
+                val prefix = text.substring(0, start)
+                val suffix = text.substring(end)
+                val needsNewline = prefix.isNotEmpty() && !prefix.endsWith("\n")
+                val formattedFormula = if (needsNewline && formula.startsWith("$$")) {
+                    "\n\n$formula"
+                } else {
+                    formula
+                }
+                val newText = prefix + formattedFormula + suffix
+                val newCursor = prefix.length + formattedFormula.length
+                onContentValueChange(TextFieldValue(newText, TextRange(newCursor)))
             }
         )
     }

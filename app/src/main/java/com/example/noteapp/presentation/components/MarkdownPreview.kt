@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.example.noteapp.domain.util.ClipboardHelper
 import com.example.noteapp.domain.util.CodeSyntaxHighlighter
 import com.example.noteapp.domain.util.MarkdownTableParser
+import com.example.noteapp.domain.util.MathFormulaEngine
 
 @Composable
 fun MarkdownPreview(
@@ -164,6 +166,128 @@ fun MarkdownPreview(
                     }
                 }
                 index = if (codeEnd < lines.size) codeEnd + 1 else lines.size
+                continue
+            }
+
+            // 0. Matematiksel Blok Formül: $$ ... $$
+            if (trimmed.startsWith("$$")) {
+                val isSingleLine = trimmed.length > 2 && trimmed.endsWith("$$") && trimmed != "$$"
+                val mathStart = lineIndex
+                var mathEnd = lineIndex
+                val latexContent = if (isSingleLine) {
+                    trimmed.removePrefix("$$").removeSuffix("$$").trim()
+                } else {
+                    mathEnd = lineIndex + 1
+                    while (mathEnd < lines.size && !lines[mathEnd].trim().endsWith("$$")) {
+                        mathEnd++
+                    }
+                    val rawBlockLines = lines.subList(mathStart, minOf(mathEnd + 1, lines.size))
+                    rawBlockLines.joinToString("\n")
+                        .replace(Regex("^\\s*\\$\\$"), "")
+                        .replace(Regex("\\$\\$\\s*$"), "")
+                        .trim()
+                }
+
+                val renderedUnicode = remember(latexContent) {
+                    MathFormulaEngine.convertToUnicodeMath(latexContent)
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Functions,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = "Matematik / LaTeX",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        ),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            val ctx = LocalContext.current
+                            IconButton(
+                                onClick = {
+                                    ClipboardHelper.copyToClipboard(
+                                        context = ctx,
+                                        label = "Formül",
+                                        text = latexContent,
+                                        option = ClipboardHelper.CopyOption.PLAIN_TEXT,
+                                        showToast = true
+                                    )
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Formülü Kopyala",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = renderedUnicode.ifBlank { latexContent },
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontFamily = FontFamily.Serif,
+                                    fontStyle = FontStyle.Italic,
+                                    fontSize = (fontSize * 1.25f).sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                ),
+                                color = contentColor
+                            )
+                        }
+                    }
+                }
+
+                index = if (isSingleLine) lineIndex + 1 else if (mathEnd < lines.size) mathEnd + 1 else lines.size
                 continue
             }
 
@@ -470,6 +594,7 @@ private val INLINE_STRIKE_REGEX = Regex("~~([^~\\n]+?)~~")
 private val INLINE_HIGHLIGHT_REGEX = Regex("==([^=\\n]+?)==")
 private val INLINE_CODE_REGEX = Regex("`([^`\\n]+?)`")
 private val INLINE_WIKI_LINK_REGEX = Regex("\\[\\[([^\\]\\n]+?)\\]\\]")
+private val INLINE_MATH_REGEX = Regex("(?<!\\\\)\\$(?!\\s)([^$\\n]+?)(?<![\\s\\\\])\\$")
 
 @Composable
 fun MarkdownText(
@@ -632,6 +757,22 @@ fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString 
         tokenIndices.add(range.last)
         spans.add(Span(range.first + 2, range.last - 1, SpanStyle(color = Color(0xFF1E88E5), textDecoration = TextDecoration.Underline, fontWeight = FontWeight.Bold)))
         stringAnnotations.add(Triple("backlink", noteName, (range.first + 2) until (range.last)))
+    }
+
+    // 10. Satır İçi Matematik Formülü: $formül$
+    for (match in INLINE_MATH_REGEX.findAll(text)) {
+        val range = match.range
+        val mathContent = match.groupValues[1]
+        if (mathContent.isNotBlank() && !mathContent.matches(Regex("^\\d+([.,]\\d+)?$"))) {
+            tokenIndices.add(range.first)
+            tokenIndices.add(range.last)
+            spans.add(Span(range.first + 1, range.last, SpanStyle(
+                fontFamily = FontFamily.Serif,
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF673AB7)
+            )))
+        }
     }
 
     // Metni oluştururken işaretleri atla ve yeni indeksleri haritalandır
