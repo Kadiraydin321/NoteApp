@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material3.*
@@ -30,6 +31,7 @@ fun ChecklistProgressRing(
     onMoveToBottom: () -> Unit,
     onToggleAll: (Boolean) -> Unit,
     onRemoveCompleted: () -> Unit,
+    onOpenHub: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -77,6 +79,24 @@ fun ChecklistProgressRing(
             expanded = showMenu,
             onDismissRequest = { showMenu = false }
         ) {
+            if (onOpenHub != null) {
+                DropdownMenuItem(
+                    text = { Text("📋 Görev Eylem Merkezi") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Checklist,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    onClick = {
+                        showMenu = false
+                        onOpenHub()
+                    }
+                )
+                HorizontalDivider()
+            }
+
             DropdownMenuItem(
                 text = { Text("Tamamlananları Alta Taşı") },
                 leadingIcon = {

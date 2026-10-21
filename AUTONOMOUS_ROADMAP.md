@@ -246,9 +246,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `NoteLinkGraphEngineTest` ile iki yönlü graf inşası, ters bağlantı çıkarımı, döngüsel referanslar, yetim not tespiti ve BFS bağlantı yolu testleri %100 doğrulandı.
 
 ### Aşama 40: Akıllı Görev & Yapılacaklar Listesi Analitiği ve Hızlı Düzenleme Paneli (Checklist Task Suite & Action Hub)
-- [ ] **Görev Analitik & Dönüştürme Motoru (`TaskAnalyticsEngine`):** Not içeriğindeki açık (`- [ ]`) ve tamamlanan (`- [x]`) maddeleri analiz etme; tamamlanan tüm maddeleri listenin en altına taşıma (`sortCompletedToBottom`); tüm görevleri tek işlemde tamamlama veya sıfırlama (`setAllTaskStates`); tamamlanan maddeleri temizleme veya arşivleme (`stripCompletedTasks`).
-- [ ] **Etkileşimli Görev Eylem Paneli (`ChecklistActionBottomSheet`):** Not detayında kontrol listesi bulunduğunda tek tıkla açılan görev kontrol merkezi; tamamlanma oranı göstergesi, "Kalan Görevleri Başa Al", "Tamamlananları Aşağı Taşı", "Tümünü Tamamla / Sıfırla" ve "Tamamlananları Sil" hızlı işlem butonları.
-- [ ] **Birim Testleri:** `TaskAnalyticsEngineTest` ile görev ayıklama, toplu durum değiştirme, sona taşıma, boş maddeleri filtreleme ve metin format koruma testleri.
+- [x] **Görev Analitik & Dönüştürme Motoru (`TaskAnalyticsEngine`):** Not içeriğindeki açık (`- [ ]`) ve tamamlanan (`- [x]`) maddeleri analiz etme; tamamlanan tüm maddeleri listenin en altına taşıma (`sortCompletedToBottom`); tüm görevleri tek işlemde tamamlama veya sıfırlama (`setAllTasksState`); tamamlanan maddeleri temizleme veya arşivleme (`removeCompletedTasks`); açık görevleri temiz madde işaretli metin olarak çıkarma (`extractOpenTasksAsPlainText`).
+- [x] **Etkileşimli Görev Eylem Paneli (`ChecklistActionBottomSheet`):** Not detayında kontrol listesi bulunduğunda tek tıkla açılan görev kontrol merkezi; tamamlanma oranı göstergesi, "Tamamlananları Aşağı Taşı", "Tümünü Tamamla", "Tümünü Sıfırla", "Tamamlananları Listeden Temizle" ve "Kalan Görevleri Kopyala" hızlı işlem butonları; `ChecklistProgressRing` ile doğrudan entegrasyon.
+- [x] **Birim Testleri:** `TaskAnalyticsEngineTest` ile görev ayıklama, toplu durum değiştirme, sona taşıma, boş maddeleri filtreleme ve metin format koruma testleri %100 doğrulandı.
+
+### Aşama 41: Çift Bölmeli Canlı Düzenleyici & Geniş Ekran / Tablet Uyarlaması (Split-Pane Live Markdown Editor & Tablet Layout)
+- [ ] **Geniş Ekran Bölünmüş Düzen Motoru (`SplitPaneLayoutHelper`):** Cihaz yatay modda veya ekran genişliği $\ge 600$ dp olduğunda (tablet, katlanabilir ekran, Chromebook) sol tarafta düzenleme alanı, sağ tarafta canlı render edilen Markdown önizleme sunan çift bölmeli düzen; bölme oranları (50/50, 40/60) ve ekran boyutu sınıflayıcısı.
+- [ ] **Eş Zamanlı Canlı Önizleme & Görünüm:** Not detay ekranında geniş ekranda klavyeden yazıldığı anda sağ bölmede anlık formatlanmış zengin metin, tablolar ve checklist renderı; tek dokunuşla tam ekran / bölünmüş ekran geçişi.
+- [ ] **Birim Testleri:** `SplitPaneLayoutHelperTest` ile ekran genişliği sınıfı hesaplama, yatay/dikey bölme optimizasyonu ve çift bölme uygunluk testleri.
 
 ---
 
@@ -289,3 +294,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 37 Tamamlandı]** Kategori bazlı biyometrik kilit ve gizlilik koruması (CategoryLockManager, SharedPreferencesCategoryLockStorage, gizlilik kalkanı kartları, kategori yönetimi kilit anahtarı, çekmece/filtre rozetleri) ve birim testleri tamamlandı.
 * **[Aşama 38 Tamamlandı]** Akıllı not içi okuma metrikleri ve metin analiz paneli (NoteMetricsEngine, NoteInsightsBottomSheet, okunabilirlik dereceleri, sesli/sessiz okuma süreleri, kelime zenginliği, anahtar kelime frekans analizi) ve birim testleri tamamlandı.
 * **[Aşama 39 Tamamlandı]** İki yönlü not bağlantı haritası ve ters bağlantı gezgini (NoteLinkGraphEngine, NoteLinkGraphBottomSheet, geri referanslar, hayalet bağlantı tespiti, 2. derece ilişkili notlar ve BFS en kısa yol analizi) ve birim testleri tamamlandı.
+* **[Aşama 40 Tamamlandı]** Akıllı görev & yapılacaklar listesi analitiği ve eylem paneli (TaskAnalyticsEngine, ChecklistActionBottomSheet, tamamlananları aşağı taşıma, toplu tamamlama/sıfırlama, tamamlananları temizleme ve panoya aktarma) ve birim testleri tamamlandı.

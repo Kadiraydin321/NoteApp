@@ -98,6 +98,7 @@ import com.example.noteapp.notification.NotificationHelper
 import com.example.noteapp.presentation.components.AttachmentList
 import com.example.noteapp.presentation.components.AudioRecordingVisualizerBar
 import com.example.noteapp.presentation.components.CategoryColorPicker
+import com.example.noteapp.presentation.components.ChecklistActionBottomSheet
 import com.example.noteapp.presentation.components.ChecklistProgressRing
 import com.example.noteapp.presentation.components.ExportVaultDialog
 import com.example.noteapp.presentation.components.FindAndReplaceBar
@@ -391,6 +392,7 @@ fun NoteDetailScreen(
     var showSmartCopySheet by remember { mutableStateOf(false) }
     var showInsightsSheet by remember { mutableStateOf(false) }
     var showGraphSheet by remember { mutableStateOf(false) }
+    var showChecklistActionsSheet by remember { mutableStateOf(false) }
 
     // Düzenleme sırasında periyodik karalama taslağı kaydetme (1.2 saniye gecikmeli)
     LaunchedEffect(state.title, state.contentValue.text) {
@@ -1332,6 +1334,22 @@ fun NoteDetailScreen(
                                     onClick = {
                                         showMoreMenu = false
                                         showGraphSheet = true
+                                    }
+                                )
+
+                                // Görev Listesi İşlemleri (Checklist Suite)
+                                DropdownMenuItem(
+                                    text = { Text("📋 Görev Listesi İşlemleri") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Checklist,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showChecklistActionsSheet = true
                                     }
                                 )
 
@@ -2381,6 +2399,9 @@ fun NoteDetailScreen(
                                             onRemoveCompleted = {
                                                 val cleaned = ChecklistSorter.removeCompletedItems(state.contentValue.text)
                                                 onContentValueChange(TextFieldValue(cleaned))
+                                            },
+                                            onOpenHub = {
+                                                showChecklistActionsSheet = true
                                             }
                                         )
                                         Spacer(Modifier.width(6.dp))
@@ -3899,6 +3920,17 @@ fun NoteDetailScreen(
                 onLinkClick(phantomTitle)
             },
             onDismiss = { showGraphSheet = false }
+        )
+    }
+
+    // Görev Listesi İşlemleri (Checklist Action Hub) BottomSheet
+    if (showChecklistActionsSheet) {
+        ChecklistActionBottomSheet(
+            content = state.contentValue.text,
+            onApplyModifiedContent = { newText ->
+                onContentValueChange(TextFieldValue(newText))
+            },
+            onDismiss = { showChecklistActionsSheet = false }
         )
     }
 }
