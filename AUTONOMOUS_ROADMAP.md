@@ -216,9 +216,14 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 - [x] **Birim Testleri:** `ClipboardHelperTest` ile markdown temizleme, başlık/içerik birleştirme, özet sınırlaması, checklist ayıklama ve kelime sayım testleri %100 doğrulandı.
 
 ### Aşama 34: Takvim & Tarih Bazlı Not Ajandası Görünümü (Calendar & Note Agenda View)
-- [ ] **Ajanda & Takvim Gruplayıcı Motoru (`CalendarNoteGrouper`):** Notları oluşturulma, güncellenme ve hatırlatıcı tarihlerine göre `LocalDate` (Yıl-Ay-Gün) bazında gruplama, her gün için not yoğunluk haritası (activity dot count) ve aktif gün istatistikleri çıkarma.
-- [ ] **İnteraktif Aylık / Haftalık Takvim Çubuğu (`CalendarAgendaBar`):** Ana ekranda takvim modu açıldığında günleri gösteren, üzerinde not olan günleri renkli noktalarla belirten, "Bugüne Dön" butonlu ve seçilen güne ait notları anında listeleyen ajanda görünümü.
-- [ ] **Birim Testleri:** `CalendarNoteGrouperTest` ile tarih eşleştirme, gün bazlı gruplama, sınır tarihleri ve yoğunluk haritası testleri.
+- [x] **Ajanda & Takvim Gruplayıcı Motoru (`CalendarNoteGrouper`):** Notları oluşturulma, güncellenme ve hatırlatıcı tarihlerine göre `LocalDate` bazında gruplama, her gün için not etkinlik/yoğunluk haritası (`calculateMonthActivity`), 7 günlük hafta dilimleri (`getWeekDates`), tam takvim matrisi (`getMonthCalendarDays`) ve kullanıcı dostu Türkçe tarih etiketleri.
+- [x] **İnteraktif Aylık / Haftalık Takvim Çubuğu (`CalendarAgendaBar`):** Ana ekranda filtre çubuğuna entegre "Ajanda" çipi, kompakt 7 günlük yatay kaydırma ve genişletilebilir tam aylık takvim ızgarası, notu olan günlerde renkli etkinlik noktaları, "Bugün" hızlı atlama butonu ve seçilen güne ait notları anında süzme.
+- [x] **Birim Testleri:** `CalendarNoteGrouperTest` ile tarih eşleştirme, gün bazlı gruplama, sınır tarihleri, hafta başlangıç/bitiş günleri ve etkinlik yoğunluk testleri %100 doğrulandı.
+
+### Aşama 35: Not Versiyon Karşılaştırma & Görsel Diff İnceleyici (Note Version Diff & Change Visualizer)
+- [ ] **Görsel Metin Fark Motoru (`NoteDiffEngine`):** İki not versiyonu veya mevcut içerik ile geçmiş versiyon arasındaki satır/kelime bazlı farkları (eklenen `+`, silinen `-`, korunan satırlar) hesaplama, LCS algoritması ve değişim istatistiği çıkarma (+X ekleme, -Y silme).
+- [ ] **Görsel Değişiklik İnceleme Penceresi (`NoteDiffDialog`):** `NoteHistoryBottomSheet` geçmiş listesinde her versiyon için "Değişiklikleri Gör" butonu; yeşil/kırmızı zeminle vurgulanmış satır bazlı karşılaştırma ekranı ve tek tıkla geri yükleme.
+- [ ] **Birim Testleri:** `NoteDiffEngineTest` ile ekleme, silme, değiştirme, boşluk koruma ve satır hizalama testleri.
 
 ---
 
@@ -253,3 +258,4 @@ Bu belge, **NoteApp (Not Defterim)** Android uygulamasının otonom geliştirme 
 * **[Aşama 31 Tamamlandı]** Akıllı etiket otomatik tamamlama (TagSuggestionEngine, TagAutocompleteBar), etiket yönetim alt sayfası (TagManagerBottomSheet), toplu etiket refaktörü/silme ve birim testleri tamamlandı.
 * **[Aşama 32 Tamamlandı]** Çoklu görsel kolaj ızgarası (GalleryGridCalculator, AttachmentList), +X taşma rozeti, tam ekran sağa/sola kaydırmalı fotoğraf görüntüleyici (HorizontalPager) ve birim testleri tamamlandı.
 * **[Aşama 33 Tamamlandı]** Akıllı not kopyalama paketi (ClipboardHelper, SmartCopyBottomSheet), düz metin, markdown, özet, görev listesi kopyalama, haptik titreşim ve birim testleri tamamlandı.
+* **[Aşama 34 Tamamlandı]** Takvim & not ajandası görünümü (CalendarNoteGrouper, CalendarAgendaBar), haftalık/aylık etkinlik haritası, güne göre filtreleme ve birim testleri tamamlandı.

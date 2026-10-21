@@ -48,9 +48,11 @@ import com.example.noteapp.data.settings.QuickActionLocation
 import com.example.noteapp.data.settings.SearchBarShape
 import com.example.noteapp.domain.util.VaultExportEngine
 import com.example.noteapp.domain.util.VaultNote
+import com.example.noteapp.presentation.components.CalendarAgendaBar
 import com.example.noteapp.presentation.components.ExportVaultDialog
 import com.example.noteapp.presentation.components.SmartCopyBottomSheet
 import com.example.noteapp.presentation.components.TagManagerBottomSheet
+import java.time.LocalDate
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -138,6 +140,8 @@ fun NotesScreen(
     onRenameTag: (oldTag: String, newTag: String) -> Unit = { _, _ -> },
     onDeleteTag: (String) -> Unit = {},
     getTagUsageCounts: () -> Map<String, Int> = { emptyMap() },
+    onToggleAgendaMode: () -> Unit = {},
+    onSelectAgendaDate: (LocalDate?) -> Unit = {},
     onSettingsClick: () -> Unit
 ) {
     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
@@ -1275,13 +1279,28 @@ fun NotesScreen(
                         // Tür Filtreleri
                         item(key = "type_all") {
                             FilterChip(
-                                selected = state.filterType == NoteTypeFilter.ALL && state.selectedCategory == null && state.selectedTag == null,
+                                selected = state.filterType == NoteTypeFilter.ALL && state.selectedCategory == null && state.selectedTag == null && !state.isAgendaModeEnabled,
                                 onClick = {
                                     onFilterTypeChange(NoteTypeFilter.ALL)
                                     if (state.selectedCategory != null) onCategorySelect(null)
                                     if (state.selectedTag != null) onSelectTag(null)
+                                    if (state.isAgendaModeEnabled) onToggleAgendaMode()
                                 },
                                 label = { Text("Tümü") }
+                            )
+                        }
+                        item(key = "agenda_toggle") {
+                            FilterChip(
+                                selected = state.isAgendaModeEnabled,
+                                onClick = onToggleAgendaMode,
+                                label = { Text("Ajanda") },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.CalendarMonth,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
                             )
                         }
                         item(key = "type_pinned") {
@@ -1336,6 +1355,19 @@ fun NotesScreen(
                             }
                         }
                     }
+                }
+
+                // Ajanda / Takvim Çubuğu
+                AnimatedVisibility(
+                    visible = state.isAgendaModeEnabled && state.viewMode == NotesViewMode.ALL,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    CalendarAgendaBar(
+                        notes = state.notes,
+                        selectedDate = state.selectedAgendaDate,
+                        onDateSelected = onSelectAgendaDate
+                    )
                 }
 
                 // Çöp Kutusu Saklama Politikası Bilgilendirme Kartı
@@ -1403,11 +1435,14 @@ fun NotesScreen(
                                 modifier = Modifier.size(38.dp)
                             )
                             Text(
-                                text = if (state.searchQuery.isNotEmpty()) "Sonuç bulunamadı" else when (state.viewMode) {
-                                    NotesViewMode.ALL -> "Burada henüz not yok"
-                                    NotesViewMode.REMINDERS -> "Hatırlatıcı yok"
-                                    NotesViewMode.ARCHIVE -> "Arşiv boş"
-                                    NotesViewMode.TRASH -> "Çöp kutusu boş"
+                                text = when {
+                                    state.searchQuery.isNotEmpty() -> "Sonuç bulunamadı"
+                                    state.isAgendaModeEnabled && state.selectedAgendaDate != null -> "Bu tarihte not bulunmuyor"
+                                    state.viewMode == NotesViewMode.ALL -> "Burada henüz not yok"
+                                    state.viewMode == NotesViewMode.REMINDERS -> "Hatırlatıcı yok"
+                                    state.viewMode == NotesViewMode.ARCHIVE -> "Arşiv boş"
+                                    state.viewMode == NotesViewMode.TRASH -> "Çöp kutusu boş"
+                                    else -> "Not bulunamadı"
                                 },
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold
@@ -1415,6 +1450,12 @@ fun NotesScreen(
                             if (state.searchQuery.isNotEmpty()) {
                                 Text(
                                     "Başka bir arama sözcüğü deneyin.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else if (state.isAgendaModeEnabled && state.selectedAgendaDate != null) {
+                                Text(
+                                    "Bu güne özel yeni bir not eklemek için + butonuna dokunun.",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

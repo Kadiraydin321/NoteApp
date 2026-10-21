@@ -9,7 +9,9 @@ import com.example.noteapp.data.settings.NotesLayoutMode
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.repository.NoteRepository
+import com.example.noteapp.domain.util.CalendarNoteGrouper
 import com.example.noteapp.domain.util.TagSuggestionEngine
+import java.time.LocalDate
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -81,7 +83,9 @@ data class NotesState(
     val sortOrder: NoteSortOrder = NoteSortOrder.MODIFIED_DESC,
     val selectedTag: String? = null,
     val trashRetentionPolicy: com.example.noteapp.data.settings.TrashRetentionPolicy = com.example.noteapp.data.settings.TrashRetentionPolicy.DAYS_30,
-    val recentSearches: List<String> = emptyList()
+    val recentSearches: List<String> = emptyList(),
+    val isAgendaModeEnabled: Boolean = false,
+    val selectedAgendaDate: LocalDate? = null
 )
 
 @HiltViewModel
@@ -299,6 +303,20 @@ class NotesViewModel @Inject constructor(
         recalculateNotes()
     }
 
+    fun onToggleAgendaMode() {
+        val next = !_state.value.isAgendaModeEnabled
+        _state.value = _state.value.copy(
+            isAgendaModeEnabled = next,
+            selectedAgendaDate = if (next) (_state.value.selectedAgendaDate ?: LocalDate.now()) else null
+        )
+        recalculateNotes()
+    }
+
+    fun onSelectAgendaDate(date: LocalDate?) {
+        _state.value = _state.value.copy(selectedAgendaDate = date)
+        recalculateNotes()
+    }
+
     /** Run full-text matching, tag extraction, and sorting away from the UI thread. */
     private fun recalculateNotes(debounce: Boolean = false) {
         derivedNotesJob?.cancel()
@@ -332,7 +350,11 @@ class NotesViewModel @Inject constructor(
                     val matchesTag = tagToken == null ||
                             note.content.contains(tagToken, ignoreCase = true) ||
                             note.title.contains(tagToken, ignoreCase = true)
-                    matchesTag
+                    if (!matchesTag) return@filter false
+
+                    val matchesAgendaDate = !snapshot.isAgendaModeEnabled || snapshot.selectedAgendaDate == null ||
+                            CalendarNoteGrouper.filterNotesByDate(listOf(note), snapshot.selectedAgendaDate).isNotEmpty()
+                    matchesAgendaDate
                 }
 
                 fun modifiedTime(note: Note): Long = when {
@@ -369,7 +391,9 @@ class NotesViewModel @Inject constructor(
                 latest.searchQuery == snapshot.searchQuery &&
                 latest.filterType == snapshot.filterType &&
                 latest.sortOrder == snapshot.sortOrder &&
-                latest.selectedTag == snapshot.selectedTag
+                latest.selectedTag == snapshot.selectedTag &&
+                latest.isAgendaModeEnabled == snapshot.isAgendaModeEnabled &&
+                latest.selectedAgendaDate == snapshot.selectedAgendaDate
             ) {
                 _state.value = latest.copy(filteredNotes = visibleNotes)
             }

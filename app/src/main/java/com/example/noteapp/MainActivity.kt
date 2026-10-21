@@ -398,6 +398,8 @@ class MainActivity : FragmentActivity() {
                                 }
                             },
                             getTagUsageCounts = viewModel::getTagUsageCounts,
+                            onToggleAgendaMode = viewModel::onToggleAgendaMode,
+                            onSelectAgendaDate = viewModel::onSelectAgendaDate,
                             onSettingsClick = {
                                 navController.navigate("settings_screen")
                             }
