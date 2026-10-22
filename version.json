@@ -1,8 +1,8 @@
 {
-  "versionCode": 19,
+  "versionCode": 20,
   "versionName": "1.0.0.7",
-  "buildTime": 1792600000000,
+  "buildTime": 1792610000000,
   "releaseDate": "23.10.2026",
-  "changeLog": "IconLabel bileseni eklendi.",
+  "changeLog": "SectionTitle bileseni eklendi.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/hermes/NoteApp-release.apk"
 }
