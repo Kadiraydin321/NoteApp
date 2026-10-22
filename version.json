@@ -1,8 +1,8 @@
 {
-  "versionCode": 10,
+  "versionCode": 11,
   "versionName": "1.0.0.7",
-  "buildTime": 1792510000000,
+  "buildTime": 1792520000000,
   "releaseDate": "23.10.2026",
-  "changeLog": "Yeni LoadingShimmer bileseni eklendi; UI yukleme durumlari icin animasyonlu iskelet.",
+  "changeLog": "EmptyState bileseni eklendi; bos listeler icin ikon+baslik+aciklama.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/hermes/NoteApp-release.apk"
 }
