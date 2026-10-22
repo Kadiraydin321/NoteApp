@@ -1,8 +1,8 @@
 {
-  "versionCode": 13,
+  "versionCode": 14,
   "versionName": "1.0.0.7",
-  "buildTime": 1792540000000,
+  "buildTime": 1792550000000,
   "releaseDate": "23.10.2026",
-  "changeLog": "TagChip bileseni eklendi; etiketler icin tutarli chip gorunumu.",
+  "changeLog": "ConfirmDialog bileseni eklendi; onay diyaloğu icin yeniden kullanilabilir.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/hermes/NoteApp-release.apk"
 }
