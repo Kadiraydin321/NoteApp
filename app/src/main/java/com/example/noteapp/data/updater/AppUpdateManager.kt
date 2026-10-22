@@ -49,8 +49,8 @@ class AppUpdateManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
-        private const val GITHUB_VERSION_JSON_URL = "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/version.json"
-        private const val GITHUB_APK_RAW_URL = "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
+        private const val GITHUB_VERSION_JSON_URL = "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/hermes/version.json"
+        private const val GITHUB_APK_RAW_URL = "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/hermes/NoteApp-release.apk"
         private const val GITHUB_COMMITS_API = "https://api.github.com/repos/Kadiraydin321/NoteApp/commits/apk"
         private const val APK_FILE_NAME = "NoteApp-update.apk"
         private const val APK_TEMP_NAME = "NoteApp-update.apk.tmp"
