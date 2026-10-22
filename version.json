@@ -1,8 +1,8 @@
 {
-  "versionCode": 17,
+  "versionCode": 18,
   "versionName": "1.0.0.7",
-  "buildTime": 1792580000000,
+  "buildTime": 1792590000000,
   "releaseDate": "23.10.2026",
-  "changeLog": "KeyValueRow ve DividerLabel bilesenleri eklendi.",
+  "changeLog": "StatusBadge bileseni eklendi; durum etiketleri icin renkli badge.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/hermes/NoteApp-release.apk"
 }
