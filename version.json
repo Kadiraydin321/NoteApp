@@ -1,8 +1,8 @@
 {
-  "versionCode": 14,
+  "versionCode": 15,
   "versionName": "1.0.0.7",
-  "buildTime": 1792550000000,
+  "buildTime": 1792560000000,
   "releaseDate": "23.10.2026",
-  "changeLog": "ConfirmDialog bileseni eklendi; onay diyaloğu icin yeniden kullanilabilir.",
+  "changeLog": "InfoRow bileseni eklendi; ayarlar/istatistik satirlari icin tutarli.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/hermes/NoteApp-release.apk"
 }
