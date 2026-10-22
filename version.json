@@ -1,8 +1,8 @@
 {
   "versionCode": 20,
-  "versionName": "1.0.0.7",
+  "versionName": "1.2.0",
   "buildTime": 1792610000000,
   "releaseDate": "23.10.2026",
-  "changeLog": "SectionTitle bileseni eklendi.",
+  "changeLog": "Hermes branch guncellemeleri: LoadingShimmer, EmptyState, SectionHeader, TagChip, ConfirmDialog, InfoRow, PillButton, KeyValueRow, DividerLabel, StatusBadge, IconLabel, SectionTitle bilesenleri eklendi; UI tutarliligi iyilestirildi.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/hermes/NoteApp-release.apk"
 }
