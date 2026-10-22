@@ -1,8 +1,8 @@
 {
-  "versionCode": 16,
+  "versionCode": 17,
   "versionName": "1.0.0.7",
-  "buildTime": 1792570000000,
+  "buildTime": 1792580000000,
   "releaseDate": "23.10.2026",
-  "changeLog": "PillButton bileseni eklendi; yuvarlak kenarli buton.",
+  "changeLog": "KeyValueRow ve DividerLabel bilesenleri eklendi.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/hermes/NoteApp-release.apk"
 }
