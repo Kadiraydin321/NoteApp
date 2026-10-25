@@ -1,5 +1,6 @@
 package com.example.noteapp.quicknote
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
@@ -11,6 +12,7 @@ import com.example.noteapp.MainActivity
 @RequiresApi(Build.VERSION_CODES.N)
 class QuickNoteTileService : TileService() {
 
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     override fun onClick() {
         super.onClick()
         val intent = Intent(this, MainActivity::class.java).apply {
@@ -37,7 +39,7 @@ class QuickNoteTileService : TileService() {
         super.onStartListening()
         qsTile?.apply {
             state = Tile.STATE_ACTIVE
-            label = "Hızlı Not"
+            label = "Hizli Not"
             updateTile()
         }
     }

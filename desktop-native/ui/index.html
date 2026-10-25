@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Not Defterim - Masaüstü</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- ============================================== -->
+    <!-- 1. SOL MENÜ (SIDEBAR)                          -->
+    <!-- ============================================== -->
+    <aside class="sidebar">
+      <div>
+        <div class="brand">
+          <svg viewBox="0 0 48 48" style="width:34px;height:34px;border-radius:8px;">
+            <rect width="48" height="48" rx="10" fill="url(#brandGrad)"/>
+            <path d="M14 16H34M14 24H28M14 32H24" stroke="white" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="34" cy="32" r="6" fill="#10B981"/>
+            <path d="M32 32L34 34L37 30" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="brandGrad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#4F46E5"/>
+                <stop offset="1" stop-color="#7C3AED"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div>
+            <div class="brand-title">Not Defterim</div>
+            <div class="brand-sub">Masaüstü Sürümü</div>
+          </div>
+        </div>
+
+        <div class="theme-picker-container">
+          <button class="theme-btn" id="btnThemeToggle" title="Renk Paletini Değiştir">
+            <span>🎨 Renk Teması</span>
+            <span id="currentThemeLabel" style="color:var(--primary); font-weight:700;">Kehribar</span>
+          </button>
+          <div class="theme-dropdown" id="themeDropdown">
+            <div class="theme-option active" data-theme="amber">
+              <span class="theme-color-preview" style="background:#F59E0B;"></span>
+              <span>Sıcak Kehribar (Mobil)</span>
+            </div>
+            <div class="theme-option" data-theme="sapphire">
+              <span class="theme-color-preview" style="background:#38BDF8;"></span>
+              <span>Derin Okyanus</span>
+            </div>
+            <div class="theme-option" data-theme="emerald">
+              <span class="theme-color-preview" style="background:#10B981;"></span>
+              <span>Zümrüt Ormanı</span>
+            </div>
+            <div class="theme-option" data-theme="plum">
+              <span class="theme-color-preview" style="background:#EC4899;"></span>
+              <span>Gece Mürdüm</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-new-note" id="btnNewNote" style="width:100%;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Yeni Not
+        </button>
+
+        <nav class="nav-list">
+          <div class="nav-item active" data-filter="all">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+            <span>Tüm Notlar</span>
+            <span class="nav-count" id="countAll">0</span>
+          </div>
+          <div class="nav-item" data-filter="pinned">
+            <svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+            <span>Sabitlenenler</span>
+            <span class="nav-count" id="countPinned">0</span>
+          </div>
+          <div class="nav-item" data-filter="vault">
+            <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+            <span>Kilitli Kasa</span>
+            <span class="nav-count" id="countVault">0</span>
+          </div>
+          <div class="nav-item" data-filter="archive">
+            <svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+            <span>Arşiv</span>
+            <span class="nav-count" id="countArchive">0</span>
+          </div>
+          <div class="nav-item" data-filter="trash">
+            <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            <span>Çöp Kutusu</span>
+            <span class="nav-count" id="countTrash">0</span>
+          </div>
+        </nav>
+
+        <div class="categories-section">
+          <div class="cat-header">
+            <span>KATEGORİLER</span>
+            <button class="cat-btn-add" id="btnOpenCatModal" title="Kategori Yönetimi">+</button>
+          </div>
+          <div id="catListContainer" style="display:flex; flex-direction:column; gap:2px;"></div>
+        </div>
+      </div>
+
+      <div class="sidebar-bottom">
+        <button class="tool-btn" id="btnOpenSync">
+          <svg viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4z"/></svg>
+          <span>Wi-Fi Senkronizasyon</span>
+          <div class="status-indicator" id="syncStatusDot" style="display:none;"></div>
+        </button>
+        <button class="tool-btn" id="btnExportBackup">
+          <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+          <span>Yedek Al (.zip)</span>
+        </button>
+        <button class="tool-btn" id="btnToggleAntiSs">
+          <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+          <span id="antiSsLabel">Anti-SS: Açık</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ============================================== -->
+    <!-- 2. ORTA PANEL: NOT LİSTESİ                     -->
+    <!-- ============================================== -->
+    <main class="center-panel">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Notlarda ara...">
+        <button class="search-clear" id="searchClear">✕</button>
+      </div>
+
+      <!-- Mobil Tarzı Hızlı Filtre Çipleri -->
+      <div class="filter-chips-scroll" id="filterChipsBar">
+        <button class="chip active" data-chip="all">📝 Tümü</button>
+        <button class="chip" data-chip="pinned">📌 Sabitler</button>
+        <button class="chip" data-chip="vault">🔒 Kasa</button>
+        <button class="chip" data-chip="archive">📦 Arşiv</button>
+        <button class="chip" data-chip="trash">🗑️ Çöp</button>
+      </div>
+
+      <div class="list-header">
+        <span id="notesCountLabel">0 Not</span>
+        <div class="view-modes">
+          <button class="view-mode-btn active" id="btnViewList" title="Liste Görünümü">
+            <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+          </button>
+          <button class="view-mode-btn" id="btnViewGrid" title="Izgara / Google Keep Görünümü">
+            <svg viewBox="0 0 24 24"><path d="M4 11h5V5H4v6zm0 7h5v-5H4v5zm6 0h5v-5h-5v5zm6 0h5v-5h-5v5zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="notes-container layout-list" id="notesContainer"></div>
+    </main>
+
+    <!-- ============================================== -->
+    <!-- 3. SAĞ PANEL: DÜZENLEYİCİ & LIVE MARKDOWN      -->
+    <!-- ============================================== -->
+    <section class="editor-panel" id="editorPanel">
+      <div class="empty-editor" id="emptyEditorState">
+        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        <div style="font-size:15px; font-weight:600; color:var(--text-muted);">Görüntülemek veya düzenlemek için bir not seçin</div>
+        <button class="btn-new-note" id="btnNewNoteEmpty">Yeni Not Oluştur</button>
+      </div>
+
+      <div class="editor-wrapper" id="editorContentState" style="display:none;">
+        <div class="editor-top-bar">
+          <div class="editor-top-left">
+            <select class="cat-picker-select" id="editorCatSelect">
+              <option value="">Kategori Yok</option>
+            </select>
+            <div style="position:relative;">
+              <button class="color-picker-btn" id="btnColorPicker" title="Renk Değiştir">
+                <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.23 19.59 10.57 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 15c-1.15 0-2.24-.26-3.21-.73l1.83-1.83c.39-.39.39-1.02 0-1.41-.39-.39-1.02-.39-1.41 0l-1.83 1.83C7.26 14.89 7 13.97 7 13c0-2.76 2.24-5 5-5s5 2.24 5 5-2.24 5-5 5z"/></svg>
+              </button>
+              <div class="color-palette-popover" id="colorPalettePopover"></div>
+            </div>
+          </div>
+
+          <div class="editor-top-right">
+            <!-- Undo / Redo -->
+            <button class="editor-icon-btn" id="btnUndo" title="Geri Al (Ctrl+Z)">
+              <svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+            </button>
+            <button class="editor-icon-btn" id="btnRedo" title="İleri Al (Ctrl+Y)">
+              <svg viewBox="0 0 24 24"><path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/></svg>
+            </button>
+            <div style="width:1px; height:16px; background:var(--border-subtle); margin:0 4px;"></div>
+            <!-- Pin, Lock, Archive, Trash -->
+            <button class="editor-icon-btn" id="btnPin" title="Sabitle">
+              <svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+            </button>
+            <button class="editor-icon-btn" id="btnLock" title="Kilitli Kasa">
+              <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+            </button>
+            <button class="editor-icon-btn" id="btnArchive" title="Arşivle">
+              <svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+            </button>
+            <button class="editor-icon-btn" id="btnDelete" title="Çöpe At" style="color:var(--danger);">
+              <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <input type="text" class="title-input" id="editorTitle" placeholder="Başlık">
+
+        <div class="markdown-toolbar">
+          <button class="md-tool-btn" data-prefix="**" data-suffix="**" title="Kalın (Ctrl+B)"><b>B</b></button>
+          <button class="md-tool-btn" data-prefix="*" data-suffix="*" title="İtalik (Ctrl+I)"><i>I</i></button>
+          <button class="md-tool-btn" data-prefix="~~" data-suffix="~~" title="Üstü Çizili"><s>S</s></button>
+          <div class="md-sep"></div>
+          <button class="md-tool-btn" data-prefix="# " data-suffix="" title="Büyük Başlık (H1)">H1</button>
+          <button class="md-tool-btn" data-prefix="## " data-suffix="" title="Alt Başlık (H2)">H2</button>
+          <button class="md-tool-btn" data-prefix="- [ ] " data-suffix="" title="Yapılacaklar Kutusu">
+            <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM17.99 9l-1.41-1.42-6.59 6.59-2.58-2.57-1.42 1.41 4 4z"/></svg>
+          </button>
+          <button class="md-tool-btn" data-prefix="- " data-suffix="" title="Madde İmi">•</button>
+          <button class="md-tool-btn" data-prefix="`" data-suffix="`" title="Kod">&lt;&gt;</button>
+          <button class="md-tool-btn" data-prefix="> " data-suffix="" title="Alıntı">”</button>
+
+          <div class="md-view-pills">
+            <button class="md-pill-btn" id="btnModeEdit">Yaz</button>
+            <button class="md-pill-btn active" id="btnModeSplit">Bölünmüş</button>
+            <button class="md-pill-btn" id="btnModePreview">Önizle</button>
+          </div>
+        </div>
+
+        <div class="editor-body-area">
+          <div class="editor-pane-box" id="paneEditorBox">
+            <div class="pane-header">
+              <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg>
+              <span>Düzenleyici</span>
+            </div>
+            <textarea class="content-textarea" id="editorContent" placeholder="Notunuzu buraya yazın... (Markdown formatı desteklenir)"></textarea>
+          </div>
+
+          <div class="editor-pane-box" id="panePreviewBox">
+            <div class="pane-header">
+              <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+              <span>Canlı Önizleme</span>
+            </div>
+            <div class="preview-container" id="markdownPreview"></div>
+          </div>
+        </div>
+
+        <div class="editor-status-bar">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span id="charCountLabel">0 karakter • 0 kelime</span>
+            <span class="auto-save-status" id="autoSaveIndicator">✓ Otomatik Kaydedildi</span>
+          </div>
+          <div id="attachmentsCount"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modallar -->
+  <!-- 1. Kasa Parolası Modalı -->
+  <div class="modal-overlay" id="modalVault">
+    <div class="modal-dialog">
+      <div class="modal-title">
+        <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+        <span id="vaultModalTitle">Kasa Kilidini Aç</span>
+      </div>
+      <div class="modal-desc" id="vaultModalDesc">Kilitli notları görüntülemek ve düzenlemek için kasa şifrenizi girin.</div>
+      <input type="password" class="modal-input" id="vaultPasswordInput" placeholder="Kasa Parolası">
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btnCancelVault">İptal</button>
+        <button class="btn-primary" id="btnConfirmVault">Kilidi Aç</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Kategori Ekleme Modalı -->
+  <div class="modal-overlay" id="modalCategory">
+    <div class="modal-dialog">
+      <div class="modal-title">Yeni Kategori Ekle</div>
+      <input type="text" class="modal-input" id="newCatNameInput" placeholder="Kategori Adı (örn: Finans, Proje)">
+      <div style="font-size:12px; color:var(--text-dim);">Kategori Rengi:</div>
+      <div id="catColorOptions" style="display:flex; gap:8px;"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btnCancelCat">İptal</button>
+        <button class="btn-primary" id="btnSaveCat">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Wi-Fi Senkronizasyon Modalı -->
+  <div class="modal-overlay" id="modalSync">
+    <div class="modal-dialog" style="width:480px;">
+      <div class="modal-title">
+        <svg viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4z"/></svg>
+        <span>Wi-Fi Senkronizasyon</span>
+      </div>
+      <div class="modal-desc">
+        Aynı Wi-Fi ağına bağlı Android telefonunuzdan Not Defterim uygulamasını açın ve bu QR kodu okutun:
+      </div>
+      <div style="display:flex; justify-content:center; padding:10px;" id="qrCodeContainer"></div>
+      <div style="background:#0F172A; border-radius:8px; padding:12px; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="color:var(--text-dim); font-size:11px;">Eşleştirme PIN Kodu:</div>
+          <div id="syncPinCode" style="font-size:22px; font-weight:700; letter-spacing:4px; color:#3B82F6;">----</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="color:var(--text-dim); font-size:11px;">Masaüstü IP & Port:</div>
+          <div id="syncIpAddress" style="font-family:monospace; color:#CBD5E1;">127.0.0.1:8765</div>
+        </div>
+      </div>
+      <div style="font-size:11.5px; color:var(--text-faint);" id="syncServerMsg">Hazır</div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btnRefreshPin">Yeni PIN Üret</button>
+        <button class="btn-secondary" id="btnToggleServer">Sunucuyu Durdur</button>
+        <button class="btn-primary" id="btnCloseSync">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Alt-Tab Gizlilik Kalkanı (Privacy Shield) -->
+  <div class="privacy-shield" id="privacyShield">
+    <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+    <div style="font-size:16px; font-weight:600; color:#CBD5E1;">Not Defterim - Gizlilik Kalkanı</div>
+    <div style="font-size:12px; color:#64748B;">Pencereye tıklayarak notlarınıza geri dönün.</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Not Defterim Kurulum Sihirbazı</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="icon.png">
+</head>
+<body>
+  <div class="wizard-container">
+    <!-- Header -->
+    <div class="wizard-header">
+      <img src="icon.png" alt="Not Defterim" class="app-icon">
+      <div class="header-text">
+        <h1 id="wizardTitle">Not Defterim Kurulum Sihirbazı <span class="badge">v1.0.0</span></h1>
+        <p id="wizardSubtitle">Hızlı, Güvenli ve Bağımsız Masaüstü Not Uygulaması</p>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="wizard-body">
+      <!-- Step 1: Install Options -->
+      <div id="stepOptions" class="step-card">
+        <div class="section-label">Kurulum Hedef Klasörü:</div>
+        <div id="pathDisplay" class="path-box">Yükleniyor...</div>
+
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="chkDesktop" checked>
+            <span>Masaüstüne kısayol oluştur</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chkStartMenu" checked>
+            <span>Başlat Menüsüne ekle</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chkLaunch" checked>
+            <span>Kurulum tamamlandığında Not Defterim'i hemen başlat</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Step 1-B: Uninstall Mode -->
+      <div id="stepUninstall" class="step-card" style="display:none;">
+        <div class="section-label" style="color:#F87171;">Uygulama Kaldırma Uyarısı</div>
+        <p style="font-size:13.5px; line-height:1.6; margin-bottom:14px; color:#E2E8F0;">
+          Not Defterim uygulaması, masaüstü ve başlat menüsü kısayolları bilgisayarınızdan kaldırılacaktır.
+        </p>
+        <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding:10px 12px; font-size:12.5px; color:#A7F3D0;">
+          🛡️ <strong>Bilgi:</strong> Notlarınız (<code style="color:#F8FAFC;">%APPDATA%\NotDefterim</code>) silinmez, tamamen güvendedir.
+        </div>
+      </div>
+
+      <!-- Step 2: Progress -->
+      <div id="stepProgress" class="progress-section">
+        <div class="progress-status" id="progressText">Kurulum başlatılıyor...</div>
+        <div class="progress-bar-bg">
+          <div id="progressBar" class="progress-bar-fill"></div>
+        </div>
+      </div>
+
+      <!-- Step 3: Done -->
+      <div id="stepDone" class="done-section">
+        <div class="done-icon" id="doneIcon">✓</div>
+        <div class="done-title" id="doneTitle">Kurulum Başarıyla Tamamlandı!</div>
+        <div class="done-desc" id="doneDesc">
+          Not Defterim bilgisayarınıza kuruldu. Masaüstünden veya Başlat Menüsünden dilediğiniz zaman erişebilirsiniz.
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="wizard-footer">
+      <button id="btnCancel" class="btn btn-secondary">İptal</button>
+      <button id="btnAction" class="btn btn-primary">Şimdi Kur</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

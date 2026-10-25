@@ -1,0 +1,17 @@
+{
+  "name": "noteapp-desktop-electron",
+  "version": "1.0.0",
+  "description": "Modern Cross-Platform Note Taking Desktop App (Electron Edition)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "sql.js": "^1.12.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}
