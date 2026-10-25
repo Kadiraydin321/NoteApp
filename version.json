@@ -1,6 +1,8 @@
 {
-  "versionCode": 8,
-  "versionName": "1.0.0.6",
-  "releaseNotes": "🚀 Moon+ Reader Seviyesi Büyük Güncelleme:\n- Çoklu Kaynak Desteği: Türkçe (NovelGecesi) + İngilizce (WuxiaWorld/WebNovel)\n- Anlık İngilizce -> Türkçe Çeviri Motoru\n- Moon+ Reader Gerçek Sayfalı (Horizontal ViewPager2) Çevrimdışı Okuma Modu\n- Android Text-To-Speech (TTS) Sesli Okuma ve Hız Kontrolü\n- AMOLED, Sepya ve Gece Okuma Temaları\n- Kırmızı, Beyaz ve Siyah Agresif Modern Tasarım & Yeni Adaptive Logo\n- Bölüm içi anlık arama ve sıralama motoru",
-  "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/novel-downloader-apk/NovelReaderDownloader.apk"
+  "versionCode": 16,
+  "versionName": "1.1.5",
+  "buildTime": 1792945700000,
+  "releaseDate": "25.10.2026",
+  "changeLog": "Arayüz çakışmaları ve tasarım hataları giderildi: Alt yüzen kapsül dok barı tüm ekran boyutlarıyla tam uyumlu hale getirildi, arama/değiştirme çubuğu üst üste binmeleri önlendi, çoklu seçim araç çubuğu ve alt eylem paneli sadeleştirilerek mükerrerlikler kaldırıldı.",
+  "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }
