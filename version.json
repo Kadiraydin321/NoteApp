@@ -1,7 +1,8 @@
 {
-  "versionCode": 15,
-  "versionName": "1.1.4",
-  "buildTime": 1792440900000,
-  "releaseDate": "19.10.2026",
-  "changeLog": "Widget not ekleme sistemi baştan sona kişiselleştirilebilir hale getirildi: Aç-kapa yapmaya ve beklemeye gerek kalmayan 5'li 'Sabit Hızlı Araç Çubuğu' (Metin, Liste, Ses, Görsel, Çizim) eklendi; tek dokunuşla çalışan doğrudan eylemler ve klasik menü seçenekleri getirildi. Çift basma/takılma sorunu tamamen giderildi. Tüm sayfalar ve tasarım ayarları test edilip optimize edildi."
+  "versionCode": 16,
+  "versionName": "1.1.5",
+  "buildTime": 1792945700000,
+  "releaseDate": "25.10.2026",
+  "changeLog": "Arayüz çakışmaları ve tasarım hataları giderildi: Alt yüzen kapsül dok barı tüm ekran boyutlarıyla tam uyumlu hale getirildi, arama/değiştirme çubuğu üst üste binmeleri önlendi, çoklu seçim araç çubuğu ve alt eylem paneli sadeleştirilerek mükerrerlikler kaldırıldı.",
+  "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }
