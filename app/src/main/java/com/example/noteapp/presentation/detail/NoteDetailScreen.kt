@@ -1245,9 +1245,11 @@ fun NoteDetailScreen(
                             }
                         }
 
-                        // Odaklanma Modu (Zen) Butonu
-                        IconButton(onClick = onToggleZenMode) {
-                            Icon(Icons.Default.SelfImprovement, contentDescription = "Odaklanma Modu", tint = topBarIconColor)
+                        // Odaklanma Modu (Zen) Butonu (Kompakt ekranlarda 3 nokta menüsünde yer alır)
+                        if (!isCompactScreen) {
+                            IconButton(onClick = onToggleZenMode) {
+                                Icon(Icons.Default.SelfImprovement, contentDescription = "Odaklanma Modu", tint = topBarIconColor)
+                            }
                         }
 
                         // Not İçi Arama ve Değiştirme Butonu
@@ -2003,13 +2005,15 @@ fun NoteDetailScreen(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState())
                                                 .padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.SpaceAround,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             // 1. Görsel Ekle
                                             OutlinedButton(
-                                                onClick = { showImageSourceDialog = true }
+                                                onClick = { showImageSourceDialog = true },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                                             ) {
                                                 Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                                                 Spacer(modifier = Modifier.width(6.dp))
@@ -2017,7 +2021,10 @@ fun NoteDetailScreen(
                                             }
 
                                             // 2. Çizim Yap
-                                            OutlinedButton(onClick = onAddDrawingClick) {
+                                            OutlinedButton(
+                                                onClick = onAddDrawingClick,
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                                            ) {
                                                 Icon(Icons.Default.Brush, contentDescription = null, modifier = Modifier.size(18.dp))
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text("Çizim", style = MaterialTheme.typography.labelMedium)
@@ -2028,6 +2035,7 @@ fun NoteDetailScreen(
                                                 onClick = {
                                                     audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
                                                 },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                                                 colors = ButtonDefaults.buttonColors(
                                                     containerColor = if (state.isRecordingAudio) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                                                 )
@@ -2388,14 +2396,15 @@ fun NoteDetailScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Düğmeler
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(1.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f, fill = false)
                             ) {
                                 // 0. Onay Kutusu (Checklist)
                                 IconButton(
@@ -2409,7 +2418,7 @@ fun NoteDetailScreen(
                                             onContentValueChange(TextFieldValue(converted, selection = TextRange(converted.length)))
                                         }
                                     },
-                                    modifier = Modifier.size(38.dp),
+                                    modifier = Modifier.size(36.dp),
                                     colors = IconButtonDefaults.iconButtonColors(
                                         containerColor = if (hasChecklistItems) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                     )
@@ -2418,7 +2427,7 @@ fun NoteDetailScreen(
                                         imageVector = if (hasChecklistItems) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
                                         contentDescription = if (hasChecklistItems) "Metne Dönüştür" else "Onay Kutusuna Dönüştür",
                                         tint = if (hasChecklistItems) MaterialTheme.colorScheme.primary else dockIconColor,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(19.dp)
                                     )
                                 }
 
@@ -2427,7 +2436,7 @@ fun NoteDetailScreen(
                                     onClick = {
                                         activeToolCategory = if (activeToolCategory == NoteToolCategory.MEDIA) NoteToolCategory.NONE else NoteToolCategory.MEDIA
                                     },
-                                    modifier = Modifier.size(38.dp),
+                                    modifier = Modifier.size(36.dp),
                                     colors = IconButtonDefaults.iconButtonColors(
                                         containerColor = if (activeToolCategory == NoteToolCategory.MEDIA) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                     )
@@ -2436,7 +2445,7 @@ fun NoteDetailScreen(
                                         Icons.Default.AddCircleOutline,
                                         contentDescription = "Ekle",
                                         tint = if (activeToolCategory == NoteToolCategory.MEDIA) MaterialTheme.colorScheme.primary else dockIconColor,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(19.dp)
                                     )
                                 }
 
@@ -2445,7 +2454,7 @@ fun NoteDetailScreen(
                                     onClick = {
                                         activeToolCategory = if (activeToolCategory == NoteToolCategory.FORMAT) NoteToolCategory.NONE else NoteToolCategory.FORMAT
                                     },
-                                    modifier = Modifier.size(38.dp),
+                                    modifier = Modifier.size(36.dp),
                                     colors = IconButtonDefaults.iconButtonColors(
                                         containerColor = if (activeToolCategory == NoteToolCategory.FORMAT) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                     )
@@ -2454,7 +2463,7 @@ fun NoteDetailScreen(
                                         Icons.Default.FormatSize,
                                         contentDescription = "Biçimlendir",
                                         tint = if (activeToolCategory == NoteToolCategory.FORMAT) MaterialTheme.colorScheme.primary else dockIconColor,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(19.dp)
                                     )
                                 }
 
@@ -2463,7 +2472,7 @@ fun NoteDetailScreen(
                                     onClick = {
                                         activeToolCategory = if (activeToolCategory == NoteToolCategory.COLOR) NoteToolCategory.NONE else NoteToolCategory.COLOR
                                     },
-                                    modifier = Modifier.size(38.dp),
+                                    modifier = Modifier.size(36.dp),
                                     colors = IconButtonDefaults.iconButtonColors(
                                         containerColor = if (activeToolCategory == NoteToolCategory.COLOR) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                     )
@@ -2472,7 +2481,7 @@ fun NoteDetailScreen(
                                         Icons.Default.Palette,
                                         contentDescription = "Renk",
                                         tint = if (activeToolCategory == NoteToolCategory.COLOR) MaterialTheme.colorScheme.primary else dockIconColor,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(19.dp)
                                     )
                                 }
 
@@ -2481,7 +2490,7 @@ fun NoteDetailScreen(
                                     onClick = {
                                         activeToolCategory = if (activeToolCategory == NoteToolCategory.CATEGORY) NoteToolCategory.NONE else NoteToolCategory.CATEGORY
                                     },
-                                    modifier = Modifier.size(38.dp),
+                                    modifier = Modifier.size(36.dp),
                                     colors = IconButtonDefaults.iconButtonColors(
                                         containerColor = if (activeToolCategory == NoteToolCategory.CATEGORY) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                     )
@@ -2490,7 +2499,7 @@ fun NoteDetailScreen(
                                         Icons.Default.FolderOpen,
                                         contentDescription = "Kategori",
                                         tint = if (activeToolCategory == NoteToolCategory.CATEGORY) MaterialTheme.colorScheme.primary else dockIconColor,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(19.dp)
                                     )
                                 }
                             }
@@ -2498,7 +2507,8 @@ fun NoteDetailScreen(
                             // Sağ Bölüm: Aktif ses kaydı bildirimi veya Tıklanabilir İstatistik Hapı
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(end = 4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(start = 4.dp, end = 2.dp)
                             ) {
                                 if (state.isRecordingAudio) {
                                     AssistChip(
@@ -2533,7 +2543,6 @@ fun NoteDetailScreen(
                                                 showChecklistActionsSheet = true
                                             }
                                         )
-                                        Spacer(Modifier.width(6.dp))
                                     }
 
                                     val wordGoal = state.wordGoal
@@ -2547,9 +2556,9 @@ fun NoteDetailScreen(
                                             onEditGoal = { showWordGoalDialog = true },
                                             onRemoveGoal = { onSetWordGoal(null) }
                                         )
-                                        Spacer(Modifier.width(6.dp))
                                     }
 
+                                    val hasExtraBadges = checklistStats != null || (wordGoal != null && wordGoal > 0)
                                     Surface(
                                         onClick = { showStatsDialog = true },
                                         shape = RoundedCornerShape(12.dp),
@@ -2558,7 +2567,7 @@ fun NoteDetailScreen(
                                     ) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
                                         ) {
                                             Icon(
                                                 Icons.Default.AccessTime,
@@ -2566,11 +2575,13 @@ fun NoteDetailScreen(
                                                 modifier = Modifier.size(12.dp),
                                                 tint = dockIconColor.copy(alpha = 0.75f)
                                             )
-                                            Spacer(Modifier.width(4.dp))
+                                            Spacer(Modifier.width(3.dp))
                                             Text(
-                                                text = "$wordCount kelime · ~${readingTime} dk",
+                                                text = if (hasExtraBadges) "$wordCount k" else "$wordCount k · ~${readingTime} dk",
                                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                                                color = dockIconColor.copy(alpha = 0.75f)
+                                                color = dockIconColor.copy(alpha = 0.75f),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }
@@ -2709,7 +2720,7 @@ fun NoteDetailScreen(
                     .padding(horizontal = if (isPresentationMode) 22.dp else 16.dp, vertical = 8.dp)
             ) {
                 if (isSearchActive) {
-                    Spacer(modifier = Modifier.height(56.dp))
+                    Spacer(modifier = Modifier.height(112.dp))
                 }
                 // Notun Atandığı Kategori Etiketi (Varsa)
                 val currentCategory = categories.firstOrNull { it.id == state.categoryId }

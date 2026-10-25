@@ -102,7 +102,7 @@ fun BatchActionsBottomBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -112,21 +112,24 @@ fun BatchActionsBottomBar(
                         icon = if (isAllPinned) Icons.Outlined.PushPin else Icons.Default.PushPin,
                         label = if (isAllPinned) "Kaldır" else "Sabitle",
                         onClick = onTogglePin,
-                        tint = if (isAllPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        tint = if (isAllPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
                     )
 
                     // Renk Değiştir
                     BatchActionButton(
                         icon = Icons.Default.Palette,
                         label = "Renk",
-                        onClick = onChangeColor
+                        onClick = onChangeColor,
+                        modifier = Modifier.weight(1f)
                     )
 
                     // Kategori / Etiket Ata
                     BatchActionButton(
                         icon = Icons.AutoMirrored.Filled.Label,
                         label = "Kategori",
-                        onClick = onAssignCategory
+                        onClick = onAssignCategory,
+                        modifier = Modifier.weight(1f)
                     )
 
                     // Birleştir (Eğer 2 veya daha fazla not seçilmişse)
@@ -135,7 +138,8 @@ fun BatchActionsBottomBar(
                             icon = Icons.AutoMirrored.Filled.CallMerge,
                             label = "Birleştir",
                             onClick = onMergeNotes,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -145,16 +149,18 @@ fun BatchActionsBottomBar(
                     icon = Icons.Default.Delete,
                     label = if (isTrashMode) "Kalıcı Sil" else "Sil",
                     onClick = onDeleteNotes,
-                    tint = MaterialTheme.colorScheme.error
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f)
                 )
 
                 // Diğer İşlemler (Menü)
                 if (!isTrashMode) {
-                    Box {
+                    Box(modifier = Modifier.weight(1f)) {
                         BatchActionButton(
                             icon = Icons.Default.MoreVert,
                             label = "Diğer",
-                            onClick = { showMoreMenu = true }
+                            onClick = { showMoreMenu = true },
+                            modifier = Modifier.fillMaxWidth()
                         )
 
                         DropdownMenu(
@@ -209,13 +215,14 @@ private fun BatchActionButton(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 2.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -229,7 +236,9 @@ private fun BatchActionButton(
             text = label,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
             color = tint,
-            maxLines = 1
+            maxLines = 1,
+            softWrap = false,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
     }
 }

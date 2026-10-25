@@ -809,13 +809,19 @@ fun NotesScreen(
                                 Text(
                                     text = "${state.selectedNoteIds.size} not seçildi",
                                     fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.titleMedium
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                Text(
-                                    text = summary,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                if (summary.isNotBlank()) {
+                                    Text(
+                                        text = summary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         },
                         navigationIcon = {
@@ -831,22 +837,6 @@ fun NotesScreen(
                                         Icons.Default.Deselect else Icons.Default.SelectAll,
                                     contentDescription = "Tümünü Seç"
                                 )
-                            }
-                            if (state.viewMode == NotesViewMode.ALL || state.viewMode == NotesViewMode.REMINDERS) {
-                                // Sabitle / Kaldır
-                                IconButton(onClick = onTogglePinForSelected) {
-                                    Icon(Icons.Default.PushPin, contentDescription = "Sabitle")
-                                }
-                                // Rengi Değiştir (Toplu)
-                                IconButton(onClick = { showBatchColorDialog = true }) {
-                                    Icon(Icons.Default.Palette, contentDescription = "Renk Değiştir")
-                                }
-                                if (state.selectedNoteIds.size >= 2 && state.viewMode != NotesViewMode.TRASH) {
-                                    // Notları Birleştir
-                                    IconButton(onClick = { showMergeNotesConfirm = true }) {
-                                        Icon(Icons.Default.CallMerge, contentDescription = "Notları Birleştir")
-                                    }
-                                }
                             }
                             Box {
                                 IconButton(onClick = { showSelectionActionsMenu = true }) {
