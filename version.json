@@ -1,7 +1,7 @@
 {
   "versionCode": 25,
   "versionName": "1.2.5",
-  "buildTime": 1793026500000,
+  "buildTime": 0,
   "releaseDate": "26.10.2026",
   "changeLog": "Arayüz çakışmaları ve tasarım hataları giderildi: Alt yüzen kapsül dok barı tüm ekran boyutlarıyla tam uyumlu hale getirildi, arama/değiştirme çubuğu üst üste binmeleri önlendi, çoklu seçim araç çubuğu ve alt eylem paneli sadeleştirilerek mükerrerlikler kaldırıldı.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
