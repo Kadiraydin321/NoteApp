@@ -1,8 +1,8 @@
 {
-  "versionCode": 27,
-  "versionName": "1.2.7",
+  "versionCode": 28,
+  "versionName": "1.2.8",
   "buildTime": 0,
   "releaseDate": "26.10.2026",
-  "changeLog": "Okuma / Sunum modunda başlığın üst çubuktaki okuma ve biçimlendirme butonlarının üstüne binmesi sorunu giderildi; başlık içerik alanında zarifçe sergilenerek üst çubuk butonlarına tam alan sağlandı.",
+  "changeLog": "Notları dışa aktarırken ve yedeklerken parola yerine biyometrik parmak izi ile tek dokunuşla doğrulama desteği eklendi.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }
