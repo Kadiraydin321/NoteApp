@@ -151,6 +151,7 @@ fun NotesScreen(
     onSelectAgendaDate: (LocalDate?) -> Unit = {},
     onToggleCategoryLock: (Long) -> Unit = {},
     isNoteConcealed: (Note) -> Boolean = { false },
+    masterPin: String? = null,
     onSettingsClick: () -> Unit
 ) {
     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
@@ -2311,6 +2312,7 @@ fun NotesScreen(
     if (showBatchVaultExportDialog) {
         ExportVaultDialog(
             noteCount = selectedNotes.size,
+            masterPin = masterPin,
             onDismiss = { showBatchVaultExportDialog = false },
             onConfirm = { password ->
                 showBatchVaultExportDialog = false

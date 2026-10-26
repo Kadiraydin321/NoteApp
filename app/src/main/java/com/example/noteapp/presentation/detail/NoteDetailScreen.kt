@@ -3994,6 +3994,7 @@ fun NoteDetailScreen(
     if (showExportVaultDialog) {
         ExportVaultDialog(
             noteCount = 1,
+            masterPin = state.masterPin,
             onDismiss = { showExportVaultDialog = false },
             onConfirm = { password ->
                 showExportVaultDialog = false

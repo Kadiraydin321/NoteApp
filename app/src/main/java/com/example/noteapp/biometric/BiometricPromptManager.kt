@@ -1,9 +1,20 @@
 package com.example.noteapp.biometric
 
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.fragment.app.FragmentActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+
+fun Context.findFragmentActivity(): FragmentActivity? {
+    var ctx = this
+    while (ctx is ContextWrapper) {
+        if (ctx is FragmentActivity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
 
 sealed interface BiometricResult {
     data object HardwareUnavailable : BiometricResult
@@ -17,6 +28,13 @@ sealed interface BiometricResult {
 class BiometricPromptManager(
     private val activity: FragmentActivity
 ) {
+    fun canAuthenticate(): Boolean {
+        val manager = BiometricManager.from(activity)
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        return manager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
+    }
+
     fun showBiometricPrompt(
         title: String = "Kilitli Not",
         description: String = "Bu nota erişmek için kimliğinizi doğrulayın",

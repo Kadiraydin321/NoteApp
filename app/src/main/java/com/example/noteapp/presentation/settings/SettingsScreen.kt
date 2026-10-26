@@ -40,6 +40,9 @@ import com.example.noteapp.data.settings.WidgetFabBehavior
 import com.example.noteapp.data.settings.WidgetFilterMode
 import com.example.noteapp.data.updater.UpdateStatus
 import com.example.noteapp.presentation.detail.NoteColors
+import com.example.noteapp.biometric.BiometricPromptManager
+import com.example.noteapp.biometric.BiometricResult
+import com.example.noteapp.biometric.findFragmentActivity
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import kotlinx.coroutines.delay
@@ -571,8 +574,28 @@ fun SettingsScreen(
                     Button(
                         onClick = {
                             isSharePending = false
-                            vaultPasswordForExport = settings.masterPin ?: ""
-                            showExportPasswordDialog = true
+                            val activity = context.findFragmentActivity()
+                            val promptManager = activity?.let { BiometricPromptManager(it) }
+                            if (promptManager != null && promptManager.canAuthenticate()) {
+                                promptManager.showBiometricPrompt(
+                                    title = "Yedeklemeyi Onayla",
+                                    description = "Notlarınızı dışa aktarmak için parmak izinizi kullanın",
+                                    onResult = { result ->
+                                        if (result is BiometricResult.AuthenticationSuccess) {
+                                            vaultPasswordForExport = settings.masterPin ?: ""
+                                            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                                            val ext = if (vaultPasswordForExport.isNotBlank()) "notevault" else "zip"
+                                            createDocumentLauncher.launch("NoteApp_Yedek_$dateStr.$ext")
+                                        } else if (result !is BiometricResult.AuthenticationFailed) {
+                                            vaultPasswordForExport = settings.masterPin ?: ""
+                                            showExportPasswordDialog = true
+                                        }
+                                    }
+                                )
+                            } else {
+                                vaultPasswordForExport = settings.masterPin ?: ""
+                                showExportPasswordDialog = true
+                            }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -585,8 +608,26 @@ fun SettingsScreen(
                     OutlinedButton(
                         onClick = {
                             isSharePending = true
-                            vaultPasswordForExport = settings.masterPin ?: ""
-                            showExportPasswordDialog = true
+                            val activity = context.findFragmentActivity()
+                            val promptManager = activity?.let { BiometricPromptManager(it) }
+                            if (promptManager != null && promptManager.canAuthenticate()) {
+                                promptManager.showBiometricPrompt(
+                                    title = "Yedeklemeyi Onayla",
+                                    description = "Notlarınızı paylaşmak için parmak izinizi kullanın",
+                                    onResult = { result ->
+                                        if (result is BiometricResult.AuthenticationSuccess) {
+                                            vaultPasswordForExport = settings.masterPin ?: ""
+                                            onExportAndShare(context, vaultPasswordForExport.ifBlank { null })
+                                        } else if (result !is BiometricResult.AuthenticationFailed) {
+                                            vaultPasswordForExport = settings.masterPin ?: ""
+                                            showExportPasswordDialog = true
+                                        }
+                                    }
+                                )
+                            } else {
+                                vaultPasswordForExport = settings.masterPin ?: ""
+                                showExportPasswordDialog = true
+                            }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -1790,6 +1831,36 @@ fun SettingsScreen(
                         "Yedek dosyanızı AES-256-GCM ve PBKDF2 hash koruması ile şifrelemek için bir Kasa Kilidi (şifre/PIN) girin:",
                         style = MaterialTheme.typography.bodySmall
                     )
+                    val activity = context.findFragmentActivity()
+                    val promptManager = remember(activity) { activity?.let { BiometricPromptManager(it) } }
+                    if (promptManager?.canAuthenticate() == true) {
+                        OutlinedButton(
+                            onClick = {
+                                promptManager.showBiometricPrompt(
+                                    title = "Yedeklemeyi Onayla",
+                                    description = "Notlarınızı dışa aktarmak için parmak izinizi kullanın",
+                                    onResult = { result ->
+                                        if (result is BiometricResult.AuthenticationSuccess) {
+                                            showExportPasswordDialog = false
+                                            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                                            if (isSharePending) {
+                                                onExportAndShare(context, vaultPasswordForExport.ifBlank { null })
+                                            } else {
+                                                val ext = if (vaultPasswordForExport.isNotBlank()) "notevault" else "zip"
+                                                createDocumentLauncher.launch("NoteApp_Yedek_$dateStr.$ext")
+                                            }
+                                        }
+                                    }
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Parmak İzi ile Doğrula")
+                        }
+                    }
+
                     OutlinedTextField(
                         value = vaultPasswordForExport,
                         onValueChange = { vaultPasswordForExport = it },

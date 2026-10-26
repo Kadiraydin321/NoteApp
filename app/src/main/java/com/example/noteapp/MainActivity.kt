@@ -486,6 +486,7 @@ class MainActivity : FragmentActivity() {
                                 }
                             },
                             isNoteConcealed = viewModel::isNoteConcealed,
+                            masterPin = noteSettingsState.masterPin,
                             onSettingsClick = {
                                 navController.navigate("settings_screen")
                             }
