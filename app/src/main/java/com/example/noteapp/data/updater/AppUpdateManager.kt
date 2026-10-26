@@ -92,8 +92,10 @@ class AppUpdateManager @Inject constructor(
                         @Suppress("DEPRECATION")
                         pkgInfo.versionCode
                     }
-                    if (archiveVersionCode == targetVersionCode) {
+                    if (archiveVersionCode == targetVersionCode && targetVersionCode > BuildConfig.VERSION_CODE) {
                         return apkFile
+                    } else if (archiveVersionCode <= BuildConfig.VERSION_CODE) {
+                        apkFile.delete()
                     }
                 }
             } catch (_: Exception) {}
@@ -111,10 +113,19 @@ class AppUpdateManager @Inject constructor(
             return@withContext _updateStatus.value
         }
 
-        // 2. Halihazırda indirilmiş ve hazır bir APK varsa durumu koru
+        // 2. Halihazırda indirilmiş ve hazır bir APK varsa sadece henüz kurulmamışsa koru
         val currentStatus = _updateStatus.value
         if (currentStatus is UpdateStatus.ReadyToInstall && currentStatus.apkFile.exists()) {
-            return@withContext currentStatus
+            val pkgInfo = context.packageManager.getPackageArchiveInfo(currentStatus.apkFile.absolutePath, 0)
+            val archiveVersionCode = if (pkgInfo != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pkgInfo.longVersionCode.toInt() else @Suppress("DEPRECATION") pkgInfo.versionCode
+            } else 0
+            if (archiveVersionCode > BuildConfig.VERSION_CODE) {
+                return@withContext currentStatus
+            } else {
+                currentStatus.apkFile.delete()
+                _updateStatus.value = UpdateStatus.Idle
+            }
         }
 
         _updateStatus.value = UpdateStatus.Checking
@@ -161,8 +172,7 @@ class AppUpdateManager @Inject constructor(
                 val changeLog = json.optString("changeLog", "Yeni geliştirmeler ve optimizasyonlar")
                 val downloadUrl = json.optString("downloadUrl", "")
 
-                val hasNewerVersion = remoteVersionCode > currentVersionCode ||
-                        (remoteVersionCode == currentVersionCode && remoteBuildTime > currentBuildTime + 60_000L)
+                val hasNewerVersion = remoteVersionCode > currentVersionCode
 
                 return@withContext if (hasNewerVersion) {
                     UpdateStatus.UpdateAvailable(
