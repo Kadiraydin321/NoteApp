@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.noteapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "1.1.5"
+        versionCode = 25
+        versionName = "1.2.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("Long", "BUILD_TIME", "${System.currentTimeMillis()}L")

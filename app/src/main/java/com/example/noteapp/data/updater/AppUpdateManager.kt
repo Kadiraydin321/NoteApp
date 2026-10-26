@@ -36,7 +36,8 @@ sealed class UpdateStatus {
         val currentVersionName: String,
         val currentVersionCode: Int,
         val message: String,
-        val releaseDate: String = ""
+        val releaseDate: String = "",
+        val downloadUrl: String = ""
     ) : UpdateStatus()
     data class UpToDate(val currentVersionName: String) : UpdateStatus()
     data class Downloading(val progressPercent: Int, val downloadedBytes: Long, val totalBytes: Long) : UpdateStatus()
@@ -158,6 +159,7 @@ class AppUpdateManager @Inject constructor(
                 val remoteBuildTime = json.optLong("buildTime", 0L)
                 val releaseDate = json.optString("releaseDate", "")
                 val changeLog = json.optString("changeLog", "Yeni geliştirmeler ve optimizasyonlar")
+                val downloadUrl = json.optString("downloadUrl", "")
 
                 val hasNewerVersion = remoteVersionCode > currentVersionCode ||
                         (remoteVersionCode == currentVersionCode && remoteBuildTime > currentBuildTime + 60_000L)
@@ -169,7 +171,8 @@ class AppUpdateManager @Inject constructor(
                         currentVersionName = currentVersionName,
                         currentVersionCode = currentVersionCode,
                         message = changeLog,
-                        releaseDate = releaseDate
+                        releaseDate = releaseDate,
+                        downloadUrl = downloadUrl
                     )
                 } else {
                     UpdateStatus.UpToDate(currentVersionName)
@@ -264,7 +267,8 @@ class AppUpdateManager @Inject constructor(
             _updateStatus.value = UpdateStatus.Downloading(0, 0L, -1L)
 
             try {
-                val url = URL("$GITHUB_APK_RAW_URL?t=${System.currentTimeMillis()}")
+                val targetUrl = available?.downloadUrl?.takeIf { it.isNotBlank() } ?: GITHUB_APK_RAW_URL
+                val url = URL("$targetUrl?t=${System.currentTimeMillis()}")
                 val connection = (url.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 15000
                     readTimeout = 30000
