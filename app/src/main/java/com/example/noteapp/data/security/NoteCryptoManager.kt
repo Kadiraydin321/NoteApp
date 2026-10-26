@@ -60,10 +60,13 @@ class NoteCryptoManager @Inject constructor() {
 
     /**
      * Düz metni AES-256-GCM ile şifreler.
+     * Zaten şifreli bir metin gelirse çift şifrelemeyi önlemek için olduğu gibi döndürür (idempotent).
      * Çıktı: "ENC_GCM_V1:<Base64(IV + Ciphertext)>"
      */
     fun encrypt(plainText: String): String {
         if (plainText.isEmpty()) return plainText
+        if (isEncrypted(plainText)) return plainText
+
         return try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             val secretKey = getOrCreateSecretKey()
@@ -85,8 +88,25 @@ class NoteCryptoManager @Inject constructor() {
 
     /**
      * Şifreli metni çözer. Eğer şifreli değilse orijinal metni döndürür.
+     * Çok katmanlı şifrelenmiş içerikleri düz metne ulaşana kadar özyinelemeli (recursive) çözer.
      */
     fun decrypt(cipherText: String): String {
+        if (!isEncrypted(cipherText)) return cipherText
+
+        var current = cipherText
+        var iterationCount = 0
+        while (isEncrypted(current) && iterationCount < 10) {
+            val decrypted = decryptSingle(current)
+            if (decrypted == current || decrypted == "[Korumalı İçerik Çözülemedi]") {
+                return decrypted
+            }
+            current = decrypted
+            iterationCount++
+        }
+        return current
+    }
+
+    private fun decryptSingle(cipherText: String): String {
         if (!cipherText.startsWith(PREFIX)) return cipherText
 
         return try {
@@ -104,7 +124,7 @@ class NoteCryptoManager @Inject constructor() {
             String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {
             e.printStackTrace()
-            // Şifre çözülemezse boş veya hata mesajı döndür
+            // Şifre çözülemezse hata mesajı döndür
             "[Korumalı İçerik Çözülemedi]"
         }
     }

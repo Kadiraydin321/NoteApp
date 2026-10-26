@@ -140,13 +140,18 @@ class NoteDetailViewModel @Inject constructor(
         if (noteId != -1L) {
             viewModelScope.launch {
                 repository.getNoteById(noteId)?.let { note ->
-                    val initialContent = TextFieldValue(note.content)
+                    val cleanContent = if (cryptoManager.isEncrypted(note.content)) {
+                        cryptoManager.decrypt(note.content)
+                    } else {
+                        note.content
+                    }
+                    val initialContent = TextFieldValue(cleanContent)
                     val goal = noteGoalManager.getWordGoal(note.id)
                     val noteTimestamp = if (note.updatedAt != 0L) note.updatedAt else note.timestamp
                     val hasDraft = draftRecoveryManager.hasRecoverableDraft(
                         noteId = note.id,
                         currentDbTitle = note.title,
-                        currentDbContent = note.content,
+                        currentDbContent = cleanContent,
                         currentDbTimestamp = noteTimestamp
                     )
                     val recoverableDraft = if (hasDraft) draftRecoveryManager.getDraft(note.id) else null
@@ -971,7 +976,12 @@ class NoteDetailViewModel @Inject constructor(
 
     fun restoreDraft(draft: NoteDraft) {
         commitCurrentStateToUndo()
-        val newContent = TextFieldValue(draft.content, TextRange(draft.content.length))
+        val cleanContent = if (cryptoManager.isEncrypted(draft.content)) {
+            cryptoManager.decrypt(draft.content)
+        } else {
+            draft.content
+        }
+        val newContent = TextFieldValue(cleanContent, TextRange(cleanContent.length))
         _state.value = _state.value.copy(
             title = draft.title,
             contentValue = newContent,

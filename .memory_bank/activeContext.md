@@ -1,19 +1,18 @@
 # Active Context - NoteApp
 
-## Son Yapılan İşlemler (v1.2.8 - Dışa Aktarma & Yedeklemede Biyometrik Parmak İzi Doğrulaması)
-- **Notları Dışarı Çıkarırken Parmak İzi Desteği:**
-  - `BiometricPromptManager.kt` içerisine `Context.findFragmentActivity()` ve `canAuthenticate()` yardımcı fonksiyonları eklendi.
-  - `SettingsScreen.kt`:
-    - "Kasa Kilidi ile Yedekle (.notevault / .zip)" ve "Kasa Kilidi ile Yedeği Paylaş / Gönder" butonlarına tıklandığında cihazda parmak izi/biyometrik varsa doğrudan sistem `BiometricPrompt` diyaloğu tetikleniyor.
-    - Parmak izi okutulduğunda kullanıcının kayıtlı Master PIN'i ile otomatik eşleşip dosya doğrudan kaydediliyor/paylaşılıyor.
-    - Şifre giriş diyaloğu (`showExportPasswordDialog`) içerisine de tek dokunuşla çalışan "Parmak İzi ile Doğrula" butonu yerleştirildi.
-  - `VaultPasswordDialogs.kt` (`ExportVaultDialog`):
-    - Seçili notları veya tekil notu `.notevault` kasası olarak dışa aktarırken biyometrik destek eklendi.
-    - Diyalog açıldığında Master PIN ve parmak izi tanımlıysa sistem biyometrik istemi doğrudan açılarak tek dokunuşla şifreleme ve dışa aktarma olanağı sağlandı.
-    - Diyalog içine "Parmak İzi ile Onayla" butonu entegre edildi.
-  - `NotesScreen.kt` ve `NoteDetailScreen.kt`:
-    - Dışa aktarma diyaloglarına `masterPin` aktarımı bağlandı.
-- **Sürüm Güncellemesi ve Yayın (v1.2.8 - Code 28):**
-  - `app/build.gradle.kts`: `versionCode = 28`, `versionName = "1.2.8"`
-  - `version.json`: `versionCode: 28`, `versionName: "1.2.8"`
+## Son Yapılan İşlemler (v1.2.9 - Kilitli Not İçeriğinin Şifreli Görünmesi Hatasının Onarımı)
+- **Kilitli Not Açıldığında `ENC_GCM_V1` Şifreli Metninin Görünmesi Hatasının Giderilmesi:**
+  - **Kök Nedenler:**
+    1. `NoteRepositoryImpl.kt` içindeki `getNoteById(id)` ve `getNoteByTitle(title)` metodlarında `if (note.isLocked && cryptoManager.isEncrypted(note.content))` koşulu bulunuyordu. Not kilidi kaldırıldığında veya durum geçişlerinde `isLocked` false iken veritabanında henüz şifreli kalan içerik deşifre edilmeden doğrudan kullanıcıya sunuluyordu.
+    2. `NoteRepositoryImpl.insertNote` ve `updateNote` fonksiyonlarında, eğer içerik zaten şifrelenmişse (`ENC_GCM_V1:` ile başlıyorsa) idempotency kontrolü olmadığı için şifreli metin tekrar tekrar şifreleniyor (çift/üç katmanlı şifreleme) ve tek katman deşifre edilse bile içteki `ENC_GCM_V1:` metni editöre yansıyordu.
+    3. `getAllNotes()`, `getActiveNotesList()` gibi yedekleme ve dışa aktarma fonksiyonları ham veritabanını okuyup Keystore şifresini çözmeden aktarıyordu.
+  - **Çözümler:**
+    1. `NoteCryptoManager.kt` içindeki `encrypt` fonksiyonu **idempotent** yapıldı; metin zaten `ENC_GCM_V1:` ile başlıyorsa asla tekrar şifrelenmez.
+    2. `NoteCryptoManager.kt` içindeki `decrypt` fonksiyonu **özyinelemeli (recursive)** hale getirildi; daha önce birden fazla kez şifrelenmiş tüm katmanları tek seferde düz metne ulaşana kadar çözer.
+    3. `NoteRepositoryImpl.kt` içindeki `getNoteById`, `getNoteByTitle`, `getNotesLinkingTo`, `getAllNotes`, `getActiveNotesList`, `getPinnedNotesList` metodlarında `note.isLocked` şartına bakılmaksızın içerik şifreliyse anında otomatik olarak deşifre edilir.
+    4. Notun kilidi kaldırıldığında (`updateNote`), veritabanındaki içerik de otomatik olarak düz metne çevrilerek kaydedilir.
+    5. `NoteDetailViewModel.kt` başlangıç yüklemesi (`init`) ve taslak geri yükleme (`restoreDraft`) aşamalarına deşifre koruması eklendi.
+- **Sürüm Güncellemesi ve Yayın (v1.2.9 - Code 29):**
+  - `app/build.gradle.kts`: `versionCode = 29`, `versionName = "1.2.9"`
+  - `version.json`: `versionCode: 29`, `versionName: "1.2.9"`
   - `NoteApp-release.apk` kök dizine kopyalandı ve `hermes`, `main`, `apk` dallarına pushlandı.

@@ -1,8 +1,8 @@
 {
-  "versionCode": 28,
-  "versionName": "1.2.8",
+  "versionCode": 29,
+  "versionName": "1.2.9",
   "buildTime": 0,
   "releaseDate": "26.10.2026",
-  "changeLog": "Notları dışa aktarırken ve yedeklerken parola yerine biyometrik parmak izi ile tek dokunuşla doğrulama desteği eklendi.",
+  "changeLog": "Kilitli not açıldığında şifreli metin (ENC_GCM_V1) görünmesi hatası giderildi; çift şifreleme engellendi, çok katmanlı şifre çözücü ve yedekleme için otomatik deşifre entegre edildi.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }

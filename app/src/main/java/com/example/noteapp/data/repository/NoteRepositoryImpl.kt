@@ -18,15 +18,27 @@ class NoteRepositoryImpl @Inject constructor(
     private val cryptoManager: NoteCryptoManager
 ) : NoteRepository {
     override fun getActiveNotes(): Flow<List<Note>> = dao.getActiveNotes()
-    override suspend fun getActiveNotesList(): List<Note> = dao.getActiveNotesList()
-    override suspend fun getPinnedNotesList(): List<Note> = dao.getPinnedNotesList()
+    override suspend fun getActiveNotesList(): List<Note> = dao.getActiveNotesList().map { note ->
+        if (cryptoManager.isEncrypted(note.content)) {
+            note.copy(content = cryptoManager.decrypt(note.content))
+        } else {
+            note
+        }
+    }
+    override suspend fun getPinnedNotesList(): List<Note> = dao.getPinnedNotesList().map { note ->
+        if (cryptoManager.isEncrypted(note.content)) {
+            note.copy(content = cryptoManager.decrypt(note.content))
+        } else {
+            note
+        }
+    }
     override fun getArchivedNotes(): Flow<List<Note>> = dao.getArchivedNotes()
     override fun getTrashNotes(): Flow<List<Note>> = dao.getTrashNotes()
     override fun getNotesByCategory(categoryId: Long): Flow<List<Note>> = dao.getNotesByCategory(categoryId)
 
     override suspend fun getNoteById(id: Long): Note? {
         val note = dao.getNoteById(id) ?: return null
-        return if (note.isLocked && cryptoManager.isEncrypted(note.content)) {
+        return if (cryptoManager.isEncrypted(note.content)) {
             note.copy(content = cryptoManager.decrypt(note.content))
         } else {
             note
@@ -35,7 +47,7 @@ class NoteRepositoryImpl @Inject constructor(
 
     override suspend fun getNoteByTitle(title: String): Note? {
         val note = dao.getNoteByTitle(title) ?: return null
-        return if (note.isLocked && cryptoManager.isEncrypted(note.content)) {
+        return if (cryptoManager.isEncrypted(note.content)) {
             note.copy(content = cryptoManager.decrypt(note.content))
         } else {
             note
@@ -46,7 +58,7 @@ class NoteRepositoryImpl @Inject constructor(
         if (noteTitle.isBlank()) return emptyList()
         val linkToken = "[[$noteTitle]]"
         return dao.getNotesLinkingTo(linkToken, noteTitle, excludeId).map { note ->
-            if (note.isLocked && cryptoManager.isEncrypted(note.content)) {
+            if (cryptoManager.isEncrypted(note.content)) {
                 note.copy(content = cryptoManager.decrypt(note.content))
             } else {
                 note
@@ -55,7 +67,7 @@ class NoteRepositoryImpl @Inject constructor(
     }
 
     override suspend fun insertNote(note: Note): Long {
-        val safeNote = if (note.isLocked && note.content.isNotBlank()) {
+        val safeNote = if (note.isLocked && note.content.isNotBlank() && !cryptoManager.isEncrypted(note.content)) {
             note.copy(content = cryptoManager.encrypt(note.content))
         } else note
         val id = dao.insertNote(safeNote)
@@ -64,8 +76,10 @@ class NoteRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateNote(note: Note) {
-        val safeNote = if (note.isLocked && note.content.isNotBlank()) {
+        val safeNote = if (note.isLocked && note.content.isNotBlank() && !cryptoManager.isEncrypted(note.content)) {
             note.copy(content = cryptoManager.encrypt(note.content))
+        } else if (!note.isLocked && cryptoManager.isEncrypted(note.content)) {
+            note.copy(content = cryptoManager.decrypt(note.content))
         } else note
         dao.updateNote(safeNote)
         NotesWidgetProvider.updateAllWidgets(context)
@@ -81,7 +95,13 @@ class NoteRepositoryImpl @Inject constructor(
         NotesWidgetProvider.updateAllWidgets(context)
     }
 
-    override suspend fun getAllNotes(): List<Note> = dao.getAllNotes()
+    override suspend fun getAllNotes(): List<Note> = dao.getAllNotes().map { note ->
+        if (cryptoManager.isEncrypted(note.content)) {
+            note.copy(content = cryptoManager.decrypt(note.content))
+        } else {
+            note
+        }
+    }
 
     override suspend fun insertNotes(notes: List<Note>): List<Long> {
         val safeNotes = notes.map { note ->
