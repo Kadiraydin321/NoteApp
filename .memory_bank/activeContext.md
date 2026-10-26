@@ -15,4 +15,9 @@
 - **Sürüm Güncellemesi ve Yayın (v1.2.9 - Code 29):**
   - `app/build.gradle.kts`: `versionCode = 29`, `versionName = "1.2.9"`
   - `version.json`: `versionCode: 29`, `versionName: "1.2.9"`
-  - `NoteApp-release.apk` kök dizine kopyalandı ve `hermes`, `main`, `apk` dallarına pushlandı.
+  - `NoteApp-release.apk` kök dizine kopyalandı ve `main`, `apk` dallarına pushlandı.
+- **Hermes Sürümü ve Klasörünün Temizlenmesi:**
+  - `NoteApp` yerel deposundaki `hermes` dalı silindi (`git branch -D hermes`).
+  - GitHub uzak deposundaki `origin/hermes` dalı tamamen kaldırıldı (`git push origin --delete hermes`).
+  - Disk üzerindeki `/home/birin/Projeler/hermes_NoteApp` klasörü kalıcı olarak silindi.
+  - Aktif geliştirme dalı doğrudan ana `main` dalına alındı.
