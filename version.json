@@ -1,8 +1,8 @@
 {
-  "versionCode": 26,
-  "versionName": "1.2.6",
+  "versionCode": 27,
+  "versionName": "1.2.7",
   "buildTime": 0,
   "releaseDate": "26.10.2026",
-  "changeLog": "Uygulama açılışında tüm izinlerin tek seferde istenmesi sağlandı (bildirim, mikrofon, medya). Hatırlatıcı bildirimlerinin Android 13+ üzerinde çıkmaması sorunu giderildi, bildirim kanalları ve cihaz yeniden başlatma sonrası hatırlatıcıların otomatik yenilenmesi eklendi.",
+  "changeLog": "Okuma / Sunum modunda başlığın üst çubuktaki okuma ve biçimlendirme butonlarının üstüne binmesi sorunu giderildi; başlık içerik alanında zarifçe sergilenerek üst çubuk butonlarına tam alan sağlandı.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }

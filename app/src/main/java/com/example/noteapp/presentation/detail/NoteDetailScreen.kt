@@ -1058,15 +1058,7 @@ fun NoteDetailScreen(
         topBar = {
             if (isPresentationMode) {
                 TopAppBar(
-                    title = {
-                        Text(
-                            text = state.title.ifBlank { "Not Sunumu" },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    },
+                    title = { },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = animatedBgColor,
                         titleContentColor = contentColor,
