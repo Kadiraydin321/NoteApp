@@ -29,7 +29,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
         }
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.cancel(noteId.toInt())
+        notificationManager.cancel(NotificationHelper.getReminderNotificationId(noteId))
 
         when (intent.action) {
             ACTION_MARK_DONE -> {

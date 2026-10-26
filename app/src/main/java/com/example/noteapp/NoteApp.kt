@@ -44,6 +44,7 @@ class NoteApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        com.example.noteapp.notification.NotificationHelper.createNotificationChannels(this)
         observeNotesForWidgetSync()
         com.example.noteapp.worker.TrashCleanupScheduler.schedulePeriodicCleanup(this)
         com.example.noteapp.domain.util.AppShortcutManager.initDynamicShortcuts(this)

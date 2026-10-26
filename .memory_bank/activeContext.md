@@ -1,20 +1,25 @@
 # Active Context - NoteApp
 
-## Son Yapılan İşlemler (UI Çakışmaları, Broken Feature Düzeltmeleri & v1.2.5 Release Yayını)
-- **NoteDetailScreen Alt Yüzen Kapsül Dok Barı (Overlap Düzeltmesi):**
-  - Sol taraftaki 5 adet aksiyon butonu (Checklist, Medya, Biçimlendir, Renk, Kategori) `Modifier.weight(1f, fill = false)` ile esnek genişliğe kavuşturuldu.
-  - Sağ taraftaki istatistik rozeti (`Surface`), ekranda aynı anda checklist halkası veya kelime hedefi rozeti varken otomatik olarak kompakt formata (`"$wordCount k"`) geçecek şekilde uyarlandı.
-  - İstatistik metinlerine `maxLines = 1` ve `overflow = TextOverflow.Ellipsis` uygulandı; 320dp - 411dp arası tüm ekran boyutlarında elemanların birbirinin üstüne binmesi ve taşma tamamen engellendi.
-  - Medya araç kutusu butonları `Modifier.horizontalScroll(rememberScrollState())` ve `PaddingValues(10.dp, 6.dp)` ile sarılarak dar ekranlarda butonların sıkışıp kırılması önlendi.
-  - Odaklanma Modu (Zen) butonu kompakt ekranlarda (`<400dp`) üst çubuktan kaldırılarak 3-nokta menüsüne taşındı; böylece üst başlık ve otomatik kayıt göstergesi ile aksiyon butonları arasındaki çakışma giderildi.
-- **Find & Replace Toolbar Boşluk Düzeltmesi:**
-  - `FindAndReplaceBar` açıkken içerik sütununun üstüne eklenen Spacer yüksekliği 56.dp'den 112.dp'ye çıkarılarak, değiştir (replace) paneli açıkken dahi not başlığı ve kategori etiketinin araç çubuğu altında kalması önlendi.
-- **NotesScreen Çoklu Seçim Modu ve BatchActionsBottomBar Sadeleştirmesi:**
-  - Çoklu seçim modunda `TopAppBar` üzerinde yer alan ve alttaki `BatchActionsBottomBar` ile birebir mükerrer olan `PushPin`, `Palette`, `CallMerge` butonları kaldırıldı.
-  - Seçim üst çubuğunda sadece Kapat (Close), seçilen not adedi ve özet bilgisi (`maxLines = 1`, `TextOverflow.Ellipsis`) ve Tümünü Seç/Kaldır aksiyonu bırakıldı.
-  - `BatchActionsBottomBar` butonlarına eşit ağırlık (`Modifier.weight(1f)`), daraltılmış yatay padding ve `maxLines = 1, softWrap = false, TextOverflow.Ellipsis` kazandırılarak butonların alt panelde üst üste binmesi engellendi.
-- **Otomatik Güncelleme Teşhisi & v1.2.5 (Code 25) Yayını:**
-  - **Sorun:** Kullanıcının telefonunda daha önceki bir derlemeden kalma `versionCode = 20` bulunuyordu. Önceki güncelleme sürüm kodu `16` olduğu için `16 > 20` false dönüyor ve uygulama kendisini güncel sanarak güncellemeyi algılamıyordu.
-  - **Çözüm:** Sürüm kodu güvenle **`versionCode = 25`** ve **`versionName = "1.2.5"`** olarak yükseltildi. `AppUpdateManager` motoruna `version.json` üzerinden dinamik `downloadUrl` desteği eklendi.
-  - `./gradlew assembleRelease` ile yeni `NoteApp-release.apk` üretildi.
-  - `version.json` ve yeni APK hem `hermes`, hem `main`, hem de `apk` dallarına eşzamanlı olarak pushlandı.
+## Son Yapılan İşlemler (v1.2.6 - Başlangıç İzinleri & Hatırlatıcı Bildirimleri Onarımı)
+- **Uygulama Açılışında Tüm İzinlerin Toplu İstenmesi:**
+  - `MainActivity.kt` içerisine `requestStartupPermissionsLauncher` (`ActivityResultContracts.RequestMultiplePermissions()`) eklendi.
+  - Uygulama ilk açıldığında (`onCreate`) eksik olan izinler taranarak tek bir sistem diyaloğunda kullanıcıdan talep ediliyor:
+    - `POST_NOTIFICATIONS` (Android 13+ / API 33+)
+    - `RECORD_AUDIO` (Tüm Android sürümleri için sesli not kaydı)
+    - `READ_MEDIA_IMAGES` & `READ_MEDIA_VISUAL_USER_SELECTED` (Android 13+ ve Android 14+ medya seçimi)
+    - `READ_EXTERNAL_STORAGE` (Android 12 ve öncesi)
+  - Not detay ekranında hatırlatıcı ekleme ve ses kaydı butonlarına da kullanıcı izinleri reddetmişse anlık fallback kontrolü eklendi.
+
+- **Hatırlatıcı Bildirimlerinin Çıkmama Sorununun Giderilmesi:**
+  - **Kök Neden:** Android 13+ üzerinde `POST_NOTIFICATIONS` runtime izni daha önce hiçbir yerde istenmediği için sistem tüm bildirimleri sessizce engelliyordu.
+  - **Bildirim Kanalları:** `NotificationHelper.createNotificationChannels(context)` metodu static/companion hale getirilip `NoteApp.onCreate()` içerisine taşındı; böylece uygulama başlar başlamaz sistem bildirim kanalları tescil ediliyor.
+  - **Exact Alarm İzinleri:** `AndroidManifest.xml` içerisine `USE_EXACT_ALARM` izni eklendi (Android 13+ sistem otomatik onayı için). `AndroidAlarmScheduler.kt` içine `SecurityException` koruması eklenerek yetki kısıtlaması olan üretici cihazlarda `setAndAllowWhileIdle` yedek mekanizması devreye sokuldu.
+  - **Cihaz Yeniden Başlatma & Güncelleme Desteği:** `AlarmReceiver.kt` `@AndroidEntryPoint` ile donatılarak `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED` ve `QUICKBOOT_POWERON` sinyalleri yakalandığında Room veritabanındaki aktif hatırlatıcıların otomatik olarak yeniden takvimlendirilmesi sağlandı.
+  - **Öncelik ve Görünürlük:** Bildirimler `PRIORITY_MAX`, `CATEGORY_REMINDER`, `DEFAULT_ALL` (ses, titreşim, ışık) ve `VISIBILITY_PUBLIC` ile heads-up (açılır banner) formatına getirildi; küçük ikon NoteApp monochrome vektör ikonu ile güncellendi.
+  - **Bildirim ID Tutarlılığı:** `NotificationHelper.getReminderNotificationId(noteId)` ile `ReminderActionReceiver` ve `NotificationHelper` arasındaki iptal/erteleme senkronizasyonu sağlandı.
+
+- **Sürüm Güncellemesi ve Yayın (v1.2.6 - Code 26):**
+  - `app/build.gradle.kts`: `versionCode = 26`, `versionName = "1.2.6"`
+  - `version.json`: `versionCode: 26`, `versionName: "1.2.6"`
+  - `./gradlew testDebugUnitTest` ve `./gradlew assembleRelease` başarıyla çalıştırıldı (31 unit test & 54 build task yeşil).
+  - `NoteApp-release.apk` kök dizine kopyalandı ve `hermes`, `main`, `apk` dallarına pushlandı.

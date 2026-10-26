@@ -6,12 +6,15 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -814,6 +817,14 @@ fun NoteDetailScreen(
         }
     }
 
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(context, "Hatırlatıcı bildirimlerini alabilmek için bildirim izni gereklidir.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // Widget'tan otomatik aksiyonla açıldıysa (tek seferlik çalışması için rememberSaveable ile korunur)
     var autoActionExecuted by rememberSaveable(autoAction) { mutableStateOf(false) }
 
@@ -847,6 +858,11 @@ fun NoteDetailScreen(
 
     // Hatırlatıcı Tarih/Saat Seçici
     fun showDateTimePicker() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
         val calendar = Calendar.getInstance()
         DatePickerDialog(
             context,

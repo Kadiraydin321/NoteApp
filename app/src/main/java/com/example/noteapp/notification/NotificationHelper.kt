@@ -18,38 +18,43 @@ class NotificationHelper(private val context: Context) {
         const val CHANNEL_STICKY_ID = "note_sticky_channel"
         const val CHANNEL_STICKY_NAME = "Sabitlenmiş Notlar"
 
+        fun getReminderNotificationId(noteId: Long): Int = (noteId % 100_000L).toInt()
         fun getStickyNotificationId(noteId: Long): Int = (noteId + 200_000L).toInt()
+
+        fun createNotificationChannels(context: Context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val reminderChannel = NotificationChannel(
+                    CHANNEL_ID,
+                    CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Planlanan not hatırlatıcı bildirimleri"
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 500, 250, 500)
+                    enableLights(true)
+                    lightColor = android.graphics.Color.BLUE
+                    lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+                }
+
+                val stickyChannel = NotificationChannel(
+                    CHANNEL_STICKY_ID,
+                    CHANNEL_STICKY_NAME,
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Bildirim alanına sabitlenen kalıcı notlar"
+                    setShowBadge(false)
+                    enableVibration(false)
+                }
+
+                val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                manager.createNotificationChannel(reminderChannel)
+                manager.createNotificationChannel(stickyChannel)
+            }
+        }
     }
 
     init {
-        createNotificationChannel()
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val reminderChannel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Planlanan not hatırlatıcı bildirimleri"
-                enableVibration(true)
-            }
-
-            val stickyChannel = NotificationChannel(
-                CHANNEL_STICKY_ID,
-                CHANNEL_STICKY_NAME,
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Bildirim alanına sabitlenen kalıcı notlar"
-                setShowBadge(false)
-                enableVibration(false)
-            }
-
-            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(reminderChannel)
-            manager.createNotificationChannel(stickyChannel)
-        }
+        createNotificationChannels(context)
     }
 
     fun showReminderNotification(noteId: Long, title: String, content: String) {
@@ -108,11 +113,14 @@ class NotificationHelper(private val context: Context) {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setSmallIcon(com.example.noteapp.R.drawable.ic_launcher_monochrome)
             .setContentTitle(if (title.isNotBlank()) title else "Not Hatırlatıcısı")
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .addAction(android.R.drawable.checkbox_on_background, "✓ Tamamlandı", donePendingIntent)
@@ -121,7 +129,7 @@ class NotificationHelper(private val context: Context) {
             .build()
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(noteId.toInt(), notification)
+        manager.notify(getReminderNotificationId(noteId), notification)
     }
 
     /**
