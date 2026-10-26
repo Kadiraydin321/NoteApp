@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "1.0.0.9",
-  "releaseNotes": "🎧 Yenilenmiş Ses Oynatıcı & Güvenlik Güncellemesi (v1.0.0.9):\n- Yenilenmiş Şık Ses Oynatıcı: Moon+ Reader tarzı gerçek zamanlı cümle kaydırma çubuğu (SeekBar), parmakla cümleye atlama desteği.\n- Hızlı Sesli Oku: Okuyucu alt çubuğuna '🔊 Dinle' butonu eklendi; tek tıkla oynatma başlar.\n- Hız ve Ton (Pitch) Seçicileri: 0.8x - 2.0x hız ve Kalın/Doğal/İnce ses tonu çipleri tek dokunuşla çalışır hale getirildi.\n- Google Play Protect Güvenlik Düzeltmesi: Android genel debug anahtarı yerine 2048-bit RSA özel Release Keystore ile imzalandı.",
+  "versionCode": 12,
+  "versionName": "1.0.1.0",
+  "releaseNotes": "🎨 6 Farklı Tema & Tam Sayfa Performans Optimizasyonu (v1.0.1.0):\n- 3 Karanlık + 3 Aydınlık Tema: Obsidyen & Koyu Kırmızı, Saf AMOLED Siyah, Gece Mavisi & Derin Uzay, Sepya Kitap Dokusu, Kutup Beyazı ve Pastel Nane (Göz Yormayan) temaları eklendi.\n- Hem Ayarlar Popup'ından hem de Okuyucu alt çubuğundan anında tema değiştirme imkanı.\n- Dinamik UI Renklendirmesi: Seçilen temaya göre üst bar, arama alanları, kartlar ve sistem durum çubukları anında uyum sağlar.\n- Yüksek Hızlı Sayfa Optimizasyonu: Tüm liste ve ızgara adaptörlerine statik ViewHolder mimarisi entegre edilerek binlerce gereksiz findViewById çağrısı ve kaydırma takılmaları tamamen yok edildi.\n- Okuyucu Bellek İyileştirmesi: ViewPager2 önbellek sınırı optimize edilerek düşük RAM'li cihazlarda bile kusursuz akıcılık sağlandı.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/novel-downloader-apk/NovelReaderDownloader.apk"
 }
