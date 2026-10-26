@@ -1,8 +1,8 @@
 {
-  "versionCode": 25,
-  "versionName": "1.2.5",
+  "versionCode": 26,
+  "versionName": "1.2.6",
   "buildTime": 0,
   "releaseDate": "26.10.2026",
-  "changeLog": "Arayüz çakışmaları ve tasarım hataları giderildi: Alt yüzen kapsül dok barı tüm ekran boyutlarıyla tam uyumlu hale getirildi, arama/değiştirme çubuğu üst üste binmeleri önlendi, çoklu seçim araç çubuğu ve alt eylem paneli sadeleştirilerek mükerrerlikler kaldırıldı.",
+  "changeLog": "Uygulama açılışında tüm izinlerin tek seferde istenmesi sağlandı (bildirim, mikrofon, medya). Hatırlatıcı bildirimlerinin Android 13+ üzerinde çıkmaması sorunu giderildi, bildirim kanalları ve cihaz yeniden başlatma sonrası hatırlatıcıların otomatik yenilenmesi eklendi.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }
