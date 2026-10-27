@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "1.0.1.0",
-  "releaseNotes": "🎨 6 Farklı Tema & Tam Sayfa Performans Optimizasyonu (v1.0.1.0):\n- 3 Karanlık + 3 Aydınlık Tema: Obsidyen & Koyu Kırmızı, Saf AMOLED Siyah, Gece Mavisi & Derin Uzay, Sepya Kitap Dokusu, Kutup Beyazı ve Pastel Nane (Göz Yormayan) temaları eklendi.\n- Hem Ayarlar Popup'ından hem de Okuyucu alt çubuğundan anında tema değiştirme imkanı.\n- Dinamik UI Renklendirmesi: Seçilen temaya göre üst bar, arama alanları, kartlar ve sistem durum çubukları anında uyum sağlar.\n- Yüksek Hızlı Sayfa Optimizasyonu: Tüm liste ve ızgara adaptörlerine statik ViewHolder mimarisi entegre edilerek binlerce gereksiz findViewById çağrısı ve kaydırma takılmaları tamamen yok edildi.\n- Okuyucu Bellek İyileştirmesi: ViewPager2 önbellek sınırı optimize edilerek düşük RAM'li cihazlarda bile kusursuz akıcılık sağlandı.",
+  "versionCode": 13,
+  "versionName": "1.0.1.1",
+  "releaseNotes": "🌐 NovelBin EN Entegrasyonu & Akıcı TTS İyileştirmeleri (v1.0.1.1):\n- NovelBin EN Kaynağı: Geniş İngilizce web novel kütüphanesi doğrudan arama ve indirme desteğiyle entegre edildi.\n- Akıcı TTS Seslendirmesi: Bölüm içindeki sahne ayraçları (***, --- vb.) ve anlamsız semboller sesli okuma öncesinde otomatik temizlenir.\n- Kısaltma ve Boşluk Filtreleme: Okuma akışını bozan kısaltmalar ve tekrar eden karakterler filtrelenerek pürüzsüz dinleme deneyimi sağlandı.\n- Kararlılık & Performans: Kaynak yönetimi ve bölüm ayrıştırma optimizasyonları yapıldı.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/novel-downloader-apk/NovelReaderDownloader.apk"
 }
