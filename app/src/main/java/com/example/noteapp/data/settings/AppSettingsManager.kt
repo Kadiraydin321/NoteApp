@@ -311,6 +311,7 @@ data class AppSettings(
     val searchBarShape: SearchBarShape = SearchBarShape.PILL,
     val designPreset: DesignPreset = DesignPreset.MODERN_MATERIAL,
     val dailyWordGoal: Int = 300,
+    val amoledDark: Boolean = false,
     val trashRetentionPolicy: TrashRetentionPolicy = TrashRetentionPolicy.DAYS_30,
     val lockTimeoutPolicy: LockTimeoutPolicy = LockTimeoutPolicy.IMMEDIATE
 )
@@ -409,6 +410,8 @@ class AppSettingsManager @Inject constructor(
         val widgetCornerRadiusStr = prefs.getString(KEY_WIDGET_CORNER_RADIUS, WidgetCornerRadius.LARGE.name) ?: WidgetCornerRadius.LARGE.name
         val widgetCornerRadius = try { WidgetCornerRadius.valueOf(widgetCornerRadiusStr) } catch (_: Exception) { WidgetCornerRadius.LARGE }
 
+        val amoledDark = prefs.getBoolean(KEY_AMOLED_DARK, false)
+
         val trashRetentionStr = prefs.getString(KEY_TRASH_RETENTION_POLICY, TrashRetentionPolicy.DAYS_30.name) ?: TrashRetentionPolicy.DAYS_30.name
         val trashRetentionPolicy = try { TrashRetentionPolicy.valueOf(trashRetentionStr) } catch (_: Exception) { TrashRetentionPolicy.DAYS_30 }
 
@@ -441,6 +444,7 @@ class AppSettingsManager @Inject constructor(
             searchBarShape = searchBarShape,
             designPreset = designPreset,
             dailyWordGoal = prefs.getInt(KEY_DAILY_WORD_GOAL, 300),
+            amoledDark = amoledDark,
             trashRetentionPolicy = trashRetentionPolicy,
             lockTimeoutPolicy = lockTimeoutPolicy
         )
@@ -665,7 +669,13 @@ class AppSettingsManager @Inject constructor(
         _settings.value = _settings.value.copy(lockTimeoutPolicy = policy)
     }
 
+    fun setAmoledDark(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AMOLED_DARK, enabled).apply()
+        _settings.value = _settings.value.copy(amoledDark = enabled)
+    }
+
     companion object {
+        private const val KEY_AMOLED_DARK = "amoled_dark_mode"
         private const val KEY_WIDGET_FILTER_MODE = "widget_filter_mode"
         private const val KEY_WIDGET_SHOW_LOCKED = "widget_show_locked"
         private const val KEY_WIDGET_SHOW_CONTENT = "widget_show_content"

@@ -12,12 +12,10 @@ import com.example.noteapp.MainActivity
 @RequiresApi(Build.VERSION_CODES.N)
 class QuickNoteTileService : TileService() {
 
-    @SuppressLint("StartActivityAndCollapseDeprecated")
-    override fun onClick() {
-        super.onClick()
+    private fun launchQuickNote() {
         val intent = Intent(this, MainActivity::class.java).apply {
             action = ACTION_QUICK_NOTE
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(EXTRA_OPEN_NEW_NOTE, true)
         }
 
@@ -35,11 +33,26 @@ class QuickNoteTileService : TileService() {
         }
     }
 
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    override fun onClick() {
+        super.onClick()
+        if (isLocked) {
+            unlockAndRun {
+                launchQuickNote()
+            }
+        } else {
+            launchQuickNote()
+        }
+    }
+
     override fun onStartListening() {
         super.onStartListening()
         qsTile?.apply {
-            state = Tile.STATE_ACTIVE
-            label = "Hizli Not"
+            state = Tile.STATE_INACTIVE
+            label = "Hızlı Not"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                subtitle = "Yeni Not Ekle"
+            }
             updateTile()
         }
     }

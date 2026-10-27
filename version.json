@@ -1,8 +1,8 @@
 {
-  "versionCode": 29,
-  "versionName": "1.2.9",
+  "versionCode": 30,
+  "versionName": "1.3.0",
   "buildTime": 0,
-  "releaseDate": "26.10.2026",
-  "changeLog": "Kilitli not açıldığında şifreli metin (ENC_GCM_V1) görünmesi hatası giderildi; çift şifreleme engellendi, çok katmanlı şifre çözücü ve yedekleme için otomatik deşifre entegre edildi.",
+  "releaseDate": "27.10.2026",
+  "changeLog": "v1.3.0 Major Release: 16 alt ajan işbirliğiyle kapsamlı UI/UX modernizasyonu, Obsidian tarzı çift yönlü wikilink ([[ ]]) desteği, interaktif yapılacaklar listesi (- [x]), akıllı biyometrik oturum (30sn grace period & 5 hatalı deneme lockout koruması), Room indeksleri & kalıcı taslak kurtarma, AMOLED saf siyah tema, ProGuard/R8 optimizasyonu (%75 APK küçülmesi) ve 284 birim test doğrulaması.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }

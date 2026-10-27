@@ -21,8 +21,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -118,6 +120,11 @@ import com.example.noteapp.presentation.components.SaveTemplateDialog
 import com.example.noteapp.presentation.components.SetWordGoalDialog
 import com.example.noteapp.presentation.components.WordGoalProgressBadge
 import com.example.noteapp.presentation.components.TagAutocompleteBar
+import com.example.noteapp.presentation.components.WikilinkAutocompleteBar
+import com.example.noteapp.presentation.components.BottomEditorBar
+import com.example.noteapp.presentation.components.NoteToolCategory
+import com.example.noteapp.presentation.components.ActiveEditorStyles
+import com.example.noteapp.presentation.components.detectActiveEditorStyles
 import com.example.noteapp.presentation.components.TemplatePickerBottomSheet
 import com.example.noteapp.domain.util.ClipboardHelper
 import com.example.noteapp.domain.util.NoteDraft
@@ -165,14 +172,6 @@ val NoteColors = listOf(
     Color(0xFFD7CCC8), // Sıcak Kaşmir & Bej
     Color(0xFF181512)  // Gece Koyu Espresso
 )
-
-enum class NoteToolCategory {
-    NONE,
-    MEDIA,
-    FORMAT,
-    COLOR,
-    CATEGORY
-}
 
 private fun isChecklistLine(line: String): Boolean {
     val trimmed = line.trimStart()
@@ -388,8 +387,10 @@ fun NoteDetailScreen(
     availableTemplates: List<NoteTemplate> = emptyList(),
     onSeekAudio: (Int) -> Unit = {},
     onCycleAudioPlaybackSpeed: () -> Unit = {},
+    onSetAudioPlaybackSpeed: ((Float) -> Unit)? = null,
     onSeekAudioFraction: (Float) -> Unit = {},
     onCancelAudioRecording: () -> Unit = {},
+    onTogglePauseAudioRecording: () -> Unit = {},
     onSetWordGoal: (Int?) -> Unit = {},
     onRestoreDraft: (NoteDraft) -> Unit = {},
     onDiscardDraft: () -> Unit = {},
@@ -432,6 +433,19 @@ fun NoteDetailScreen(
         if (sel.collapsed) {
             TagSuggestionEngine.findActiveTagQuery(state.contentValue.text, sel.start)
         } else null
+    }
+
+    val activeWikilinkQuery = remember(state.contentValue) {
+        val sel = state.contentValue.selection
+        if (sel.collapsed) {
+            TagSuggestionEngine.findActiveWikilinkQuery(state.contentValue.text, sel.start)
+        } else null
+    }
+
+    val activeEditorStyles = remember(state.contentValue, state.isRecordingAudio) {
+        val sel = state.contentValue.selection
+        val cursor = if (sel.collapsed) sel.start else sel.min
+        detectActiveEditorStyles(state.contentValue.text, cursor, state.isRecordingAudio)
     }
 
     val tagSuggestions = remember(activeTagQuery, state.availableTags) {
@@ -585,88 +599,162 @@ fun NoteDetailScreen(
                 ) {
                     HorizontalPager(
                         state = pagerState,
+                        userScrollEnabled = true,
                         modifier = Modifier.fillMaxSize()
                     ) { page ->
                         val path = allImageAttachments[page]
+                        val isDrawing = path.contains("drawing", ignoreCase = true) || path.contains("DRAW_")
                         var zoom by remember(path) { mutableFloatStateOf(1f) }
                         var panX by remember(path) { mutableFloatStateOf(0f) }
                         var panY by remember(path) { mutableFloatStateOf(0f) }
                         val transformState = rememberTransformableState { zoomChange, panChange, _ ->
                             zoom = (zoom * zoomChange).coerceIn(1f, 5f)
-                            panX += panChange.x
-                            panY += panChange.y
+                            if (zoom <= 1.05f) {
+                                panX = 0f
+                                panY = 0f
+                            } else {
+                                panX += panChange.x
+                                panY += panChange.y
+                            }
                         }
 
                         Box(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(path) {
+                                    detectTapGestures(
+                                        onDoubleTap = {
+                                            if (zoom > 1.2f) {
+                                                zoom = 1f
+                                                panX = 0f
+                                                panY = 0f
+                                            } else {
+                                                zoom = 2.5f
+                                            }
+                                        }
+                                    )
+                                },
                             contentAlignment = Alignment.Center
                         ) {
-                            AsyncImage(
-                                model = File(path),
-                                contentDescription = "Tam ekran görsel ${page + 1}",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .transformable(transformState)
-                                    .graphicsLayer {
-                                        scaleX = zoom
-                                        scaleY = zoom
-                                        translationX = panX
-                                        translationY = panY
-                                    }
-                            )
+                            if (isDrawing) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color.White)
+                                        .graphicsLayer {
+                                            scaleX = zoom
+                                            scaleY = zoom
+                                            translationX = panX
+                                            translationY = panY
+                                        }
+                                        .transformable(transformState),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AsyncImage(
+                                        model = File(path),
+                                        contentDescription = "Tam ekran çizim ${page + 1}",
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            } else {
+                                AsyncImage(
+                                    model = File(path),
+                                    contentDescription = "Tam ekran görsel ${page + 1}",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .transformable(transformState)
+                                        .graphicsLayer {
+                                            scaleX = zoom
+                                            scaleY = zoom
+                                            translationX = panX
+                                            translationY = panY
+                                        }
+                                )
+                            }
                         }
                     }
 
-                    // Üst Araç Çubuğu
-                    Row(
+                    // Üst Araç Çubuğu ve Degrade Koruma (Top Gradient Scrim)
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .align(Alignment.TopCenter)
-                            .statusBarsPadding()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    colors = listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent)
+                                )
+                            )
                     ) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            FilledTonalIconButton(onClick = { fullScreenViewerInitialIndex = null }) {
-                                Icon(Icons.Default.Close, contentDescription = "Görseli kapat")
-                            }
-
-                            if (allImageAttachments.size > 1) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Color.White.copy(alpha = 0.22f)
-                                ) {
-                                    Text(
-                                        text = "${pagerState.currentPage + 1} / ${allImageAttachments.size}",
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                FilledTonalIconButton(
+                                    onClick = { fullScreenViewerInitialIndex = null },
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = Color.White.copy(alpha = 0.20f),
+                                        contentColor = Color.White
                                     )
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Görseli kapat")
+                                }
+
+                                if (allImageAttachments.size > 1) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color.White.copy(alpha = 0.20f)
+                                    ) {
+                                        Text(
+                                            text = "${pagerState.currentPage + 1} / ${allImageAttachments.size}",
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilledTonalButton(onClick = {
-                                fullScreenViewerInitialIndex = null
-                                onAnnotateImage(currentPath)
-                            }) {
-                                Icon(Icons.Default.Brush, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("İşaretle & Çiz")
-                            }
-                            FilledTonalButton(onClick = {
-                                fullScreenViewerInitialIndex = null
-                                onImageEditClick(currentPath)
-                            }) {
-                                Icon(Icons.Default.Edit, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Düzenle")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilledTonalButton(
+                                    onClick = {
+                                        fullScreenViewerInitialIndex = null
+                                        onAnnotateImage(currentPath)
+                                    },
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = Color.White.copy(alpha = 0.20f),
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Brush, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("İşaretle & Çiz", style = MaterialTheme.typography.labelMedium)
+                                }
+                                FilledTonalButton(
+                                    onClick = {
+                                        fullScreenViewerInitialIndex = null
+                                        onImageEditClick(currentPath)
+                                    },
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Düzenle", style = MaterialTheme.typography.labelMedium)
+                                }
                             }
                         }
                     }
@@ -1214,7 +1302,34 @@ fun NoteDetailScreen(
                             }
                         }
 
-                        // 1. Sabitleme (Pin) Butonu
+                        // 1. Önizleme / Düzenleme Modu Butonu (Markdown Hızlı Geçiş)
+                        IconButton(onClick = { isPreviewMode = !isPreviewMode }) {
+                            Icon(
+                                imageVector = if (isPreviewMode) Icons.Default.Edit else Icons.Default.RemoveRedEye,
+                                contentDescription = if (isPreviewMode) "Düzenleme Modu" else "Önizleme Modu",
+                                tint = if (isPreviewMode) MaterialTheme.colorScheme.primary else topBarIconColor
+                            )
+                        }
+
+                        // 2. Odaklanma Modu (Zen) Butonu
+                        IconButton(onClick = onToggleZenMode) {
+                            Icon(
+                                Icons.Default.SelfImprovement,
+                                contentDescription = "Odaklanma Modu (Zen)",
+                                tint = topBarIconColor
+                            )
+                        }
+
+                        // 3. Not İçi Arama ve Değiştirme Butonu
+                        IconButton(onClick = { isSearchActive = !isSearchActive }) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Notta Bul ve Değiştir",
+                                tint = if (isSearchActive) MaterialTheme.colorScheme.primary else topBarIconColor
+                            )
+                        }
+
+                        // 4. Sabitleme (Pin) Butonu
                         IconButton(onClick = onTogglePin) {
                             if (state.isPinned) {
                                 Icon(
@@ -1231,19 +1346,8 @@ fun NoteDetailScreen(
                             }
                         }
 
-                        // 2. Notu Sil Butonu (Geniş ekranlarda doğrudan üst çubukta, küçük ekranlarda 3 nokta menüsünde)
-                        if (!isCompactScreen) {
-                            IconButton(onClick = { showDeleteConfirmDialog = true }) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Notu Sil",
-                                    tint = deleteButtonColor
-                                )
-                            }
-                        }
-
-                        // Çift Bölmeli Canlı Düzenleyici (Split-Pane) Butonu (Sadece desteklenen geniş/yatay ekranlarda)
-                        if (isSplitSupported) {
+                        // Çift Bölmeli Canlı Düzenleyici (Split-Pane) Butonu (Sadece desteklenen geniş ekranlarda)
+                        if (isSplitSupported && !isCompactScreen) {
                             IconButton(onClick = { isSplitPaneActive = !isSplitPaneActive }) {
                                 Icon(
                                     imageVector = if (isSplitPaneActive) Icons.Default.ViewStream else Icons.Default.VerticalSplit,
@@ -1251,31 +1355,6 @@ fun NoteDetailScreen(
                                     tint = if (isSplitPaneActive) MaterialTheme.colorScheme.primary else topBarIconColor
                                 )
                             }
-                        }
-
-                        // Odaklanma Modu (Zen) Butonu (Kompakt ekranlarda 3 nokta menüsünde yer alır)
-                        if (!isCompactScreen) {
-                            IconButton(onClick = onToggleZenMode) {
-                                Icon(Icons.Default.SelfImprovement, contentDescription = "Odaklanma Modu", tint = topBarIconColor)
-                            }
-                        }
-
-                        // Not İçi Arama ve Değiştirme Butonu
-                        IconButton(onClick = { isSearchActive = !isSearchActive }) {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Notta Bul ve Değiştir",
-                                tint = if (isSearchActive) MaterialTheme.colorScheme.primary else topBarIconColor
-                            )
-                        }
-
-                        // Hızlı Kilit Butonu
-                        IconButton(onClick = onToggleLock) {
-                            Icon(
-                                imageVector = if (state.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                                contentDescription = if (state.isLocked) "Not Kilitli" else "Not Kilitsiz",
-                                tint = if (state.isLocked) MaterialTheme.colorScheme.primary else topBarIconColor.copy(alpha = 0.75f)
-                            )
                         }
 
                         // Üç Nokta Menüsü
@@ -1288,6 +1367,22 @@ fun NoteDetailScreen(
                                 expanded = showMoreMenu,
                                 onDismissRequest = { showMoreMenu = false }
                             ) {
+                                // Hızlı Kilit Butonu
+                                DropdownMenuItem(
+                                    text = { Text(if (state.isLocked) "Kilidi Kaldır" else "Notu Kilitle") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = if (state.isLocked) Icons.Default.LockOpen else Icons.Default.Lock,
+                                            contentDescription = null,
+                                            tint = if (state.isLocked) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        onToggleLock()
+                                    }
+                                )
+
                                 // Odaklanma Modu (Zen)
                                 DropdownMenuItem(
                                     text = { Text("🧘 Odaklanma Modu (Zen)") },
@@ -1909,695 +2004,128 @@ fun NoteDetailScreen(
         },
         bottomBar = {
             if (!isPreviewMode && !state.isZenMode && !isPresentationMode) {
-                val isAppDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-                val dockSurfaceColor = if (isAppDark) Color(0xFF22252A) else Color(0xFFFFFFFF)
-                val dockBorderColor = if (isAppDark) Color(0x30FFFFFF) else Color(0x18000000)
-                val panelContentColor = if (isAppDark) Color(0xFFF0F1F5) else Color(0xFF191C20)
-                val panelSubtleColor = if (isAppDark) Color(0xFF9EABB8) else Color(0xFF5E6573)
+                BottomEditorBar(
+                    textFieldValue = state.contentValue,
+                    activeToolCategory = activeToolCategory,
+                    onToolCategoryChange = { activeToolCategory = it },
+                    hasChecklistItems = hasChecklistItems,
+                    onToggleChecklist = {
+                        val currentText = state.contentValue.text
+                        if (hasChecklistItems) {
+                            val stripped = stripChecklist(currentText)
+                            onContentValueChange(TextFieldValue(stripped, selection = TextRange(stripped.length)))
+                        } else {
+                            val converted = convertToChecklist(currentText)
+                            onContentValueChange(TextFieldValue(converted, selection = TextRange(converted.length)))
+                        }
+                    },
+                    activeStyles = activeEditorStyles,
+                    onApplyWrap = { p, s -> applyWrap(p, s) },
+                    onApplyPrefix = { p -> applyPrefix(p) },
+                    onApplyCodeBlock = applyCodeBlockAction,
+                    onAddImage = { showImageSourceDialog = true },
+                    onAddDrawing = onAddDrawingClick,
+                    onToggleAudioRecording = {
+                        audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    },
+                    isRecordingAudio = state.isRecordingAudio,
+                    noteFontSize = state.noteFontSize,
+                    onFontSizeChange = onFontSizeChange,
+                    selectedColor = state.color,
+                    onColorChange = onColorChange,
+                    selectedBackgroundImage = state.backgroundImage,
+                    onPickBackgroundImage = {
+                        backgroundImagePickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    onRemoveBackgroundImage = { onBackgroundImageChange(null) },
+                    selectedCategoryId = state.categoryId,
+                    categories = categories,
+                    onCategoryChange = { onCategoryChange(it) },
+                    onAddNewCategory = { showAddCategoryDialog = true },
+                    onOpenSnippetPicker = { showSnippetPickerSheet = true },
+                    onOpenMathFormula = { showMathFormulaSheet = true },
+                    onInsertTimestamp = {
+                        val now = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date())
+                        insertTextAtCursor(state.contentValue, "[$now] ", onContentValueChange) { runCatching { focusRequester.requestFocus() } }
+                    },
+                    onInsertHorizontalRule = {
+                        insertTextAtCursor(state.contentValue, "\n---\n", onContentValueChange) { runCatching { focusRequester.requestFocus() } }
+                    },
+                    wordCount = currentWordCount,
+                    readingTime = readingTime,
+                    checklistStats = remember(state.contentValue.text) { ChecklistParser.parse(state.contentValue.text) },
+                    wordGoal = state.wordGoal,
+                    onOpenStatsDialog = { showStatsDialog = true },
+                    onOpenChecklistHub = { showChecklistActionsSheet = true },
+                    onOpenWordGoalDialog = { showWordGoalDialog = true },
+                    onRemoveWordGoal = { onSetWordGoal(null) },
+                    topContent = {
+                        // 1. Akıllı #etiket Otomatik Tamamlama Çubuğu (Tag Autocomplete)
+                        AnimatedVisibility(
+                            visible = activeTagQuery != null && (tagSuggestions.isNotEmpty() || activeTagQuery.query.isNotBlank()),
+                            enter = slideInVertically { it } + fadeIn(),
+                            exit = slideOutVertically { it } + fadeOut()
+                        ) {
+                            if (activeTagQuery != null) {
+                                TagAutocompleteBar(
+                                    query = activeTagQuery.query,
+                                    suggestions = tagSuggestions,
+                                    onSelectTag = { selectedTag ->
+                                        val (newText, newCursor) = TagSuggestionEngine.applyTagSuggestion(
+                                            text = state.contentValue.text,
+                                            activeQuery = activeTagQuery,
+                                            selectedTag = selectedTag
+                                        )
+                                        onContentValueChange(TextFieldValue(newText, TextRange(newCursor)))
+                                    },
+                                    modifier = Modifier.padding(bottom = 6.dp)
+                                )
+                            }
+                        }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .imePadding()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Akıllı #etiket Otomatik Tamamlama Çubuğu (Tag Autocomplete)
-                    AnimatedVisibility(
-                        visible = activeTagQuery != null && (tagSuggestions.isNotEmpty() || activeTagQuery.query.isNotBlank()),
-                        enter = slideInVertically { it } + fadeIn(),
-                        exit = slideOutVertically { it } + fadeOut()
-                    ) {
-                        if (activeTagQuery != null) {
-                            TagAutocompleteBar(
-                                query = activeTagQuery.query,
-                                suggestions = tagSuggestions,
-                                onSelectTag = { selectedTag ->
-                                    val (newText, newCursor) = TagSuggestionEngine.applyTagSuggestion(
-                                        text = state.contentValue.text,
-                                        activeQuery = activeTagQuery,
-                                        selectedTag = selectedTag
-                                    )
-                                    onContentValueChange(TextFieldValue(newText, TextRange(newCursor)))
-                                },
+                        // 2. Akıllı [[Wikilink]] Not Bağlantısı Tamamlama Çubuğu
+                        AnimatedVisibility(
+                            visible = activeWikilinkQuery != null,
+                            enter = slideInVertically { it } + fadeIn(),
+                            exit = slideOutVertically { it } + fadeOut()
+                        ) {
+                            if (activeWikilinkQuery != null) {
+                                WikilinkAutocompleteBar(
+                                    query = activeWikilinkQuery.query,
+                                    allNotes = state.allActiveNotes,
+                                    onSelectNoteTitle = { selectedTitle ->
+                                        val (newText, newCursor) = TagSuggestionEngine.applyWikilinkSuggestion(
+                                            text = state.contentValue.text,
+                                            activeQuery = activeWikilinkQuery,
+                                            selectedTitle = selectedTitle
+                                        )
+                                        onContentValueChange(TextFieldValue(newText, TextRange(newCursor)))
+                                    },
+                                    modifier = Modifier.padding(bottom = 6.dp)
+                                )
+                            }
+                        }
+
+                        // 3. Canlı Ses Kaydı Görselleştirici Barı
+                        AnimatedVisibility(
+                            visible = state.isRecordingAudio,
+                            enter = slideInVertically { it } + fadeIn(),
+                            exit = slideOutVertically { it } + fadeOut()
+                        ) {
+                            AudioRecordingVisualizerBar(
+                                durationSec = state.recordingDurationSec,
+                                amplitudes = state.recordingAmplitudes,
+                                onStop = onToggleAudioRecording,
+                                onCancel = onCancelAudioRecording,
+                                onPauseToggle = onTogglePauseAudioRecording,
+                                isPaused = state.isRecordingPaused,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
                         }
                     }
-
-                    // Canlı Ses Kaydı Görselleştirici Barı (Live Audio Recording Visualizer)
-                    AnimatedVisibility(
-                        visible = state.isRecordingAudio,
-                        enter = slideInVertically { it } + fadeIn(),
-                        exit = slideOutVertically { it } + fadeOut()
-                    ) {
-                        AudioRecordingVisualizerBar(
-                            durationSec = state.recordingDurationSec,
-                            amplitudes = state.recordingAmplitudes,
-                            onStop = onToggleAudioRecording,
-                            onCancel = onCancelAudioRecording,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                    }
-
-                    // Kategoriye Göre Açılan Yüzen Araç Kutusu (Floating Card)
-                    AnimatedVisibility(
-                        visible = activeToolCategory != NoteToolCategory.NONE,
-                        enter = slideInVertically { it / 2 } + fadeIn(),
-                        exit = slideOutVertically { it / 2 } + fadeOut()
-                    ) {
-                        Surface(
-                            tonalElevation = 6.dp,
-                            shadowElevation = 10.dp,
-                            color = dockSurfaceColor,
-                            contentColor = panelContentColor,
-                            shape = RoundedCornerShape(24.dp),
-                            border = BorderStroke(1.dp, dockBorderColor),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                                // Panel Başlığı ve Kapatma Butonu
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = when (activeToolCategory) {
-                                            NoteToolCategory.MEDIA -> "Medya ve Eklentiler"
-                                            NoteToolCategory.FORMAT -> "Metin Biçimlendirme"
-                                            NoteToolCategory.COLOR -> "Sayfa Arka Plan Rengi"
-                                            NoteToolCategory.CATEGORY -> "Not Kategorisi"
-                                            else -> ""
-                                        },
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-
-                                    IconButton(
-                                        onClick = { activeToolCategory = NoteToolCategory.NONE },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(Icons.Default.Close, contentDescription = "Kapat", modifier = Modifier.size(18.dp))
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                when (activeToolCategory) {
-                                    NoteToolCategory.MEDIA -> {
-                                        // Medya Butonları
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .horizontalScroll(rememberScrollState())
-                                                .padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            // 1. Görsel Ekle
-                                            OutlinedButton(
-                                                onClick = { showImageSourceDialog = true },
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                                            ) {
-                                                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Resim", style = MaterialTheme.typography.labelMedium)
-                                            }
-
-                                            // 2. Çizim Yap
-                                            OutlinedButton(
-                                                onClick = onAddDrawingClick,
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                                            ) {
-                                                Icon(Icons.Default.Brush, contentDescription = null, modifier = Modifier.size(18.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Çizim", style = MaterialTheme.typography.labelMedium)
-                                            }
-
-                                            // 3. Ses Kaydet
-                                            Button(
-                                                onClick = {
-                                                    audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
-                                                },
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = if (state.isRecordingAudio) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                                                )
-                                            ) {
-                                                Icon(
-                                                    if (state.isRecordingAudio) Icons.Default.Stop else Icons.Default.Mic,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(if (state.isRecordingAudio) "Durdur" else "Ses", style = MaterialTheme.typography.labelMedium)
-                                            }
-
-                                            // 4. Zaman Damgası
-                                            IconButton(
-                                                onClick = {
-                                                    val now = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date())
-                                                    insertTextAtCursor(state.contentValue, "[$now] ", onContentValueChange) { runCatching { focusRequester.requestFocus() } }
-                                                }
-                                            ) {
-                                                Icon(Icons.Default.AccessTime, contentDescription = "Zaman Damgası")
-                                            }
-                                        }
-                                    }
-
-                                    NoteToolCategory.FORMAT -> {
-                                        // Metin Biçimlendirme ve Yazı Boyutu Araçları
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            // 1. Satır: Yazı Boyutu Kontrolü (A- / [16 sp] / A+)
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(horizontal = 4.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.FormatSize,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(18.dp),
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                    Text(
-                                                        text = "Yazı Boyutu",
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = panelContentColor
-                                                    )
-                                                }
-
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                ) {
-                                                    FilledTonalIconButton(
-                                                        onClick = {
-                                                            val next = (state.noteFontSize - 1f).coerceIn(12f, 24f)
-                                                            onFontSizeChange(next)
-                                                        },
-                                                        enabled = state.noteFontSize > 12f,
-                                                        modifier = Modifier.size(32.dp)
-                                                    ) {
-                                                        Text("A-", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                                    }
-
-                                                    Surface(
-                                                        shape = RoundedCornerShape(8.dp),
-                                                        color = if (isAppDark) Color(0x33FFFFFF) else Color(0x18000000)
-                                                    ) {
-                                                        Text(
-                                                            text = "${state.noteFontSize.toInt()} sp",
-                                                            style = MaterialTheme.typography.labelMedium,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = panelContentColor,
-                                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                                        )
-                                                    }
-
-                                                    FilledTonalIconButton(
-                                                        onClick = {
-                                                            val next = (state.noteFontSize + 1f).coerceIn(12f, 24f)
-                                                            onFontSizeChange(next)
-                                                        },
-                                                        enabled = state.noteFontSize < 24f,
-                                                        modifier = Modifier.size(32.dp)
-                                                    ) {
-                                                        Text("A+", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-                                            }
-
-                                            // 2. Satır: Biçimlendirme Butonları (Undo/Redo ve mükerrer checklist kaldırıldı)
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .horizontalScroll(rememberScrollState()),
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                // Kalın
-                                                IconButton(onClick = { applyWrap("**", "**") }) {
-                                                    Icon(Icons.Default.FormatBold, contentDescription = "Kalın")
-                                                }
-                                                // İtalik
-                                                IconButton(onClick = { applyWrap("*", "*") }) {
-                                                    Icon(Icons.Default.FormatItalic, contentDescription = "İtalik")
-                                                }
-                                                // Üstü Çizili
-                                                IconButton(onClick = { applyWrap("~~", "~~") }) {
-                                                    Icon(Icons.Default.FormatStrikethrough, contentDescription = "Üstü Çizili")
-                                                }
-                                                // Fosforlu Vurgu
-                                                IconButton(onClick = { applyWrap("==", "==") }) {
-                                                    Icon(Icons.Default.BorderColor, contentDescription = "Vurgu", tint = Color(0xFFFBC02D))
-                                                }
-                                                VerticalDivider(modifier = Modifier.height(24.dp).padding(horizontal = 4.dp))
-                                                // Kod Bloku (```)
-                                                IconButton(onClick = applyCodeBlockAction) {
-                                                    Icon(Icons.Default.Code, contentDescription = "Kod Bloku")
-                                                }
-                                                // Başlık H1
-                                                FilledTonalButton(
-                                                    onClick = { applyPrefix("# ") },
-                                                    contentPadding = PaddingValues(horizontal = 6.dp),
-                                                    modifier = Modifier.height(30.dp)
-                                                ) {
-                                                    Text("H1", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                                                }
-                                                // Başlık H2
-                                                FilledTonalButton(
-                                                    onClick = { applyPrefix("## ") },
-                                                    contentPadding = PaddingValues(horizontal = 6.dp),
-                                                    modifier = Modifier.height(30.dp)
-                                                ) {
-                                                    Text("H2", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                                                }
-                                                // Başlık H3
-                                                FilledTonalButton(
-                                                    onClick = { applyPrefix("### ") },
-                                                    contentPadding = PaddingValues(horizontal = 6.dp),
-                                                    modifier = Modifier.height(30.dp)
-                                                ) {
-                                                    Text("H3", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                                                }
-                                                // Ayraç Çizgi (---)
-                                                IconButton(onClick = {
-                                                    insertTextAtCursor(state.contentValue, "\n---\n", onContentValueChange) { runCatching { focusRequester.requestFocus() } }
-                                                }) {
-                                                    Icon(Icons.Default.HorizontalRule, contentDescription = "Ayraç Çizgi (---)")
-                                                }
-                                                // Madde İşareti
-                                                IconButton(onClick = { applyPrefix("• ") }) {
-                                                    Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "Madde")
-                                                }
-                                                // Numaralı Liste
-                                                IconButton(onClick = { applyPrefix("1. ") }) {
-                                                    Icon(Icons.Default.FormatListNumbered, contentDescription = "Numaralı")
-                                                }
-                                                // Alıntı
-                                                IconButton(onClick = { applyPrefix("> ") }) {
-                                                    Icon(Icons.Default.FormatQuote, contentDescription = "Alıntı")
-                                                }
-                                                VerticalDivider(modifier = Modifier.height(24.dp).padding(horizontal = 4.dp))
-                                                // Çift Yönlü Bağlantı ([[ ]])
-                                                IconButton(onClick = { applyWrap("[[", "]]") }) {
-                                                    Icon(Icons.Default.Link, contentDescription = "Bağlantı [[ ]]", tint = MaterialTheme.colorScheme.primary)
-                                                }
-                                                // Bilgi Kutusu (> [!NOTE])
-                                                IconButton(onClick = { applyPrefix("> [!NOTE] ") }) {
-                                                    Icon(Icons.Default.Lightbulb, contentDescription = "Bilgi Kutusu", tint = MaterialTheme.colorScheme.secondary)
-                                                }
-                                                // Hızlı Metin Parçacıkları & Makrolar (⚡)
-                                                IconButton(onClick = { showSnippetPickerSheet = true }) {
-                                                    Icon(Icons.Default.Bolt, contentDescription = "Metin Parçacıkları (Makrolar)", tint = MaterialTheme.colorScheme.primary)
-                                                }
-                                                // Matematiksel Formül (∑)
-                                                IconButton(onClick = { showMathFormulaSheet = true }) {
-                                                    Icon(Icons.Default.Functions, contentDescription = "Matematiksel Formül (LaTeX)", tint = MaterialTheme.colorScheme.primary)
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    NoteToolCategory.COLOR -> {
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            // Renk Paleti Listesi
-                                            LazyRow(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 4.dp),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                items(NoteColors) { color ->
-                                                    val argb = color.toArgb()
-                                                    val isSelected = (state.color == argb) || (state.color == 0 && color == Color.Transparent)
-
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(34.dp)
-                                                            .clip(CircleShape)
-                                                            .background(if (color == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant else color)
-                                                            .border(
-                                                                width = if (isSelected) 3.dp else 1.dp,
-                                                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.5f),
-                                                                shape = CircleShape
-                                                            )
-                                                            .clickable { onColorChange(argb) },
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        if (color == Color.Transparent) {
-                                                            Icon(
-                                                                Icons.Default.FormatColorReset,
-                                                                contentDescription = "Varsayılan",
-                                                                modifier = Modifier.size(16.dp),
-                                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                            )
-                                                        } else if (isSelected) {
-                                                            Icon(
-                                                                Icons.Default.Check,
-                                                                contentDescription = null,
-                                                                modifier = Modifier.size(16.dp),
-                                                                tint = if (color.luminance() < 0.5f) Color.White else Color.Black
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            // Arka Plan Görseli Seçimi ve Kaldırma
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 4.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                ) {
-                                                    OutlinedButton(
-                                                        onClick = {
-                                                            backgroundImagePickerLauncher.launch(
-                                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                                            )
-                                                        }
-                                                    ) {
-                                                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
-                                                        Spacer(modifier = Modifier.width(6.dp))
-                                                        Text(if (state.backgroundImage != null) "Arka Planı Değiştir" else "Arka Plan Resmi Seç", style = MaterialTheme.typography.labelMedium)
-                                                    }
-
-                                                    if (!state.backgroundImage.isNullOrEmpty()) {
-                                                        AsyncImage(
-                                                            model = File(state.backgroundImage),
-                                                            contentDescription = "Arka Plan Önizleme",
-                                                            contentScale = ContentScale.Crop,
-                                                            modifier = Modifier
-                                                                .size(36.dp)
-                                                                .clip(RoundedCornerShape(8.dp))
-                                                                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-                                                        )
-                                                    }
-                                                }
-
-                                                if (!state.backgroundImage.isNullOrEmpty()) {
-                                                    TextButton(
-                                                        onClick = { onBackgroundImageChange(null) },
-                                                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                                                    ) {
-                                                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("Resmi Kaldır", style = MaterialTheme.typography.labelSmall)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    NoteToolCategory.CATEGORY -> {
-                                        // Kategori Seçim Listesi
-                                        LazyRow(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            item {
-                                                ElevatedAssistChip(
-                                                    onClick = { showAddCategoryDialog = true },
-                                                    label = { Text("Yeni") },
-                                                    leadingIcon = {
-                                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                    }
-                                                )
-                                            }
-
-                                            item {
-                                                FilterChip(
-                                                    selected = state.categoryId == null,
-                                                    onClick = { onCategoryChange(null) },
-                                                    label = { Text("Kategorisiz") },
-                                                    leadingIcon = if (state.categoryId == null) {
-                                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                                    } else null
-                                                )
-                                            }
-
-                                            items(categories) { category ->
-                                                val isSelected = state.categoryId == category.id
-                                                FilterChip(
-                                                    selected = isSelected,
-                                                    onClick = { onCategoryChange(if (isSelected) null else category.id) },
-                                                    label = { Text(category.name) },
-                                                    leadingIcon = {
-                                                        if (isSelected) {
-                                                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                        } else if (category.color != 0) {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .size(10.dp)
-                                                                    .clip(CircleShape)
-                                                                    .background(Color(category.color))
-                                                            )
-                                                        } else null
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    NoteToolCategory.NONE -> {}
-                                }
-                            }
-                        }
-                    }
-
-                    // Alt Yüzen Kapsül Dok Barı (Minimalist, Şık, Tüm Ekran Boyutlarına Duyarlı)
-                    Surface(
-                        tonalElevation = 4.dp,
-                        shadowElevation = 8.dp,
-                        color = dockSurfaceColor,
-                        shape = RoundedCornerShape(32.dp),
-                        border = BorderStroke(1.dp, dockBorderColor),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 6.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Düğmeler
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(1.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f, fill = false)
-                            ) {
-                                // 0. Onay Kutusu (Checklist)
-                                IconButton(
-                                    onClick = {
-                                        val text = state.contentValue.text
-                                        if (hasChecklistItems) {
-                                            val stripped = stripChecklist(text)
-                                            onContentValueChange(TextFieldValue(stripped, selection = TextRange(stripped.length)))
-                                        } else {
-                                            val converted = convertToChecklist(text)
-                                            onContentValueChange(TextFieldValue(converted, selection = TextRange(converted.length)))
-                                        }
-                                    },
-                                    modifier = Modifier.size(36.dp),
-                                    colors = IconButtonDefaults.iconButtonColors(
-                                        containerColor = if (hasChecklistItems) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                                    )
-                                ) {
-                                    Icon(
-                                        imageVector = if (hasChecklistItems) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
-                                        contentDescription = if (hasChecklistItems) "Metne Dönüştür" else "Onay Kutusuna Dönüştür",
-                                        tint = if (hasChecklistItems) MaterialTheme.colorScheme.primary else dockIconColor,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
-
-                                // 1. Ekle / Medya
-                                IconButton(
-                                    onClick = {
-                                        activeToolCategory = if (activeToolCategory == NoteToolCategory.MEDIA) NoteToolCategory.NONE else NoteToolCategory.MEDIA
-                                    },
-                                    modifier = Modifier.size(36.dp),
-                                    colors = IconButtonDefaults.iconButtonColors(
-                                        containerColor = if (activeToolCategory == NoteToolCategory.MEDIA) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                                    )
-                                ) {
-                                    Icon(
-                                        Icons.Default.AddCircleOutline,
-                                        contentDescription = "Ekle",
-                                        tint = if (activeToolCategory == NoteToolCategory.MEDIA) MaterialTheme.colorScheme.primary else dockIconColor,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
-
-                                // 2. Metin Biçimlendirme
-                                IconButton(
-                                    onClick = {
-                                        activeToolCategory = if (activeToolCategory == NoteToolCategory.FORMAT) NoteToolCategory.NONE else NoteToolCategory.FORMAT
-                                    },
-                                    modifier = Modifier.size(36.dp),
-                                    colors = IconButtonDefaults.iconButtonColors(
-                                        containerColor = if (activeToolCategory == NoteToolCategory.FORMAT) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                                    )
-                                ) {
-                                    Icon(
-                                        Icons.Default.FormatSize,
-                                        contentDescription = "Biçimlendir",
-                                        tint = if (activeToolCategory == NoteToolCategory.FORMAT) MaterialTheme.colorScheme.primary else dockIconColor,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
-
-                                // 3. Renk & Tema
-                                IconButton(
-                                    onClick = {
-                                        activeToolCategory = if (activeToolCategory == NoteToolCategory.COLOR) NoteToolCategory.NONE else NoteToolCategory.COLOR
-                                    },
-                                    modifier = Modifier.size(36.dp),
-                                    colors = IconButtonDefaults.iconButtonColors(
-                                        containerColor = if (activeToolCategory == NoteToolCategory.COLOR) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                                    )
-                                ) {
-                                    Icon(
-                                        Icons.Default.Palette,
-                                        contentDescription = "Renk",
-                                        tint = if (activeToolCategory == NoteToolCategory.COLOR) MaterialTheme.colorScheme.primary else dockIconColor,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
-
-                                // 4. Kategori / Klasör
-                                IconButton(
-                                    onClick = {
-                                        activeToolCategory = if (activeToolCategory == NoteToolCategory.CATEGORY) NoteToolCategory.NONE else NoteToolCategory.CATEGORY
-                                    },
-                                    modifier = Modifier.size(36.dp),
-                                    colors = IconButtonDefaults.iconButtonColors(
-                                        containerColor = if (activeToolCategory == NoteToolCategory.CATEGORY) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                                    )
-                                ) {
-                                    Icon(
-                                        Icons.Default.FolderOpen,
-                                        contentDescription = "Kategori",
-                                        tint = if (activeToolCategory == NoteToolCategory.CATEGORY) MaterialTheme.colorScheme.primary else dockIconColor,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
-                            }
-
-                            // Sağ Bölüm: Aktif ses kaydı bildirimi veya Tıklanabilir İstatistik Hapı
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier.padding(start = 4.dp, end = 2.dp)
-                            ) {
-                                if (state.isRecordingAudio) {
-                                    AssistChip(
-                                        onClick = onToggleAudioRecording,
-                                        label = { Text("Durdur", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) },
-                                        leadingIcon = {
-                                            Icon(Icons.Default.Stop, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
-                                        },
-                                        colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
-                                    )
-                                } else {
-                                    val checklistStats = remember(state.contentValue.text) {
-                                        ChecklistParser.parse(state.contentValue.text)
-                                    }
-                                    if (checklistStats != null) {
-                                        ChecklistProgressRing(
-                                            stats = checklistStats,
-                                            contentColor = dockIconColor,
-                                            onMoveToBottom = {
-                                                val sorted = ChecklistSorter.moveCheckedToBottom(state.contentValue.text)
-                                                onContentValueChange(TextFieldValue(sorted))
-                                            },
-                                            onToggleAll = { checkAll ->
-                                                val updated = ChecklistSorter.toggleAllItems(state.contentValue.text, checkAll)
-                                                onContentValueChange(TextFieldValue(updated))
-                                            },
-                                            onRemoveCompleted = {
-                                                val cleaned = ChecklistSorter.removeCompletedItems(state.contentValue.text)
-                                                onContentValueChange(TextFieldValue(cleaned))
-                                            },
-                                            onOpenHub = {
-                                                showChecklistActionsSheet = true
-                                            }
-                                        )
-                                    }
-
-                                    val wordGoal = state.wordGoal
-                                    if (wordGoal != null && wordGoal > 0) {
-                                        val goalStatus = remember(currentWordCount, wordGoal) {
-                                            WordGoalCalculator.calculateStatus(currentWordCount, wordGoal)
-                                        }
-                                        WordGoalProgressBadge(
-                                            status = goalStatus,
-                                            contentColor = dockIconColor,
-                                            onEditGoal = { showWordGoalDialog = true },
-                                            onRemoveGoal = { onSetWordGoal(null) }
-                                        )
-                                    }
-
-                                    val hasExtraBadges = checklistStats != null || (wordGoal != null && wordGoal > 0)
-                                    Surface(
-                                        onClick = { showStatsDialog = true },
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = if (isAppDark) Color(0x22FFFFFF) else Color(0x12000000),
-                                        modifier = Modifier.clip(RoundedCornerShape(12.dp))
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.AccessTime,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(12.dp),
-                                                tint = dockIconColor.copy(alpha = 0.75f)
-                                            )
-                                            Spacer(Modifier.width(3.dp))
-                                            Text(
-                                                text = if (hasExtraBadges) "$wordCount k" else "$wordCount k · ~${readingTime} dk",
-                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                                                color = dockIconColor.copy(alpha = 0.75f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                )
             }
         }
     ) { padding ->
@@ -2727,52 +2255,211 @@ fun NoteDetailScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = if (isPresentationMode) 22.dp else 16.dp, vertical = 8.dp)
             ) {
-                if (isSearchActive) {
-                    Spacer(modifier = Modifier.height(112.dp))
+                val topSpacerHeight = when {
+                    isSearchActive && state.isZenMode -> 176.dp
+                    isSearchActive -> 116.dp
+                    state.isZenMode -> 88.dp
+                    else -> 0.dp
                 }
-                // Notun Atandığı Kategori Etiketi (Varsa)
+                if (topSpacerHeight > 0.dp) {
+                    Spacer(modifier = Modifier.height(topSpacerHeight))
+                }
+
+                // Notun Atandığı Kategori & Hatırlatıcı Rozetleri
                 val currentCategory = categories.firstOrNull { it.id == state.categoryId }
-                if (currentCategory != null) {
-                    val hasColor = currentCategory.color != 0
-                    val catColor = if (hasColor) Color(currentCategory.color) else contentColor
-                    SuggestionChip(
-                        onClick = {
-                            activeToolCategory = if (activeToolCategory == NoteToolCategory.CATEGORY) NoteToolCategory.NONE else NoteToolCategory.CATEGORY
+                if (currentCategory != null || state.reminderTime != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (currentCategory != null) {
+                            val hasColor = currentCategory.color != 0
+                            val catColor = if (hasColor) Color(currentCategory.color) else contentColor
+                            SuggestionChip(
+                                onClick = {
+                                    activeToolCategory = if (activeToolCategory == NoteToolCategory.CATEGORY) NoteToolCategory.NONE else NoteToolCategory.CATEGORY
+                                },
+                                label = { Text(currentCategory.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold) },
+                                icon = {
+                                    if (hasColor) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(catColor)
+                                        )
+                                    } else {
+                                        Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    }
+                                },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = if (hasColor) catColor.copy(alpha = 0.16f) else (if (isDarkBackground) Color(0x33FFFFFF) else Color(0x1A000000)),
+                                    labelColor = if (hasColor) catColor.copy(alpha = 0.95f) else contentColor,
+                                    iconContentColor = if (hasColor) catColor else contentColor
+                                ),
+                                border = BorderStroke(1.dp, if (hasColor) catColor.copy(alpha = 0.4f) else (if (isDarkBackground) Color(0x33FFFFFF) else Color(0x22000000)))
+                            )
+                        }
+
+                        state.reminderTime?.let { reminderTime ->
+                            val formatter = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+                            InputChip(
+                                selected = true,
+                                onClick = { onSetReminder(null) },
+                                label = { Text("Hatırlatıcı: ${formatter.format(Date(reminderTime))}", style = MaterialTheme.typography.labelSmall) },
+                                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Kaldır", modifier = Modifier.size(14.dp)) }
+                            )
+                        }
+                    }
+                }
+
+                // Başlık Alanı
+                if (isPresentationMode || isPreviewMode) {
+                    if (state.title.isNotBlank()) {
+                        Text(
+                            text = state.title,
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = contentColor,
+                                fontSize = if (isPresentationMode) (presentationFontSize + 8f).sp else MaterialTheme.typography.headlineMedium.fontSize
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp, bottom = 4.dp)
+                        )
+                    }
+                } else {
+                    TextField(
+                        value = state.title,
+                        onValueChange = onTitleChange,
+                        placeholder = {
+                            Text(
+                                "Başlık",
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                                color = hintColor
+                            )
                         },
-                        label = { Text(currentCategory.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold) },
-                        icon = {
-                            if (hasColor) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(catColor)
-                                )
-                            } else {
-                                Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(14.dp))
-                            }
-                        },
-                        colors = SuggestionChipDefaults.suggestionChipColors(
-                            containerColor = if (hasColor) catColor.copy(alpha = 0.16f) else (if (isDarkBackground) Color(0x33FFFFFF) else Color(0x1A000000)),
-                            labelColor = if (hasColor) catColor.copy(alpha = 0.95f) else contentColor,
-                            iconContentColor = if (hasColor) catColor else contentColor
+                        textStyle = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor
                         ),
-                        border = BorderStroke(1.dp, if (hasColor) catColor.copy(alpha = 0.4f) else (if (isDarkBackground) Color(0x33FFFFFF) else Color(0x22000000))),
-                        modifier = Modifier.padding(bottom = 6.dp)
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = contentColor,
+                            unfocusedTextColor = contentColor,
+                            focusedPlaceholderColor = hintColor,
+                            unfocusedPlaceholderColor = hintColor,
+                            cursorColor = if (isDarkBackground) Color.White else MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 0.dp)
                     )
                 }
 
-                // Hatırlatıcı Bilgisi Varsa Göster
-                state.reminderTime?.let { reminderTime ->
-                    val formatter = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-                    InputChip(
-                        selected = true,
-                        onClick = { onSetReminder(null) },
-                        label = { Text("Hatırlatıcı: ${formatter.format(Date(reminderTime))}") },
-                        trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Kaldır") },
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                // Metadata Bilgi Şeridi: Tarih ve Kelime Sayısı Çipleri
+                val lastEditDate = remember(state.updatedAt, state.createdAt) {
+                    val ts = if (state.updatedAt > 0L) state.updatedAt else state.createdAt
+                    if (ts > 0L) {
+                        SimpleDateFormat("d MMMM yyyy, HH:mm", Locale("tr")).format(Date(ts))
+                    } else ""
                 }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp, bottom = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (lastEditDate.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isDarkBackground) Color(0x22FFFFFF) else Color(0x0E000000),
+                            modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = contentColor.copy(alpha = 0.65f)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = lastEditDate,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = contentColor.copy(alpha = 0.75f)
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        onClick = { showStatsDialog = true },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isDarkBackground) Color(0x22FFFFFF) else Color(0x0E000000),
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EditNote,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "$currentWordCount kelime · ~${readingTime} dk",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                color = contentColor.copy(alpha = 0.85f)
+                            )
+                        }
+                    }
+
+                    if (state.isLocked) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = "Kilitli",
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.width(3.dp))
+                                Text(
+                                    text = "Kilitli",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(
+                    color = if (isDarkBackground) Color(0x20FFFFFF) else Color(0x10000000),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
 
                 // Ekler (Görseller, Çizimler ve Ses Kayıtları)
                 if (state.attachments.isNotEmpty()) {
@@ -2785,6 +2472,7 @@ fun NoteDetailScreen(
                         playbackSpeed = state.audioPlaybackSpeed,
                         onSeekAudio = onSeekAudio,
                         onCycleSpeed = onCycleAudioPlaybackSpeed,
+                        onSetPlaybackSpeed = onSetAudioPlaybackSpeed,
                         onImageClick = { path ->
                             fullScreenViewerInitialIndex = allImageAttachments.indexOf(path).coerceAtLeast(0)
                         },
@@ -2812,53 +2500,6 @@ fun NoteDetailScreen(
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                // Başlık Alanı
-                if (isPresentationMode || isPreviewMode) {
-                    if (state.title.isNotBlank()) {
-                        Text(
-                            text = state.title,
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = contentColor,
-                                fontSize = if (isPresentationMode) (presentationFontSize + 8f).sp else MaterialTheme.typography.headlineMedium.fontSize
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = if (isPresentationMode) 12.dp else 8.dp)
-                        )
-                    }
-                } else {
-                    TextField(
-                        value = state.title,
-                        onValueChange = onTitleChange,
-                        placeholder = {
-                            Text(
-                                "Başlık",
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = hintColor
-                            )
-                        },
-                        textStyle = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = contentColor
-                        ),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = contentColor,
-                            unfocusedTextColor = contentColor,
-                            focusedPlaceholderColor = hintColor,
-                            unfocusedPlaceholderColor = hintColor,
-                            cursorColor = if (isDarkBackground) Color.White else MaterialTheme.colorScheme.primary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
                 // İçerik Alanı: Sunum, Önizleme veya Canlı Düzenleme
                 if (isPresentationMode) {
                     if (isTwoColumnMode && state.contentValue.text.length > 50) {
@@ -2874,7 +2515,10 @@ fun NoteDetailScreen(
                             Box(modifier = Modifier.weight(1f)) {
                                 MarkdownPreview(
                                     content = split.leftColumn,
-                                    onContentChange = {},
+                                    onContentChange = { updatedLeft ->
+                                        val combined = if (split.rightColumn.isNotBlank()) "$updatedLeft\n\n${split.rightColumn}" else updatedLeft
+                                        onContentValueChange(TextFieldValue(combined))
+                                    },
                                     contentColor = contentColor,
                                     onLinkClick = onLinkClick,
                                     fontSize = presentationFontSize,
@@ -2885,7 +2529,10 @@ fun NoteDetailScreen(
                             Box(modifier = Modifier.weight(1f)) {
                                 MarkdownPreview(
                                     content = split.rightColumn,
-                                    onContentChange = {},
+                                    onContentChange = { updatedRight ->
+                                        val combined = if (split.leftColumn.isNotBlank()) "${split.leftColumn}\n\n$updatedRight" else updatedRight
+                                        onContentValueChange(TextFieldValue(combined))
+                                    },
                                     contentColor = contentColor,
                                     onLinkClick = onLinkClick,
                                     fontSize = presentationFontSize,
@@ -2897,7 +2544,9 @@ fun NoteDetailScreen(
                     } else {
                         MarkdownPreview(
                             content = state.contentValue.text,
-                            onContentChange = {},
+                            onContentChange = { updated ->
+                                onContentValueChange(TextFieldValue(updated))
+                            },
                             contentColor = contentColor,
                             onLinkClick = onLinkClick,
                             fontSize = presentationFontSize,

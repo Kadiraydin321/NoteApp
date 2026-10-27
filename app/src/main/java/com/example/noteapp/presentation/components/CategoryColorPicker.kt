@@ -27,6 +27,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,6 +59,7 @@ fun CategoryColorPicker(
         Category.DEFAULT_COLORS.forEach { colorInt ->
             val isSelected = selectedColor == colorInt
             val isDefault = colorInt == 0
+            val colorDesc = if (isDefault) "Varsayılan renksiz kategori" else "Kategori rengi: #${Integer.toHexString(colorInt).uppercase()}"
 
             Box(
                 modifier = Modifier
@@ -69,20 +75,29 @@ fun CategoryColorPicker(
                         else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
                         shape = CircleShape
                     )
-                    .clickable { onColorSelected(colorInt) },
+                    .clickable(
+                        role = Role.RadioButton,
+                        onClickLabel = "Rengi seç",
+                        onClick = { onColorSelected(colorInt) }
+                    )
+                    .semantics {
+                        role = Role.RadioButton
+                        selected = isSelected
+                        contentDescription = "$colorDesc${if (isSelected) " (seçili)" else ""}"
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (isDefault && !isSelected) {
                     Icon(
                         imageVector = Icons.Default.Block,
-                        contentDescription = "Varsayılan",
+                        contentDescription = null,
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                     )
                 } else if (isSelected) {
                     Icon(
                         imageVector = Icons.Default.Check,
-                        contentDescription = "Seçili",
+                        contentDescription = null,
                         modifier = Modifier.size(18.dp),
                         tint = if (isDefault) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
                     )

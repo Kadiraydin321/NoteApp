@@ -16,7 +16,8 @@ data class Note(
     val attachments: List<String> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val backgroundImage: String? = null
+    val backgroundImage: String? = null,
+    val folderId: Long? = null
 )
 
 data class Category(

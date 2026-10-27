@@ -33,6 +33,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
@@ -576,127 +581,65 @@ fun DrawingScreen(
             )
         },
         bottomBar = {
-            val isAppDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-            val studioBgColor = if (isAppDark) Color(0xFF22252A) else Color(0xFFFFFFFF)
-            val studioBorderColor = if (isAppDark) Color(0x30FFFFFF) else Color(0x18000000)
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // 1. Üst Kısım: Seçili Araca Göre Hızlı Ayar Kartı (Renkler, Boyutlar, Şekiller)
-                Surface(
-                    tonalElevation = 6.dp,
-                    shadowElevation = 8.dp,
-                    shape = RoundedCornerShape(22.dp),
-                    color = studioBgColor,
-                    border = BorderStroke(1.dp, studioBorderColor),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    AnimatedContent(
-                        targetState = activeTool,
-                        transitionSpec = {
-                            fadeIn(animationSpec = tween(180)) togetherWith fadeOut(animationSpec = tween(120))
-                        },
-                        label = "ActiveToolStudioRow"
-                    ) { tool ->
-                        when (tool) {
-                            DrawingTool.PEN -> {
-                                PenStudioRow(
-                                    strokeWidth = penStrokeWidth,
-                                    onStrokeWidthChange = { penStrokeWidth = it },
-                                    currentColor = penColor,
-                                    onColorChange = { penColor = it }
-                                )
-                            }
-                            DrawingTool.HIGHLIGHTER -> {
-                                HighlighterStudioRow(
-                                    strokeWidth = highlighterStrokeWidth,
-                                    onStrokeWidthChange = { highlighterStrokeWidth = it },
-                                    currentColor = highlighterColor,
-                                    onColorChange = { highlighterColor = it }
-                                )
-                            }
-                            DrawingTool.SHAPES -> {
-                                ShapesStudioRow(
-                                    selectedShape = selectedShapeType,
-                                    onShapeSelect = { selectedShapeType = it },
-                                    isFilled = isShapeFilled,
-                                    onToggleFill = { isShapeFilled = !isShapeFilled },
-                                    currentColor = penColor,
-                                    onColorChange = { penColor = it }
-                                )
-                            }
-                            DrawingTool.ERASER -> {
-                                EraserStudioRow(
-                                    strokeWidth = eraserStrokeWidth,
-                                    onStrokeWidthChange = { eraserStrokeWidth = it },
-                                    onClearAll = { showClearConfirmDialog = true }
-                                )
-                            }
-                        }
+            DrawingFloatingToolbar(
+                activeTool = activeTool,
+                onToolSelect = { activeTool = it },
+                strokeWidth = when (activeTool) {
+                    DrawingTool.PEN -> penStrokeWidth
+                    DrawingTool.HIGHLIGHTER -> highlighterStrokeWidth
+                    DrawingTool.SHAPES -> shapeStrokeWidth
+                    DrawingTool.ERASER -> eraserStrokeWidth
+                },
+                onStrokeWidthChange = { width ->
+                    when (activeTool) {
+                        DrawingTool.PEN -> penStrokeWidth = width
+                        DrawingTool.HIGHLIGHTER -> highlighterStrokeWidth = width
+                        DrawingTool.SHAPES -> shapeStrokeWidth = width
+                        DrawingTool.ERASER -> eraserStrokeWidth = width
                     }
-                }
-
-                // 2. Alt Kısım: Ana Araç Seçim Kapsülü (Kalem, Fosforlu, Şekil, Silgi)
-                Surface(
-                    tonalElevation = 4.dp,
-                    shadowElevation = 8.dp,
-                    shape = RoundedCornerShape(32.dp),
-                    color = studioBgColor,
-                    border = BorderStroke(1.dp, studioBorderColor)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        DrawingTool.entries.forEach { tool ->
-                            val isSelected = activeTool == tool
-                            val icon = when (tool) {
-                                DrawingTool.PEN -> Icons.Default.Edit
-                                DrawingTool.HIGHLIGHTER -> Icons.Default.BorderColor
-                                DrawingTool.SHAPES -> Icons.Default.Category
-                                DrawingTool.ERASER -> Icons.Default.AutoFixNormal
-                            }
-
-                            FilledTonalIconButton(
-                                onClick = { activeTool = tool },
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                    contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                ),
-                                modifier = Modifier.size(46.dp)
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(icon, contentDescription = tool.title, modifier = Modifier.size(19.dp))
-                                    if (tool != DrawingTool.ERASER) {
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        val indicatorColor = when (tool) {
-                                            DrawingTool.PEN, DrawingTool.SHAPES -> penColor
-                                            DrawingTool.HIGHLIGHTER -> highlighterColor
-                                            else -> Color.Transparent
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .size(5.dp)
-                                                .clip(CircleShape)
-                                                .background(indicatorColor)
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                },
+                strokeWidthRange = when (activeTool) {
+                    DrawingTool.PEN -> 2f..48f
+                    DrawingTool.HIGHLIGHTER -> 12f..64f
+                    DrawingTool.SHAPES -> 2f..36f
+                    DrawingTool.ERASER -> 8f..80f
+                },
+                currentColor = when (activeTool) {
+                    DrawingTool.HIGHLIGHTER -> highlighterColor
+                    else -> penColor
+                },
+                onColorChange = { color ->
+                    if (activeTool == DrawingTool.HIGHLIGHTER) {
+                        highlighterColor = color
+                    } else {
+                        penColor = color
                     }
-                }
-            }
+                },
+                colorPalette = if (activeTool == DrawingTool.HIGHLIGHTER) HighlighterPalette else StandardPalette,
+                canUndo = elements.isNotEmpty(),
+                canRedo = redoStack.isNotEmpty(),
+                onUndo = {
+                    if (elements.isNotEmpty()) {
+                        val last = elements.last()
+                        elements = elements.dropLast(1)
+                        redoStack = redoStack + last
+                    }
+                },
+                onRedo = {
+                    if (redoStack.isNotEmpty()) {
+                        val restored = redoStack.last()
+                        redoStack = redoStack.dropLast(1)
+                        elements = elements + restored
+                    }
+                },
+                onClear = { showClearConfirmDialog = true },
+                canClear = elements.isNotEmpty(),
+                selectedShapeType = selectedShapeType,
+                onShapeTypeSelect = { selectedShapeType = it },
+                isShapeFilled = isShapeFilled,
+                onToggleShapeFill = { isShapeFilled = !isShapeFilled },
+                modifier = Modifier.navigationBarsPadding()
+            )
         }
     ) { padding ->
         Box(
@@ -1074,7 +1017,16 @@ private fun PenStudioRow(
                             color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0x30888888),
                             shape = CircleShape
                         )
-                        .clickable { onColorChange(color) },
+                        .clickable(
+                            role = Role.RadioButton,
+                            onClickLabel = "Rengi seç",
+                            onClick = { onColorChange(color) }
+                        )
+                        .semantics {
+                            role = Role.RadioButton
+                            selected = isSelected
+                            contentDescription = "Renk seçimi${if (isSelected) " (seçili)" else ""}"
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     if (isSelected) {
@@ -1175,7 +1127,16 @@ private fun HighlighterStudioRow(
                             color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0x30888888),
                             shape = CircleShape
                         )
-                        .clickable { onColorChange(color) },
+                        .clickable(
+                            role = Role.RadioButton,
+                            onClickLabel = "Fosforlu rengi seç",
+                            onClick = { onColorChange(color) }
+                        )
+                        .semantics {
+                            role = Role.RadioButton
+                            selected = isSelected
+                            contentDescription = "Fosforlu renk seçimi${if (isSelected) " (seçili)" else ""}"
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     if (isSelected) {
@@ -1293,7 +1254,16 @@ private fun ShapesStudioRow(
                             color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0x30888888),
                             shape = CircleShape
                         )
-                        .clickable { onColorChange(color) },
+                        .clickable(
+                            role = Role.RadioButton,
+                            onClickLabel = "Rengi seç",
+                            onClick = { onColorChange(color) }
+                        )
+                        .semantics {
+                            role = Role.RadioButton
+                            selected = isSelected
+                            contentDescription = "Renk seçimi${if (isSelected) " (seçili)" else ""}"
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     if (isSelected) {

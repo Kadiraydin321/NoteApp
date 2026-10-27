@@ -3,6 +3,7 @@ package com.example.noteapp.domain.repository
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.model.NoteHistory
+import com.example.noteapp.domain.util.NoteDraft
 import kotlinx.coroutines.flow.Flow
 
 interface NoteRepository {
@@ -45,4 +46,16 @@ interface NoteRepository {
     suspend fun deleteHistoryForNote(noteId: Long)
     suspend fun getAllNoteHistory(): List<NoteHistory>
     suspend fun insertNoteHistories(histories: List<NoteHistory>)
+
+    // Folders
+    fun getNotesByFolder(folderId: Long): Flow<List<Note>>
+    suspend fun getNotesByFolderList(folderId: Long): List<Note>
+    suspend fun updateNotesFolder(noteIds: List<Long>, folderId: Long?)
+
+    // Draft Persistence & Crash Recovery
+    suspend fun getDraft(noteId: Long?): NoteDraft?
+    suspend fun saveDraft(noteId: Long?, title: String, content: String, timestamp: Long = System.currentTimeMillis())
+    suspend fun deleteDraft(noteId: Long?)
+    suspend fun getAllDrafts(): List<NoteDraft>
+    suspend fun deleteAllDrafts()
 }

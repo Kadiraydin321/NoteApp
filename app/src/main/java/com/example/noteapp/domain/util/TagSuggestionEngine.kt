@@ -6,6 +6,12 @@ data class ActiveTagQuery(
     val endIndex: Int
 )
 
+data class ActiveWikilinkQuery(
+    val query: String,
+    val startIndex: Int,
+    val endIndex: Int
+)
+
 /**
  * Not içeriğinde dinamik #etiket tespiti, otomatik tamamlama ve toplu refaktör işlemlerini
  * gerçekleştiren akıllı etiket motoru.
@@ -87,5 +93,50 @@ object TagSuggestionEngine {
 
         val pattern = Regex("#(?i)${Regex.escape(cleanTag)}(?![a-zA-Z0-9_çğıöşüÇĞİÖŞÜ/-])\\s*")
         return content.replace(pattern, "").trimEnd()
+    }
+
+    /**
+     * İmlecin hemen solunda aktif bir '[[wikilink' girişi olup olmadığını tespit eder.
+     * Örneğin: "Bkz [[Not" -> ActiveWikilinkQuery(query = "Not", startIndex = 4, endIndex = 9)
+     * "Bağlantı [[" -> ActiveWikilinkQuery(query = "", startIndex = 9, endIndex = 11)
+     */
+    fun findActiveWikilinkQuery(text: String, cursorPosition: Int): ActiveWikilinkQuery? {
+        if (cursorPosition < 2 || cursorPosition > text.length) return null
+
+        val sub = text.substring(0, cursorPosition)
+        val lastOpen = sub.lastIndexOf("[[")
+        if (lastOpen == -1) return null
+
+        val lastClose = sub.lastIndexOf("]]")
+        if (lastClose != -1 && lastClose > lastOpen) return null
+
+        if (sub.substring(lastOpen, cursorPosition).contains('\n')) return null
+
+        val query = sub.substring(lastOpen + 2)
+        return ActiveWikilinkQuery(
+            query = query,
+            startIndex = lastOpen,
+            endIndex = cursorPosition
+        )
+    }
+
+    /**
+     * Seçilen not başlığını metne '[[Başlık]] ' olarak yerleştirir.
+     */
+    fun applyWikilinkSuggestion(
+        text: String,
+        activeQuery: ActiveWikilinkQuery,
+        selectedTitle: String
+    ): Pair<String, Int> {
+        val cleanTitle = selectedTitle.removePrefix("[[").removeSuffix("]]").trim()
+        val safeStart = activeQuery.startIndex.coerceIn(0, text.length)
+        val safeEnd = activeQuery.endIndex.coerceIn(safeStart, text.length)
+
+        val hasClosingAfter = text.substring(safeEnd).startsWith("]]")
+        val replacement = if (hasClosingAfter) "[[$cleanTitle" else "[[$cleanTitle]] "
+
+        val newText = text.substring(0, safeStart) + replacement + text.substring(safeEnd)
+        val newCursor = safeStart + replacement.length + (if (hasClosingAfter) 2 else 0)
+        return newText to newCursor
     }
 }

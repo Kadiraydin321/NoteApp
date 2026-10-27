@@ -120,4 +120,33 @@ interface NoteDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNoteHistories(histories: List<NoteHistory>)
+
+    // Folders
+    @Query("SELECT * FROM notes WHERE (folderId = :folderId OR categoryId = :folderId) AND isDeleted = 0 AND isArchived = 0 ORDER BY isPinned DESC, timestamp DESC")
+    fun getNotesByFolder(folderId: Long): Flow<List<Note>>
+
+    @Query("SELECT * FROM notes WHERE (folderId = :folderId OR categoryId = :folderId) AND isDeleted = 0 AND isArchived = 0 ORDER BY isPinned DESC, timestamp DESC")
+    suspend fun getNotesByFolderList(folderId: Long): List<Note>
+
+    @Query("UPDATE notes SET folderId = :folderId WHERE id IN (:noteIds)")
+    suspend fun updateNotesFolder(noteIds: List<Long>, folderId: Long?)
+
+    // Draft Persistence & Crash Recovery
+    @Query("SELECT * FROM note_drafts WHERE noteId = :noteId LIMIT 1")
+    suspend fun getDraft(noteId: Long): NoteDraftEntity?
+
+    @Query("SELECT * FROM note_drafts ORDER BY timestamp DESC")
+    suspend fun getAllDrafts(): List<NoteDraftEntity>
+
+    @Query("SELECT * FROM note_drafts ORDER BY timestamp DESC")
+    fun getAllDraftsFlow(): Flow<List<NoteDraftEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDraft(draft: NoteDraftEntity)
+
+    @Query("DELETE FROM note_drafts WHERE noteId = :noteId")
+    suspend fun deleteDraft(noteId: Long)
+
+    @Query("DELETE FROM note_drafts")
+    suspend fun deleteAllDrafts()
 }

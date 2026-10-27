@@ -67,6 +67,7 @@ data class NoteDetailState(
     val reminderTime: Long? = null,
     val attachments: List<String> = emptyList(),
     val isRecordingAudio: Boolean = false,
+    val isRecordingPaused: Boolean = false,
     val isPlayingAudio: Boolean = false,
     val currentPlayingPath: String? = null,
     val isExtractingText: Boolean = false,
@@ -148,13 +149,15 @@ class NoteDetailViewModel @Inject constructor(
                     val initialContent = TextFieldValue(cleanContent)
                     val goal = noteGoalManager.getWordGoal(note.id)
                     val noteTimestamp = if (note.updatedAt != 0L) note.updatedAt else note.timestamp
-                    val hasDraft = draftRecoveryManager.hasRecoverableDraft(
+                    val dbDraft = repository.getDraft(note.id)
+                    val effectiveDraft = dbDraft ?: draftRecoveryManager.getDraft(note.id)
+                    val hasDraft = effectiveDraft != null && draftRecoveryManager.hasRecoverableDraft(
                         noteId = note.id,
                         currentDbTitle = note.title,
                         currentDbContent = cleanContent,
                         currentDbTimestamp = noteTimestamp
                     )
-                    val recoverableDraft = if (hasDraft) draftRecoveryManager.getDraft(note.id) else null
+                    val recoverableDraft = if (hasDraft) effectiveDraft else null
 
                     _state.value = _state.value.copy(
                         currentNoteId = note.id,
@@ -191,6 +194,13 @@ class NoteDetailViewModel @Inject constructor(
             val recoverableDraft = if (newNoteDraft != null && (newNoteDraft.title.isNotBlank() || newNoteDraft.content.isNotBlank())) {
                 newNoteDraft
             } else null
+
+            viewModelScope.launch {
+                val dbDraft = repository.getDraft(null)
+                if (dbDraft != null && (dbDraft.title.isNotBlank() || dbDraft.content.isNotBlank())) {
+                    _state.value = _state.value.copy(recoverableDraft = dbDraft)
+                }
+            }
 
             // Yeni not için ayarlardaki varsayılan rengi ata
             val defaultColor = settingsManager.settings.value.defaultNoteColor
@@ -465,6 +475,7 @@ class NoteDetailViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     attachments = _state.value.attachments + file.absolutePath,
                     isRecordingAudio = false,
+                    isRecordingPaused = false,
                     recordingDurationSec = 0,
                     recordingAmplitudes = emptyList()
                 )
@@ -475,9 +486,41 @@ class NoteDetailViewModel @Inject constructor(
             // Start recording
             val file = FileStorageHelper.createAudioRecordFile(app)
             currentRecordingFile = file
-            audioRecorder.start(file)
+            audioRecorder.start(
+                outputFile = file,
+                onError = {
+                    _state.value = _state.value.copy(isRecordingAudio = false, isRecordingPaused = false)
+                    recordingJob?.cancel()
+                    recordingJob = null
+                },
+                onInterrupted = {
+                    recordingJob?.cancel()
+                    recordingJob = null
+                    currentRecordingFile?.let { interruptedFile ->
+                        if (interruptedFile.exists() && interruptedFile.length() > 0L) {
+                            _state.value = _state.value.copy(
+                                attachments = _state.value.attachments + interruptedFile.absolutePath,
+                                isRecordingAudio = false,
+                                isRecordingPaused = false,
+                                recordingDurationSec = 0,
+                                recordingAmplitudes = emptyList()
+                            )
+                            saveNoteQuietly()
+                        } else {
+                            _state.value = _state.value.copy(
+                                isRecordingAudio = false,
+                                isRecordingPaused = false,
+                                recordingDurationSec = 0,
+                                recordingAmplitudes = emptyList()
+                            )
+                        }
+                    }
+                    currentRecordingFile = null
+                }
+            )
             _state.value = _state.value.copy(
                 isRecordingAudio = true,
+                isRecordingPaused = false,
                 recordingDurationSec = 0,
                 recordingAmplitudes = emptyList()
             )
@@ -486,6 +529,9 @@ class NoteDetailViewModel @Inject constructor(
                 var tick = 0
                 while (_state.value.isRecordingAudio) {
                     delay(100)
+                    if (_state.value.isRecordingPaused) {
+                        continue
+                    }
                     tick++
                     val amp = audioRecorder.getMaxAmplitude()
                     val normalized = WaveformHelper.normalizeAmplitude(amp)
@@ -496,6 +542,17 @@ class NoteDetailViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    fun togglePauseAudioRecording() {
+        if (!_state.value.isRecordingAudio) return
+        if (_state.value.isRecordingPaused) {
+            audioRecorder.resume()
+            _state.value = _state.value.copy(isRecordingPaused = false)
+        } else {
+            audioRecorder.pause()
+            _state.value = _state.value.copy(isRecordingPaused = true)
         }
     }
 
@@ -510,6 +567,7 @@ class NoteDetailViewModel @Inject constructor(
             currentRecordingFile = null
             _state.value = _state.value.copy(
                 isRecordingAudio = false,
+                isRecordingPaused = false,
                 recordingDurationSec = 0,
                 recordingAmplitudes = emptyList()
             )
@@ -645,8 +703,12 @@ class NoteDetailViewModel @Inject constructor(
             1.5f -> 2.0f
             else -> 1.0f
         }
-        audioPlayer.setPlaybackSpeed(nextSpeed)
-        _state.value = _state.value.copy(audioPlaybackSpeed = nextSpeed)
+        setAudioPlaybackSpeed(nextSpeed)
+    }
+
+    fun setAudioPlaybackSpeed(speed: Float) {
+        audioPlayer.setPlaybackSpeed(speed)
+        _state.value = _state.value.copy(audioPlaybackSpeed = speed)
     }
 
     fun onDeleteAttachment(path: String) {
@@ -882,6 +944,10 @@ class NoteDetailViewModel @Inject constructor(
         if (isBlankNote) {
             draftRecoveryManager.clearDraft(noteId)
             draftRecoveryManager.clearDraft(null)
+            viewModelScope.launch {
+                repository.deleteDraft(noteId)
+                repository.deleteDraft(null)
+            }
             if (noteId != 0L && noteId != -1L) {
                 viewModelScope.launch {
                     repository.deleteNotesPermanently(listOf(noteId))
@@ -965,9 +1031,12 @@ class NoteDetailViewModel @Inject constructor(
             recordVersionSnapshot(finalId, currentState.title, currentState.contentValue.text)
 
             draftRecoveryManager.clearDraft(noteId)
+            repository.deleteDraft(noteId)
             if (savedId != noteId) {
                 draftRecoveryManager.clearDraft(null)
                 draftRecoveryManager.clearDraft(savedId)
+                repository.deleteDraft(null)
+                repository.deleteDraft(savedId)
             }
 
             _state.value = _state.value.copy(isSaved = true, updatedAt = now)
@@ -992,16 +1061,35 @@ class NoteDetailViewModel @Inject constructor(
 
     fun discardDraft(noteId: Long?) {
         draftRecoveryManager.clearDraft(noteId)
+        viewModelScope.launch {
+            repository.deleteDraft(noteId)
+            if (noteId == null || noteId <= 0L) {
+                repository.deleteDraft(null)
+                repository.deleteDraft(0L)
+            }
+        }
         _state.value = _state.value.copy(recoverableDraft = null)
     }
 
     fun saveDraftPeriodically(title: String, content: String) {
         if (_state.value.isSaved) return
+        val currentId = _state.value.currentNoteId
         draftRecoveryManager.saveDraft(
-            noteId = _state.value.currentNoteId,
+            noteId = currentId,
             title = title,
             content = content
         )
+        viewModelScope.launch {
+            if (title.isBlank() && content.isBlank()) {
+                repository.deleteDraft(currentId)
+            } else {
+                repository.saveDraft(
+                    noteId = currentId,
+                    title = title,
+                    content = content
+                )
+            }
+        }
     }
 
     private var lastRecordedVersionContent: String? = null
@@ -1179,11 +1267,9 @@ class NoteDetailViewModel @Inject constructor(
         super.onCleared()
         recordingJob?.cancel()
         playbackJob?.cancel()
-        audioPlayer.stop()
+        audioPlayer.release()
         focusAudioSynthesizer.stop()
-        if (_state.value.isRecordingAudio) {
-            audioRecorder.stop()
-        }
+        audioRecorder.release()
         checkAndDiscardIfEmptyOrSave()
     }
 

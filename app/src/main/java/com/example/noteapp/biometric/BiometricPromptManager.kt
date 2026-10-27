@@ -1,5 +1,6 @@
 package com.example.noteapp.biometric
 
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.fragment.app.FragmentActivity
@@ -22,7 +23,8 @@ sealed interface BiometricResult {
     data object NoneEnrolled : BiometricResult
     data object AuthenticationSuccess : BiometricResult
     data object AuthenticationFailed : BiometricResult
-    data class AuthenticationError(val error: String) : BiometricResult
+    data class AuthenticationError(val error: String, val errorCode: Int = -1) : BiometricResult
+    data class AuthenticationLockout(val isPermanent: Boolean, val message: String) : BiometricResult
 }
 
 class BiometricPromptManager(
@@ -32,7 +34,11 @@ class BiometricPromptManager(
         val manager = BiometricManager.from(activity)
         val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
                 BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        return manager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
+        if (manager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS) {
+            return true
+        }
+        val keyguardManager = activity.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        return keyguardManager?.isDeviceSecure == true
     }
 
     fun showBiometricPrompt(
@@ -41,23 +47,33 @@ class BiometricPromptManager(
         onResult: (BiometricResult) -> Unit
     ) {
         val manager = BiometricManager.from(activity)
+        val keyguardManager = activity.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        val isDeviceSecure = keyguardManager?.isDeviceSecure == true
+
         val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
                 BiometricManager.Authenticators.DEVICE_CREDENTIAL
 
-        when (manager.canAuthenticate(authenticators)) {
-            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
-                onResult(BiometricResult.HardwareUnavailable)
-                return
+        val canAuthResult = manager.canAuthenticate(authenticators)
+        val hasDeviceLockFallback = isDeviceSecure
+
+        // Donanımda parmak izi yoksa veya tanımlı değilse, ancak cihaz kilitliyse (PIN/Desen/Şifre)
+        // sistem kilit doğrulayıcısına izin ver, hemen hata ile dönme
+        if (canAuthResult != BiometricManager.BIOMETRIC_SUCCESS && !hasDeviceLockFallback) {
+            when (canAuthResult) {
+                BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
+                    onResult(BiometricResult.HardwareUnavailable)
+                    return
+                }
+                BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> {
+                    onResult(BiometricResult.FeatureUnavailable)
+                    return
+                }
+                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
+                    onResult(BiometricResult.NoneEnrolled)
+                    return
+                }
+                else -> Unit
             }
-            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> {
-                onResult(BiometricResult.FeatureUnavailable)
-                return
-            }
-            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
-                onResult(BiometricResult.NoneEnrolled)
-                return
-            }
-            else -> Unit
         }
 
         val executor = ContextCompat.getMainExecutor(activity)
@@ -67,7 +83,17 @@ class BiometricPromptManager(
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    onResult(BiometricResult.AuthenticationError(errString.toString()))
+                    when (errorCode) {
+                        BiometricPrompt.ERROR_LOCKOUT -> {
+                            onResult(BiometricResult.AuthenticationLockout(isPermanent = false, message = errString.toString()))
+                        }
+                        BiometricPrompt.ERROR_LOCKOUT_PERMANENT -> {
+                            onResult(BiometricResult.AuthenticationLockout(isPermanent = true, message = errString.toString()))
+                        }
+                        else -> {
+                            onResult(BiometricResult.AuthenticationError(errString.toString(), errorCode))
+                        }
+                    }
                 }
 
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -88,6 +114,10 @@ class BiometricPromptManager(
             .setAllowedAuthenticators(authenticators)
             .build()
 
-        prompt.authenticate(promptInfo)
+        try {
+            prompt.authenticate(promptInfo)
+        } catch (e: Exception) {
+            onResult(BiometricResult.AuthenticationError(e.localizedMessage ?: "Kimlik doğrulama başlatılamadı"))
+        }
     }
 }

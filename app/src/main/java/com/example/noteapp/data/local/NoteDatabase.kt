@@ -12,8 +12,8 @@ import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.model.NoteHistory
 
 @Database(
-    entities = [Note::class, Category::class, NoteHistory::class],
-    version = 5,
+    entities = [Note::class, Category::class, NoteHistory::class, NoteDraftEntity::class],
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -67,6 +67,31 @@ abstract class NoteDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. notes tablosuna folderId sütunu ekle
+                db.execSQL("ALTER TABLE notes ADD COLUMN folderId INTEGER DEFAULT NULL")
+
+                // 2. Sık sorgulanan sütunlar için indeksleri tanımla
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_folderId ON notes (folderId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_isPinned ON notes (isPinned)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_isArchived ON notes (isArchived)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_isLocked ON notes (isLocked)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_updatedAt ON notes (updatedAt)")
+
+                // 3. Taslak notlar ve çökme/kapanma kurtarma tablosunu oluştur
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS note_drafts (
+                        noteId INTEGER PRIMARY KEY NOT NULL,
+                        title TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_note_drafts_timestamp ON note_drafts (timestamp)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: NoteDatabase? = null
 
@@ -77,8 +102,13 @@ abstract class NoteDatabase : RoomDatabase() {
                     NoteDatabase::class.java,
                     DATABASE_NAME
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
-                .fallbackToDestructiveMigration()
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6
+                )
                 .build().also { INSTANCE = it }
             }
         }

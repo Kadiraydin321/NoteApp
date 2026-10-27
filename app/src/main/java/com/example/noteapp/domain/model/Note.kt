@@ -12,8 +12,13 @@ import androidx.room.Index
     indices = [
         Index(value = ["isDeleted", "isArchived", "isPinned", "timestamp"]),
         Index(value = ["categoryId"]),
+        Index(value = ["folderId"]),
         Index(value = ["reminderTime"]),
-        Index(value = ["title"])
+        Index(value = ["title"]),
+        Index(value = ["isPinned"]),
+        Index(value = ["isArchived"]),
+        Index(value = ["isLocked"]),
+        Index(value = ["updatedAt"])
     ]
 )
 data class Note(
@@ -33,7 +38,8 @@ data class Note(
     val attachments: List<String> = emptyList(), // Görsel / Dosya yolları
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val backgroundImage: String? = null // Arka plan görseli
+    val backgroundImage: String? = null, // Arka plan görseli
+    val folderId: Long? = null // Klasör / Folder ID
 )
 
 @Immutable

@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.noteapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "1.2.9"
+        versionCode = 30
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("Long", "BUILD_TIME", "${System.currentTimeMillis()}L")
@@ -23,7 +23,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

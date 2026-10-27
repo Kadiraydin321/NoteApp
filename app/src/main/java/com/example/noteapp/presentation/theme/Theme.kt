@@ -279,17 +279,17 @@ private val SlateMinimalDarkScheme = darkColorScheme(
 )
 
 private val SlateMinimalLightScheme = lightColorScheme(
-    primary = Color(0xFF4B5159),
+    primary = Color(0xFF323943),
     onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Color(0xFFDFE2E8),
     onPrimaryContainer = Color(0xFF181C21),
 
-    secondary = Color(0xFF5B5F66),
+    secondary = Color(0xFF4A5059),
     onSecondary = Color(0xFFFFFFFF),
     secondaryContainer = Color(0xFFDFE2E8),
     onSecondaryContainer = Color(0xFF191C20),
 
-    tertiary = Color(0xFF655E57),
+    tertiary = Color(0xFF554E48),
     onTertiary = Color(0xFFFFFFFF),
     tertiaryContainer = Color(0xFFEDE5DC),
     onTertiaryContainer = Color(0xFF201B15),
@@ -401,6 +401,7 @@ fun NoteAppTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = false,
     colorPalette: AppColorPalette = AppColorPalette.WARM_AMBER,
+    amoledDark: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val isSystemDark = isSystemInDarkTheme()
@@ -410,7 +411,7 @@ fun NoteAppTheme(
         ThemeMode.DARK -> true
     }
 
-    val colorScheme = when {
+    val baseScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -423,6 +424,22 @@ fun NoteAppTheme(
             AppColorPalette.SLATE_MINIMAL -> if (darkTheme) SlateMinimalDarkScheme else SlateMinimalLightScheme
             AppColorPalette.GLACIAL_ICE -> if (darkTheme) GlacialIceDarkScheme else GlacialIceLightScheme
         }
+    }
+
+    val colorScheme = if (darkTheme && amoledDark) {
+        baseScheme.copy(
+            background = Color(0xFF000000),
+            surface = Color(0xFF000000),
+            surfaceVariant = Color(0xFF121215),
+            surfaceContainerLowest = Color(0xFF000000),
+            surfaceContainerLow = Color(0xFF060608),
+            surfaceContainer = Color(0xFF0D0D10),
+            surfaceContainerHigh = Color(0xFF16161A),
+            surfaceContainerHighest = Color(0xFF1F1F25),
+            outlineVariant = Color(0xFF2E2E36)
+        )
+    } else {
+        baseScheme
     }
 
     MaterialTheme(

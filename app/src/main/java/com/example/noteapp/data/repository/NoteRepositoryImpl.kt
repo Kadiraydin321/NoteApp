@@ -2,11 +2,13 @@ package com.example.noteapp.data.repository
 
 import android.content.Context
 import com.example.noteapp.data.local.NoteDao
+import com.example.noteapp.data.local.NoteDraftEntity
 import com.example.noteapp.data.security.NoteCryptoManager
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
 import com.example.noteapp.domain.model.NoteHistory
 import com.example.noteapp.domain.repository.NoteRepository
+import com.example.noteapp.domain.util.NoteDraft
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -71,7 +73,7 @@ class NoteRepositoryImpl @Inject constructor(
             note.copy(content = cryptoManager.encrypt(note.content))
         } else note
         val id = dao.insertNote(safeNote)
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
         return id
     }
 
@@ -82,17 +84,17 @@ class NoteRepositoryImpl @Inject constructor(
             note.copy(content = cryptoManager.decrypt(note.content))
         } else note
         dao.updateNote(safeNote)
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
     }
 
     override suspend fun deleteNote(note: Note) {
         dao.deleteNote(note)
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
     }
 
     override suspend fun emptyTrash() {
         dao.emptyTrash()
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
     }
 
     override suspend fun getAllNotes(): List<Note> = dao.getAllNotes().map { note ->
@@ -110,13 +112,13 @@ class NoteRepositoryImpl @Inject constructor(
             } else note
         }
         val ids = dao.insertNotes(safeNotes)
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
         return ids
     }
 
     override suspend fun deleteAllNotes() {
         dao.deleteAllNotes()
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
     }
 
     override fun getAllCategories(): Flow<List<Category>> = dao.getAllCategories()
@@ -125,17 +127,17 @@ class NoteRepositoryImpl @Inject constructor(
     override suspend fun insertCategories(categories: List<Category>) = dao.insertCategories(categories)
     override suspend fun deleteAllCategories() {
         dao.deleteAllCategories()
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
     }
     override suspend fun deleteCategory(category: Category) {
         dao.clearCategoryFromNotes(category.id)
         dao.deleteCategory(category)
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
     }
 
     override suspend fun moveNotesToTrash(noteIds: List<Long>, deletedAt: Long) {
         dao.moveNotesToTrash(noteIds, deletedAt)
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
     }
 
     override suspend fun cleanUpOldTrashNotes(threshold: Long) {
@@ -157,17 +159,17 @@ class NoteRepositoryImpl @Inject constructor(
             }
         } catch (_: Exception) {}
         dao.deleteExpiredTrashNotes(threshold)
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
     }
 
     override suspend fun updateNotesCategory(noteIds: List<Long>, categoryId: Long?) {
         dao.updateNotesCategory(noteIds, categoryId)
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
     }
 
     override suspend fun deleteNotesPermanently(noteIds: List<Long>) {
         dao.deleteNotesPermanently(noteIds)
-        NotesWidgetProvider.updateAllWidgets(context)
+        NotesWidgetProvider.sendRefreshBroadcast(context)
     }
 
     // Note Version History
@@ -179,4 +181,78 @@ class NoteRepositoryImpl @Inject constructor(
     override suspend fun deleteHistoryForNote(noteId: Long) = dao.deleteHistoryForNote(noteId)
     override suspend fun getAllNoteHistory(): List<NoteHistory> = dao.getAllNoteHistory()
     override suspend fun insertNoteHistories(histories: List<NoteHistory>) = dao.insertNoteHistories(histories)
+
+    // Folders
+    override fun getNotesByFolder(folderId: Long): Flow<List<Note>> = dao.getNotesByFolder(folderId)
+    override suspend fun getNotesByFolderList(folderId: Long): List<Note> = dao.getNotesByFolderList(folderId).map { note ->
+        if (cryptoManager.isEncrypted(note.content)) {
+            note.copy(content = cryptoManager.decrypt(note.content))
+        } else {
+            note
+        }
+    }
+    override suspend fun updateNotesFolder(noteIds: List<Long>, folderId: Long?) {
+        dao.updateNotesFolder(noteIds, folderId)
+        NotesWidgetProvider.updateAllWidgets(context)
+    }
+
+    // Draft Persistence & Crash Recovery
+    override suspend fun getDraft(noteId: Long?): NoteDraft? {
+        val targetId = noteId?.takeIf { it > 0L } ?: 0L
+        val entity = dao.getDraft(targetId) ?: return null
+        val normalizedId = if (entity.noteId <= 0L) null else entity.noteId
+        val decryptedContent = if (cryptoManager.isEncrypted(entity.content)) {
+            cryptoManager.decrypt(entity.content)
+        } else {
+            entity.content
+        }
+        return NoteDraft(
+            noteId = normalizedId,
+            title = entity.title,
+            content = decryptedContent,
+            timestamp = entity.timestamp
+        )
+    }
+
+    override suspend fun saveDraft(noteId: Long?, title: String, content: String, timestamp: Long) {
+        val targetId = noteId?.takeIf { it > 0L } ?: 0L
+        if (title.isBlank() && content.isBlank()) {
+            dao.deleteDraft(targetId)
+            return
+        }
+        dao.insertDraft(
+            NoteDraftEntity(
+                noteId = targetId,
+                title = title,
+                content = content,
+                timestamp = timestamp
+            )
+        )
+    }
+
+    override suspend fun deleteDraft(noteId: Long?) {
+        val targetId = noteId?.takeIf { it > 0L } ?: 0L
+        dao.deleteDraft(targetId)
+    }
+
+    override suspend fun getAllDrafts(): List<NoteDraft> {
+        return dao.getAllDrafts().map { entity ->
+            val normalizedId = if (entity.noteId <= 0L) null else entity.noteId
+            val content = if (cryptoManager.isEncrypted(entity.content)) {
+                cryptoManager.decrypt(entity.content)
+            } else {
+                entity.content
+            }
+            NoteDraft(
+                noteId = normalizedId,
+                title = entity.title,
+                content = content,
+                timestamp = entity.timestamp
+            )
+        }
+    }
+
+    override suspend fun deleteAllDrafts() {
+        dao.deleteAllDrafts()
+    }
 }

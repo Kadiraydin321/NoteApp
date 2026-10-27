@@ -3,4 +3,10 @@
     <string name="widget_name">Notlar Widget</string>
     <string name="widget_description">Tüm veya favori notlarınızı ana ekranınızda görüntüleyin ve hızlıca yeni not ekleyin.</string>
     <string name="quick_note_widget_description">Hızlıca yeni metin notu oluşturma kısayolu</string>
+    <string name="shortcut_quick_note">Hızlı Not</string>
+    <string name="shortcut_quick_note_long">Yeni bir not oluştur</string>
+    <string name="shortcut_quick_todo">Liste</string>
+    <string name="shortcut_quick_todo_long">Yapılacaklar listesi oluştur</string>
+    <string name="shortcut_quick_voice">Sesli Not</string>
+    <string name="shortcut_quick_voice_long">Ses kaydı ile not al</string>
 </resources>

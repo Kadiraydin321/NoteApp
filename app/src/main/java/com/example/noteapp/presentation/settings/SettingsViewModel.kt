@@ -203,6 +203,14 @@ class SettingsViewModel @Inject constructor(
         settingsManager.setLockTimeoutPolicy(policy)
     }
 
+    fun setAmoledDark(enabled: Boolean) {
+        settingsManager.setAmoledDark(enabled)
+    }
+
+    fun setDailyWordGoal(goal: Int) {
+        settingsManager.setDailyWordGoal(goal)
+    }
+
     fun refreshWidget() {
         NotesWidgetProvider.updateAllWidgets(app)
     }

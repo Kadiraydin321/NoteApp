@@ -18,6 +18,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 
@@ -38,6 +43,8 @@ fun KeepCheckboxIcon(
     val size = (fontSize.value * 1.25f).coerceIn(16f, 32f).dp
     val cornerRadius = (size.value * 0.22f).dp
     val strokeWidth = (size.value * 0.08f).coerceAtLeast(1.5f).dp
+    val actionDesc = if (isChecked) "İşareti kaldır" else "İşaretle"
+    val stateDesc = if (isChecked) "Tamamlandı" else "Tamamlanmadı"
 
     Box(
         modifier = modifier
@@ -46,8 +53,15 @@ fun KeepCheckboxIcon(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = false, radius = size),
+                role = Role.Checkbox,
+                onClickLabel = actionDesc,
                 onClick = onToggle
             )
+            .semantics {
+                role = Role.Checkbox
+                stateDescription = stateDesc
+                contentDescription = "Onay kutusu: $stateDesc"
+            }
             .then(
                 if (isChecked) {
                     Modifier
@@ -73,7 +87,7 @@ fun KeepCheckboxIcon(
         if (isChecked) {
             Icon(
                 imageVector = Icons.Default.Close,
-                contentDescription = "Tamamlandı (X)",
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size((size.value * 0.72f).dp)
             )

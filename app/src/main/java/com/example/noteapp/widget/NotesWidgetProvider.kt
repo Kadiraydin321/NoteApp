@@ -70,6 +70,8 @@ class NotesWidgetProvider : AppWidgetProvider() {
 
     companion object {
         const val ACTION_REFRESH_WIDGET = "com.example.noteapp.ACTION_REFRESH_WIDGET"
+        const val ACTION_NOTE_CLICK = "com.example.noteapp.ACTION_NOTE_CLICK"
+        const val EXTRA_NOTE_ID = "noteId"
         const val ACTION_OPEN_POPUP = "com.example.noteapp.ACTION_OPEN_POPUP"
         const val ACTION_CLOSE_POPUP = "com.example.noteapp.ACTION_CLOSE_POPUP"
         const val EXTRA_NEW_NOTE = "extra_new_note"
@@ -371,6 +373,13 @@ class NotesWidgetProvider : AppWidgetProvider() {
             }
             views.setTextViewText(R.id.widget_subtitle_filter, subtitle)
 
+            val emptyText = if (filterMode == WidgetFilterMode.FAVORITES) {
+                "Sabitlenmiş not bulunmuyor.\nÖnemli notlarınızı sabitleyebilirsiniz."
+            } else {
+                "Notların burada görünecek.\n+ ile hemen yeni not ekle."
+            }
+            views.setTextViewText(R.id.widget_empty_view, emptyText)
+
             val serviceIntent = Intent(context, NotesWidgetService::class.java).apply {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 data = Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
@@ -383,15 +392,16 @@ class NotesWidgetProvider : AppWidgetProvider() {
             }
             views.setOnClickPendingIntent(
                 R.id.widget_title,
-                PendingIntent.getActivity(context, 1, openAppIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                PendingIntent.getActivity(context, 2000 + appWidgetId, openAppIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             )
 
             val clickIntent = Intent(context, MainActivity::class.java).apply {
+                action = ACTION_NOTE_CLICK
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             val clickPendingIntent = PendingIntent.getActivity(
                 context,
-                0,
+                3000 + appWidgetId,
                 clickIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
@@ -416,7 +426,7 @@ class NotesWidgetProvider : AppWidgetProvider() {
             }
             val refreshPendingIntent = PendingIntent.getBroadcast(
                 context,
-                20,
+                4000 + appWidgetId,
                 refreshIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -547,6 +557,18 @@ class NotesWidgetProvider : AppWidgetProvider() {
                     QuickNoteWidgetProvider.updateAppWidget(context, appWidgetManager, id)
                 }
             }
+        }
+
+        fun sendRefreshBroadcast(context: Context) {
+            try {
+                val intent = Intent(ACTION_REFRESH_WIDGET).apply {
+                    `package` = context.packageName
+                }
+                context.sendBroadcast(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            updateAllWidgets(context)
         }
     }
 }

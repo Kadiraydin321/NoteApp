@@ -58,6 +58,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.noteapp.biometric.BiometricPromptManager
 import com.example.noteapp.biometric.BiometricResult
+import com.example.noteapp.biometric.BiometricSessionManager
+import com.example.noteapp.biometric.LockoutStatus
 import com.example.noteapp.data.settings.AppSettingsManager
 import com.example.noteapp.data.security.NoteCryptoManager
 import com.example.noteapp.domain.model.Note
@@ -96,6 +98,8 @@ class MainActivity : FragmentActivity() {
     private val biometricPromptManager by lazy {
         BiometricPromptManager(this)
     }
+
+    private val sessionManager = BiometricSessionManager()
 
     private val isPrivacyShieldActive = mutableStateOf(false)
     private var navControllerRef: NavController? = null
@@ -171,7 +175,8 @@ class MainActivity : FragmentActivity() {
             NoteAppTheme(
                 themeMode = appSettings.themeMode,
                 dynamicColor = appSettings.dynamicColor,
-                colorPalette = appSettings.colorPalette
+                colorPalette = appSettings.colorPalette,
+                amoledDark = appSettings.amoledDark
             ) {
                 var showWelcomeScreen by remember { mutableStateOf(true) }
                 LaunchedEffect(Unit) {
@@ -268,9 +273,17 @@ class MainActivity : FragmentActivity() {
                             confirmButton = {
                                 TextButton(
                                     onClick = {
+                                        val lockoutStatus = sessionManager.getLockoutStatus()
+                                        if (lockoutStatus is LockoutStatus.Locked) {
+                                            val remainingSec = (lockoutStatus.remainingMs / 1000).coerceAtLeast(1)
+                                            pinErrorText = "Çok fazla hatalı giriş! Lütfen $remainingSec saniye bekleyin."
+                                            return@TextButton
+                                        }
+
                                         if (hasMasterPin) {
                                             if (pinInput == appSettings.masterPin) {
                                                 val id = targetNote.id
+                                                sessionManager.recordSuccessfulUnlock()
                                                 lastUnlockTimestamp = System.currentTimeMillis()
                                                 noteToUnlockWithPin = null
                                                 pinInput = ""
@@ -280,7 +293,12 @@ class MainActivity : FragmentActivity() {
                                                     launchSingleTop = true
                                                 }
                                             } else {
-                                                pinErrorText = "Hatalı PIN! Lütfen tekrar deneyin."
+                                                val status = sessionManager.recordFailedAttempt()
+                                                pinErrorText = when (status) {
+                                                    is LockoutStatus.Locked -> "5 kez hatalı PIN girildi! Sistem 30 saniye kilitlendi."
+                                                    is LockoutStatus.AttemptsRemaining -> "Hatalı PIN! (Kalan deneme hakkı: ${status.remaining})"
+                                                    else -> "Hatalı PIN! Lütfen tekrar deneyin."
+                                                }
                                             }
                                         } else {
                                             if (pinInput.length >= 4) {
@@ -288,6 +306,7 @@ class MainActivity : FragmentActivity() {
                                                     settingsManager.setMasterPin(pinInput)
                                                     Toast.makeText(this@MainActivity, "Master PIN kaydedildi", Toast.LENGTH_SHORT).show()
                                                     val id = targetNote.id
+                                                    sessionManager.recordSuccessfulUnlock()
                                                     lastUnlockTimestamp = System.currentTimeMillis()
                                                     noteToUnlockWithPin = null
                                                     pinInput = ""
@@ -348,9 +367,7 @@ class MainActivity : FragmentActivity() {
                                 val isCategoryConcealed = viewModel.isNoteConcealed(note)
                                 if (note.isLocked || isCategoryConcealed) {
                                     val policy = appSettings.lockTimeoutPolicy
-                                    val isGraceActive = policy != com.example.noteapp.data.settings.LockTimeoutPolicy.IMMEDIATE &&
-                                            lastUnlockTimestamp > 0L &&
-                                            (System.currentTimeMillis() - lastUnlockTimestamp <= policy.timeoutMs)
+                                    val isGraceActive = sessionManager.isSessionValid(policy.timeoutMs)
 
                                     if (isGraceActive) {
                                         if (isCategoryConcealed && note.categoryId != null) {
@@ -370,11 +387,19 @@ class MainActivity : FragmentActivity() {
                                             onResult = { result ->
                                                 when (result) {
                                                     is BiometricResult.AuthenticationSuccess -> {
+                                                        sessionManager.recordSuccessfulUnlock()
                                                         lastUnlockTimestamp = System.currentTimeMillis()
                                                         if (note.categoryId != null) {
-                                                            viewModel.unlockCategoryInSession(note.categoryId)
+                                                             viewModel.unlockCategoryInSession(note.categoryId)
                                                         }
                                                         navController.navigate("note_detail_screen?noteId=${note.id}")
+                                                    }
+                                                    is BiometricResult.AuthenticationLockout -> {
+                                                        sessionManager.recordBiometricLockout(result.isPermanent)
+                                                        Toast.makeText(this@MainActivity, "Çok fazla hatalı deneme: ${result.message}", Toast.LENGTH_LONG).show()
+                                                        if (!appSettings.masterPin.isNullOrBlank()) {
+                                                            noteToUnlockWithPin = note
+                                                        }
                                                     }
                                                     is BiometricResult.AuthenticationError -> {
                                                         if (!appSettings.masterPin.isNullOrBlank()) {
@@ -384,7 +409,12 @@ class MainActivity : FragmentActivity() {
                                                         }
                                                     }
                                                     is BiometricResult.AuthenticationFailed -> {
-                                                        Toast.makeText(this@MainActivity, "Kimlik doğrulama başarısız", Toast.LENGTH_SHORT).show()
+                                                        val status = sessionManager.recordFailedAttempt()
+                                                        if (status is LockoutStatus.Locked) {
+                                                            Toast.makeText(this@MainActivity, "Çok fazla hatalı deneme! Sistem 30 saniye kilitlendi.", Toast.LENGTH_SHORT).show()
+                                                        } else {
+                                                            Toast.makeText(this@MainActivity, "Kimlik doğrulama başarısız", Toast.LENGTH_SHORT).show()
+                                                        }
                                                     }
                                                     is BiometricResult.FeatureUnavailable,
                                                     is BiometricResult.HardwareUnavailable,
@@ -424,6 +454,7 @@ class MainActivity : FragmentActivity() {
                             onUpdateCategoryForSelected = viewModel::updateCategoryForSelected,
                             onUpdateColorForSelected = viewModel::updateColorForSelected,
                             onTogglePinForSelected = viewModel::togglePinForSelected,
+                            onToggleLockForSelected = viewModel::toggleLockForSelected,
                             onDuplicateNote = viewModel::onDuplicateNote,
                             onFilterTypeChange = viewModel::setFilterType,
                             onSortOrderChange = viewModel::setSortOrder,
@@ -600,6 +631,8 @@ class MainActivity : FragmentActivity() {
                             onSetReminder = viewModel::onSetReminder,
                             onAddImageUri = viewModel::onAddImage,
                             onToggleAudioRecording = viewModel::toggleAudioRecording,
+                            onTogglePauseAudioRecording = viewModel::togglePauseAudioRecording,
+                            onSetAudioPlaybackSpeed = viewModel::setAudioPlaybackSpeed,
                             onToggleAudioPlayback = viewModel::toggleAudioPlayback,
                             onDeleteAttachment = viewModel::onDeleteAttachment,
                             onImageEditClick = { imagePath ->
@@ -804,6 +837,8 @@ class MainActivity : FragmentActivity() {
                             onDynamicColorChange = viewModel::setDynamicColor,
                             onColorPaletteChange = viewModel::setColorPalette,
                             onThemeModeChange = viewModel::setThemeMode,
+                            onAmoledDarkChange = viewModel::setAmoledDark,
+                            onDailyWordGoalChange = viewModel::setDailyWordGoal,
                             onLayoutModeChange = viewModel::setLayoutMode,
                             onDrawerCollapseModeChange = viewModel::setDrawerCollapseMode,
                             onMasterPinChange = viewModel::setMasterPin,
@@ -1024,10 +1059,17 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         wasAppInBackground = true
         backgroundTimestamp = System.currentTimeMillis()
+        sessionManager.onAppBackgrounded(backgroundTimestamp)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isPrivacyShieldActive.value = false
+        wasAppInBackground = false
 
         val policy = settingsManager.settings.value.lockTimeoutPolicy
-        if (policy == com.example.noteapp.data.settings.LockTimeoutPolicy.IMMEDIATE) {
-            // Anında kilitleme politikası: kullanıcı ayrıldığı anda kilitli notu kapat
+        if (sessionManager.shouldLockOnResume(policy.timeoutMs)) {
+            // Akıllı tolerans (grace period) ve kilit süresi doldu: kilitli not açıksa kapat ve ana ekrana dön
             navControllerRef?.let { nav ->
                 val currentRoute = nav.currentBackStackEntry?.destination?.route
                 if (currentRoute?.startsWith("note_detail_screen") == true) {
@@ -1037,35 +1079,7 @@ class MainActivity : FragmentActivity() {
                             val note = repository.getNoteById(noteId)
                             if (note != null && note.isLocked) {
                                 nav.popBackStack("notes_screen", inclusive = false)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        isPrivacyShieldActive.value = false
-        wasAppInBackground = false
-
-        val policy = settingsManager.settings.value.lockTimeoutPolicy
-        if (policy != com.example.noteapp.data.settings.LockTimeoutPolicy.IMMEDIATE && backgroundTimestamp > 0L) {
-            val elapsed = System.currentTimeMillis() - backgroundTimestamp
-            if (elapsed > policy.timeoutMs) {
-                // Zaman aşımı doldu: kilitli not açıksa kapat ve ana ekrana dön
-                navControllerRef?.let { nav ->
-                    val currentRoute = nav.currentBackStackEntry?.destination?.route
-                    if (currentRoute?.startsWith("note_detail_screen") == true) {
-                        val noteId = nav.currentBackStackEntry?.arguments?.getLong("noteId") ?: -1L
-                        if (noteId != -1L && activeLockedNoteId == noteId) {
-                            CoroutineScope(Dispatchers.Main).launch {
-                                val note = repository.getNoteById(noteId)
-                                if (note != null && note.isLocked) {
-                                    nav.popBackStack("notes_screen", inclusive = false)
-                                    Toast.makeText(this@MainActivity, "Kilit zaman aşımına uğradı", Toast.LENGTH_SHORT).show()
-                                }
+                                Toast.makeText(this@MainActivity, "Kilit zaman aşımına uğradı", Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
@@ -1152,9 +1166,17 @@ class MainActivity : FragmentActivity() {
         }
 
         // Widget'tan belirli bir nota tıklandıysa
-        val noteId = intent.getLongExtra("noteId", -1L)
+        val noteId = intent.getLongExtra(NotesWidgetProvider.EXTRA_NOTE_ID, -1L).takeIf { it != -1L }
+            ?: intent.getLongExtra("noteId", -1L).takeIf { it != -1L }
+            ?: if (intent.data?.scheme == "noteapp" && intent.data?.host == "note") {
+                intent.data?.lastPathSegment?.toLongOrNull() ?: -1L
+            } else -1L
+
         if (noteId != -1L) {
+            intent.removeExtra(NotesWidgetProvider.EXTRA_NOTE_ID)
             intent.removeExtra("noteId")
+            intent.data = null
+            intent.action = Intent.ACTION_MAIN
             CoroutineScope(Dispatchers.Main).launch {
                 val note = repository.getNoteById(noteId)
                 if (note != null) {
@@ -1165,7 +1187,16 @@ class MainActivity : FragmentActivity() {
                             onResult = { result ->
                                 when (result) {
                                     is BiometricResult.AuthenticationSuccess -> {
+                                        sessionManager.recordSuccessfulUnlock()
+                                        lastUnlockTimestamp = System.currentTimeMillis()
                                         onNavigate("note_detail_screen?noteId=$noteId")
+                                    }
+                                    is BiometricResult.AuthenticationLockout -> {
+                                        sessionManager.recordBiometricLockout(result.isPermanent)
+                                        Toast.makeText(this@MainActivity, "Çok fazla hatalı deneme: ${result.message}", Toast.LENGTH_LONG).show()
+                                        if (!settingsManager.settings.value.masterPin.isNullOrBlank()) {
+                                            onUnlockWithPinRequired(note)
+                                        }
                                     }
                                     is BiometricResult.AuthenticationError -> {
                                         if (!settingsManager.settings.value.masterPin.isNullOrBlank()) {
@@ -1175,6 +1206,7 @@ class MainActivity : FragmentActivity() {
                                         }
                                     }
                                     is BiometricResult.AuthenticationFailed -> {
+                                        sessionManager.recordFailedAttempt()
                                         Toast.makeText(this@MainActivity, "Kimlik doğrulama başarısız", Toast.LENGTH_SHORT).show()
                                     }
                                     is BiometricResult.FeatureUnavailable,

@@ -48,50 +48,20 @@ data class NoteGraphStats(
  */
 object NoteLinkGraphEngine {
 
-    private val WIKILINK_REGEX = Regex("\\[\\[([^\\]]+)\\]\\]")
+    private val WIKILINK_REGEX = WikiLinkParser.WIKILINK_REGEX
 
     /**
      * Metindeki tüm `[[Not Başlığı]]` referanslarını ve her birinin geçtiği cümle bağlamını ayıklar.
      */
     fun extractWikilinksWithSnippets(content: String): List<WikilinkReference> {
-        if (content.isBlank()) return emptyList()
-
-        val results = mutableListOf<WikilinkReference>()
-        val matches = WIKILINK_REGEX.findAll(content)
-
-        for (match in matches) {
-            val targetTitle = match.groupValues[1].trim()
-            if (targetTitle.isNotBlank()) {
-                val startPos = match.range.first
-                val endPos = match.range.last + 1
-
-                // Cümle veya çevreleyen metin bağlamını çıkar (~60 karakter öncesi ve sonrası)
-                val snippetStart = (startPos - 50).coerceAtLeast(0)
-                val snippetEnd = (endPos + 50).coerceAtMost(content.length)
-                var rawSnippet = content.substring(snippetStart, snippetEnd).trim()
-
-                // Satır sonlarını boşluğa çevir
-                rawSnippet = rawSnippet.replace('\n', ' ')
-                val prefix = if (snippetStart > 0) "…" else ""
-                val suffix = if (snippetEnd < content.length) "…" else ""
-                val context = "$prefix$rawSnippet$suffix"
-
-                results.add(WikilinkReference(targetTitle, context))
-            }
-        }
-        return results
+        return WikiLinkParser.extractWikilinksWithSnippets(content)
     }
 
     /**
      * Metindeki wikilink hedef başlıklarını tekil olarak döndürür.
      */
     fun extractOutboundTitles(content: String): List<String> {
-        if (content.isBlank()) return emptyList()
-        return WIKILINK_REGEX.findAll(content)
-            .map { it.groupValues[1].trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-            .toList()
+        return WikiLinkParser.extractTargetTitles(content)
     }
 
     /**

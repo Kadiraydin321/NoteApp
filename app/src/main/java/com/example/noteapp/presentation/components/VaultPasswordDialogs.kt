@@ -122,7 +122,7 @@ fun ExportVaultDialog(
                         IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
                             Icon(
                                 imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = null
+                                contentDescription = if (isPasswordVisible) "Şifreyi gizle" else "Şifreyi göster"
                             )
                         }
                     },
@@ -232,7 +232,7 @@ fun ImportVaultDialog(
                         IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
                             Icon(
                                 imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = null
+                                contentDescription = if (isPasswordVisible) "Şifreyi gizle" else "Şifreyi göster"
                             )
                         }
                     },

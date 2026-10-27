@@ -333,15 +333,32 @@ class NotesViewModel @Inject constructor(
                 delay(120)
             }
             val visibleNotes = withContext(Dispatchers.Default) {
-                val query = snapshot.searchQuery.trim()
-                val hasQuery = query.isNotEmpty()
+                val rawQuery = snapshot.searchQuery.trim()
+                val hasQuery = rawQuery.isNotEmpty()
+                val searchTokens = if (hasQuery) {
+                    com.example.noteapp.domain.util.TextHighlightHelper.extractTokens(rawQuery)
+                } else emptyList()
                 val selectedTag = snapshot.selectedTag
                 val tagToken = if (selectedTag != null) "#$selectedTag" else null
 
                 val filtered = snapshot.notes.filter { note ->
-                    val matchesSearch = !hasQuery ||
-                            note.title.contains(query, ignoreCase = true) ||
-                            note.content.contains(query, ignoreCase = true)
+                    val matchesSearch = if (!hasQuery) {
+                        true
+                    } else {
+                        searchTokens.all { token ->
+                            val isTagToken = token.startsWith("#") && token.length > 1
+                            if (isTagToken) {
+                                val cleanTag = token.removePrefix("#")
+                                note.content.contains(token, ignoreCase = true) ||
+                                note.title.contains(token, ignoreCase = true) ||
+                                note.content.contains("#$cleanTag", ignoreCase = true) ||
+                                note.title.contains("#$cleanTag", ignoreCase = true)
+                            } else {
+                                note.title.contains(token, ignoreCase = true) ||
+                                note.content.contains(token, ignoreCase = true)
+                            }
+                        }
+                    }
                     if (!matchesSearch) return@filter false
 
                     val matchesType = when (snapshot.filterType) {
@@ -544,6 +561,20 @@ class NotesViewModel @Inject constructor(
         viewModelScope.launch {
             selectedNotes.forEach { note ->
                 repository.updateNote(note.copy(isPinned = anyUnpinned))
+            }
+            _state.value = _state.value.copy(selectedNoteIds = emptySet())
+            NotesWidgetProvider.updateAllWidgets(app)
+        }
+    }
+
+    fun toggleLockForSelected() {
+        val ids = _state.value.selectedNoteIds
+        val selectedNotes = _state.value.notes.filter { it.id in ids }
+        if (selectedNotes.isEmpty()) return
+        val anyUnlocked = selectedNotes.any { !it.isLocked }
+        viewModelScope.launch {
+            selectedNotes.forEach { note ->
+                repository.updateNote(note.copy(isLocked = anyUnlocked))
             }
             _state.value = _state.value.copy(selectedNoteIds = emptySet())
             NotesWidgetProvider.updateAllWidgets(app)

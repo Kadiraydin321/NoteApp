@@ -2,6 +2,7 @@ package com.example.noteapp.widget
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
@@ -87,11 +88,12 @@ class NotesRemoteViewsFactory(
                     db.noteDao.getActiveNotesList()
                 }
 
-                notes = if (!showLocked) {
+                val filtered = if (!showLocked) {
                     rawList.filter { !it.isLocked }
                 } else {
                     rawList
                 }
+                notes = filtered.take(50)
             } catch (e: Exception) {
                 e.printStackTrace()
                 notes = emptyList()
@@ -152,6 +154,9 @@ class NotesRemoteViewsFactory(
 
         // Tıklama intent'i (fill-in intent)
         val fillInIntent = Intent().apply {
+            action = NotesWidgetProvider.ACTION_NOTE_CLICK
+            data = Uri.parse("noteapp://note/${note.id}")
+            putExtra(NotesWidgetProvider.EXTRA_NOTE_ID, note.id)
             putExtra("noteId", note.id)
             putExtra("isFromWidget", true)
         }

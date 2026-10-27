@@ -52,4 +52,31 @@ class TextHighlightHelperTest {
         assertEquals(text, result.text)
         assertTrue(result.spanStyles.isEmpty())
     }
+
+    @Test
+    fun testMultiTokenHighlighting() {
+        val text = "Android geliştiricisi Jetpack Compose ile harika arayüzler tasarlar."
+        val query = "android compose"
+        val result = TextHighlightHelper.highlightQuery(text, query)
+
+        assertEquals(text, result.text)
+        // İki farklı token ("android" ve "compose") eşleşti ve iki ayrı span oluşturdu
+        assertEquals(2, result.spanStyles.size)
+        assertEquals(0, result.spanStyles[0].start) // "Android"
+        assertEquals(7, result.spanStyles[0].end)
+        assertEquals(30, result.spanStyles[1].start) // "Compose"
+        assertEquals(37, result.spanStyles[1].end)
+    }
+
+    @Test
+    fun testHashtagTokenHighlighting() {
+        val text = "Sprint planlaması yapıldı, #mobil ekibi görevleri aldı."
+        val query = "#mobil"
+        val result = TextHighlightHelper.highlightQuery(text, query)
+
+        assertEquals(text, result.text)
+        assertEquals(1, result.spanStyles.size)
+        val span = result.spanStyles[0]
+        assertEquals("#mobil", text.substring(span.start, span.end))
+    }
 }

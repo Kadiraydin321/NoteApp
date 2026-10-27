@@ -2,9 +2,9 @@ package com.example.noteapp.data.security
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.util.Base64
 import java.nio.ByteBuffer
 import java.security.KeyStore
+import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -20,24 +20,34 @@ import javax.inject.Singleton
  * 128-bit GCM kimlik doğrulama etiketi (authentication tag) ile bütünlük garanti edilir.
  */
 @Singleton
-class NoteCryptoManager @Inject constructor() {
+class NoteCryptoManager(
+    private val keyProvider: (() -> SecretKey)? = null
+) {
+
+    @Inject
+    constructor() : this(keyProvider = null)
 
     companion object {
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEY_ALIAS = "NoteAppMasterSecretKey_v1"
-        private const val ALGORITHM = KeyProperties.KEY_ALGORITHM_AES
-        private const val BLOCK_MODE = KeyProperties.BLOCK_MODE_GCM
-        private const val PADDING = KeyProperties.ENCRYPTION_PADDING_NONE
+        private const val ALGORITHM = "AES"
+        private const val BLOCK_MODE = "GCM"
+        private const val PADDING = "NoPadding"
         private const val TRANSFORMATION = "$ALGORITHM/$BLOCK_MODE/$PADDING"
         private const val GCM_TAG_LENGTH = 128
         private const val PREFIX = "ENC_GCM_V1:"
     }
 
-    private val keyStore: KeyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply {
-        load(null)
+    private val keyStore: KeyStore by lazy {
+        KeyStore.getInstance(ANDROID_KEYSTORE).apply {
+            load(null)
+        }
     }
 
     private fun getOrCreateSecretKey(): SecretKey {
+        if (keyProvider != null) {
+            return keyProvider.invoke()
+        }
         if (!keyStore.containsAlias(KEY_ALIAS)) {
             val keyGenerator = KeyGenerator.getInstance(ALGORITHM, ANDROID_KEYSTORE)
             val keyGenParameterSpec = KeyGenParameterSpec.Builder(
@@ -80,7 +90,7 @@ class NoteCryptoManager @Inject constructor() {
             byteBuffer.put(cipherBytes)
             val combined = byteBuffer.array()
 
-            PREFIX + Base64.encodeToString(combined, Base64.NO_WRAP)
+            PREFIX + Base64.getEncoder().encodeToString(combined)
         } catch (e: Exception) {
             throw IllegalStateException("Kilitli not şifrelenemedi; düz metin olarak kaydedilmedi.", e)
         }
@@ -111,7 +121,11 @@ class NoteCryptoManager @Inject constructor() {
 
         return try {
             val base64Data = cipherText.removePrefix(PREFIX)
-            val combined = Base64.decode(base64Data, Base64.NO_WRAP)
+            val combined = Base64.getDecoder().decode(base64Data)
+
+            if (combined.size < 12) {
+                return "[Korumalı İçerik Çözülemedi]"
+            }
 
             val cipher = Cipher.getInstance(TRANSFORMATION)
             val secretKey = getOrCreateSecretKey()
@@ -123,7 +137,6 @@ class NoteCryptoManager @Inject constructor() {
             val decryptedBytes = cipher.doFinal(combined, 12, combined.size - 12)
             String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {
-            e.printStackTrace()
             // Şifre çözülemezse hata mesajı döndür
             "[Korumalı İçerik Çözülemedi]"
         }
@@ -134,3 +147,4 @@ class NoteCryptoManager @Inject constructor() {
      */
     fun isEncrypted(text: String): Boolean = text.startsWith(PREFIX)
 }
+

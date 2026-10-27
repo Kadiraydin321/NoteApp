@@ -40,6 +40,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -1565,7 +1570,16 @@ private fun DrawControlPanel(
                             .size(if (isSelected) 34.dp else 28.dp)
                             .clip(CircleShape)
                             .background(color)
-                            .clickable { onColorSelect(color) }
+                            .clickable(
+                                role = Role.RadioButton,
+                                onClickLabel = "Rengi seç",
+                                onClick = { onColorSelect(color) }
+                            )
+                            .semantics {
+                                role = Role.RadioButton
+                                selected = isSelected
+                                contentDescription = "Renk seçimi${if (isSelected) " (seçili)" else ""}"
+                            }
                             .border(
                                 width = if (isSelected) 3.dp else 1.dp,
                                 color = if (isSelected) Color.White else Color(0x44FFFFFF),
