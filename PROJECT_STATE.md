@@ -84,6 +84,7 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] v1.4.0: Release APK derlendi (versionCode: 31, 4.44 MB), version.json hazırlandı ve apk/main dalları GitHub'a dağıtıldı.
 - [x] v1.4.0: GitHub Uzak Depo Yedeklemesi tamamlandı (`commit: cb39152`, `branch: main` -> `git@github.com:Kadiraydin321/NoteApp.git`).
 - [x] v1.4.0: Android canlı emülatör doğrulaması %100 yeşil (13/13 fonksiyon ve hotfix bizzat kanıtlandı).
 - [x] v1.4.0: Okuma modu kontrast/boyut optimizasyonu ve 3 nokta akordiyon menü mimarisi tamamlandı.

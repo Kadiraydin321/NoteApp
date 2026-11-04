@@ -1532,7 +1532,7 @@ fun SettingsScreen(
                 iconTint = MaterialTheme.colorScheme.primary,
                 title = "Hakkında & Güncellemeler",
                 subtitle = "Sürüm detayları, güncelleme motoru ve yazma analitiği",
-                badgeText = "v1.0.1"
+                badgeText = null
             ) {
                 // 1. Güncelleme Durumu Kutusu
                 Surface(
@@ -1776,7 +1776,7 @@ fun SettingsScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            "Not Defterim · v1.0.1 (En Güncel)",
+                            "Not Defterim · Yerel & Güvenli",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold
                         )

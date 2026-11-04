@@ -1,8 +1,8 @@
 {
-  "versionCode": 30,
-  "versionName": "1.3.0",
-  "buildTime": 0,
-  "releaseDate": "27.10.2026",
-  "changeLog": "v1.3.0 Major Release: 16 alt ajan işbirliğiyle kapsamlı UI/UX modernizasyonu, Obsidian tarzı çift yönlü wikilink ([[ ]]) desteği, interaktif yapılacaklar listesi (- [x]), akıllı biyometrik oturum (30sn grace period & 5 hatalı deneme lockout koruması), Room indeksleri & kalıcı taslak kurtarma, AMOLED saf siyah tema, ProGuard/R8 optimizasyonu (%75 APK küçülmesi) ve 284 birim test doğrulaması.",
+  "versionCode": 31,
+  "versionName": "1.4.0",
+  "buildTime": 1730737700,
+  "releaseDate": "04.11.2026",
+  "changeLog": "v1.4.0: Okuma modu düzeltmesi, 4 kategorili akordiyon menü, hava boşluklu optik QR akış aktarımı (15 FPS), masaüstü QR LAN senkronizasyonu, AutoResizeText taşma koruması ve sadeleştirilmiş tek sürüm arayüzü.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }
