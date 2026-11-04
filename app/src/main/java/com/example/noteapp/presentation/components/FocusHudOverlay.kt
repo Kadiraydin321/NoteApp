@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +37,8 @@ fun FocusHudOverlay(
     onSelectSoundType: (FocusSoundType) -> Unit,
     onVolumeChange: (Float) -> Unit,
     onExitZenMode: () -> Unit,
+    isTtsSpeaking: Boolean = false,
+    onToggleTts: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Pomodoro State
@@ -134,7 +137,29 @@ fun FocusHudOverlay(
                         .width(1.dp)
                 )
 
-                // Ses Butonu
+                // 1. Sesli Okuma (TTS Hoparlör) Butonu
+                Surface(
+                    shape = CircleShape,
+                    color = if (isTtsSpeaking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .clickable(
+                            onClickLabel = if (isTtsSpeaking) "Sesli Okumayı Durdur" else "Sesli Oku",
+                            onClick = onToggleTts
+                        )
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isTtsSpeaking) Icons.Default.Stop else Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = if (isTtsSpeaking) "Sesli Okumayı Durdur" else "Sesli Oku",
+                            tint = if (isTtsSpeaking) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                // 2. Ses Butonu
                 Surface(
                     shape = CircleShape,
                     color = if (isSoundPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,

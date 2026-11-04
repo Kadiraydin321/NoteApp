@@ -1,8 +1,8 @@
 {
-  "versionCode": 33,
-  "versionName": "1.4.2",
-  "buildTime": 1730741900,
+  "versionCode": 34,
+  "versionName": "1.4.3",
+  "buildTime": 1730745200,
   "releaseDate": "04.11.2026",
-  "changeLog": "v1.4.2: Kullanıcı yedeğinin şifresi ('2526') adli testlerle çözüldü, kör [Tamam] bilgilendirme diyaloğu kaldırılarak yerine doğrudan parmak izi okuma ve şifre çözme modalı bağlandı, tek tıkla pop-up yedekleme menüsü entegre edildi.",
+  "changeLog": "v1.4.3: Sesli okuma (Text-to-Speech / TTS) motoru, Android 11+ servis görünürlüğü, oynat/durdur buton geri bildirimi ve Markdown konuşma temizleyicisi entegre edildi.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }

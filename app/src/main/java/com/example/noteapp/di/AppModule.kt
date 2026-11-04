@@ -8,6 +8,7 @@ import com.example.noteapp.data.repository.NoteRepositoryImpl
 import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.media.AudioPlayer
 import com.example.noteapp.media.AudioRecorder
+import com.example.noteapp.media.TextToSpeechHelper
 import com.example.noteapp.notification.AlarmScheduler
 import com.example.noteapp.notification.AndroidAlarmScheduler
 import dagger.Module
@@ -58,5 +59,11 @@ object AppModule {
     @Singleton
     fun provideAudioPlayer(app: Application): AudioPlayer {
         return AudioPlayer(app)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTextToSpeechHelper(app: Application): TextToSpeechHelper {
+        return TextToSpeechHelper(app)
     }
 }

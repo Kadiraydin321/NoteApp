@@ -20,6 +20,7 @@ import com.example.noteapp.media.AudioRecorder
 import com.example.noteapp.media.FileStorageHelper
 import com.example.noteapp.media.FocusAudioSynthesizer
 import com.example.noteapp.media.FocusSoundType
+import com.example.noteapp.media.TextToSpeechHelper
 import com.example.noteapp.notification.AlarmScheduler
 import com.example.noteapp.data.settings.AppSettingsManager
 import com.example.noteapp.data.settings.NoteGoalManager
@@ -81,6 +82,7 @@ data class NoteDetailState(
     val extractedTags: List<String> = emptyList(),
     val isZenMode: Boolean = false,
     val isSoundPlaying: Boolean = false,
+    val isTtsSpeaking: Boolean = false,
     val currentFocusSound: FocusSoundType = FocusSoundType.PINK_NOISE,
     val noteHistoryList: List<NoteHistory> = emptyList(),
     val audioPlaybackSpeed: Float = 1.0f,
@@ -108,6 +110,7 @@ class NoteDetailViewModel @Inject constructor(
     private val templateManager: TemplateManager,
     private val focusAudioSynthesizer: FocusAudioSynthesizer,
     private val noteGoalManager: NoteGoalManager,
+    private val ttsHelper: TextToSpeechHelper,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -137,6 +140,11 @@ class NoteDetailViewModel @Inject constructor(
     private val draftRecoveryManager = DraftRecoveryManager.create(app)
 
     init {
+        viewModelScope.launch {
+            ttsHelper.isSpeaking.collect { speaking ->
+                _state.value = _state.value.copy(isTtsSpeaking = speaking)
+            }
+        }
         val noteId = savedStateHandle.get<Long>("noteId") ?: -1L
         if (noteId != -1L) {
             viewModelScope.launch {
@@ -1192,6 +1200,18 @@ class NoteDetailViewModel @Inject constructor(
         focusAudioSynthesizer.setVolume(volume)
     }
 
+    fun toggleTextToSpeech(onFeedback: ((isSpeaking: Boolean, warningMessage: String?) -> Unit)? = null): Boolean {
+        return ttsHelper.toggle(
+            title = _state.value.title,
+            content = _state.value.contentValue.text,
+            onFeedback = onFeedback
+        )
+    }
+
+    fun stopTextToSpeech() {
+        ttsHelper.stop()
+    }
+
     // Şablon İşlemleri
     fun getAvailableTemplates(): List<NoteTemplate> = templateManager.getAllTemplates()
 
@@ -1268,6 +1288,7 @@ class NoteDetailViewModel @Inject constructor(
         recordingJob?.cancel()
         playbackJob?.cancel()
         audioPlayer.release()
+        ttsHelper.stop()
         focusAudioSynthesizer.stop()
         audioRecorder.release()
         checkAndDiscardIfEmptyOrSave()

@@ -1,7 +1,7 @@
 # 📌 Proje Durumu & Hafıza Kartı (PROJECT_STATE)
 
 **Son Güncelleme:** 2026-11-04 17:00
-**Aktif Sürüm / Durum:** v1.4.2 / Kararlı & Emülatör Doğrulamalı
+**Aktif Sürüm / Durum:** v1.4.3 / Kararlı & Emülatör Doğrulamalı
 **Teknoloji Yığını:** Rust Wry / Tauri (`desktop-native`), Node.js / Electron 33 (`desktop-electron`), Kotlin Jetpack Compose Room SQLite (`app` Android), Compose Multiplatform (`desktop`), CameraX & ML Kit Barcode, Vanilla JS, CSS3 Glassmorphism
 
 ---
@@ -89,6 +89,7 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] v1.4.3: Sesli okuma (Text-to-Speech / TTS) motoru, Android 11+ paket görünürlüğü, Focus HUD overlay buton geri bildirimi, Release APK derlemesi (versionCode: 34, 4.25 MB) ve GitHub apk/main dağıtımı tamamlandı.
 - [x] v1.4.2: Release APK derlendi (versionCode: 33, 4.25 MB), kör [Tamam] diyaloğu kaldırılarak doğrudan parmak izi/PIN akışı bağlandı, version.json güncellendi ve apk/main dalları GitHub'a dağıtıldı.
 - [x] v1.4.2: Gerçek kullanıcı .notevault dosyasının kriptografik başlık analizi ve PIN eşleştirmesi tamamlandı ('2526', AES-256-GCM ZIP arşivi deşifrelendi).
 - [x] v1.4.1: Biyometrik parmak iziyle şifreli yedek geri yükleme, tek butonlu modern yedekleme pop-up'ı, Release APK derlemesi (versionCode: 32, 4.46 MB) ve GitHub apk/main dağıtımı tamamlandı.

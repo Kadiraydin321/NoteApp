@@ -707,6 +707,13 @@ class MainActivity : FragmentActivity() {
                             onToggleFocusSound = viewModel::toggleFocusSound,
                             onSelectFocusSound = viewModel::selectFocusSound,
                             onFocusSoundVolumeChange = viewModel::setFocusSoundVolume,
+                            onToggleTextToSpeech = {
+                                viewModel.toggleTextToSpeech { _, warningMsg ->
+                                    if (warningMsg != null) {
+                                        android.widget.Toast.makeText(this@MainActivity, warningMsg, android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
                             onRestoreVersion = viewModel::restoreNoteVersion,
                             onApplyTemplate = viewModel::applyTemplate,
                             onSaveCustomTemplate = viewModel::saveCurrentAsCustomTemplate,

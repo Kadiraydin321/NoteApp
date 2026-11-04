@@ -48,6 +48,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
@@ -388,6 +389,7 @@ fun NoteDetailScreen(
     onToggleFocusSound: () -> Unit = {},
     onSelectFocusSound: (FocusSoundType) -> Unit = {},
     onFocusSoundVolumeChange: (Float) -> Unit = {},
+    onToggleTextToSpeech: () -> Unit = {},
     onRestoreVersion: (NoteHistory) -> Unit = {},
     onApplyTemplate: (NoteTemplate) -> Unit = {},
     onSaveCustomTemplate: (title: String, description: String, iconEmoji: String) -> Unit = { _, _, _ -> },
@@ -1182,6 +1184,14 @@ fun NoteDetailScreen(
                         }
                     },
                     actions = {
+                        // Sesli Okuma (TTS Hoparlör) Butonu
+                        IconButton(onClick = onToggleTextToSpeech) {
+                            Icon(
+                                imageVector = if (state.isTtsSpeaking) Icons.Default.Stop else Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = if (state.isTtsSpeaking) "Sesli Okumayı Durdur" else "Sesli Oku",
+                                tint = if (state.isTtsSpeaking) MaterialTheme.colorScheme.primary else topBarIconColor
+                            )
+                        }
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
@@ -1297,6 +1307,14 @@ fun NoteDetailScreen(
                         }
                     },
                     actions = {
+                        // Sesli Okuma (TTS Hoparlör) Butonu
+                        IconButton(onClick = onToggleTextToSpeech) {
+                            Icon(
+                                imageVector = if (state.isTtsSpeaking) Icons.Default.Stop else Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = if (state.isTtsSpeaking) "Sesli Okumayı Durdur" else "Sesli Oku",
+                                tint = if (state.isTtsSpeaking) MaterialTheme.colorScheme.primary else topBarIconColor
+                            )
+                        }
                         // Geri Al (Undo) - Yalnızca geri alınabilir bir işlem olduğunda yer kaplar
                         AnimatedVisibility(
                             visible = canUndo,
@@ -2377,6 +2395,8 @@ fun NoteDetailScreen(
                     onSelectSoundType = onSelectFocusSound,
                     onVolumeChange = onFocusSoundVolumeChange,
                     onExitZenMode = onToggleZenMode,
+                    isTtsSpeaking = state.isTtsSpeaking,
+                    onToggleTts = onToggleTextToSpeech,
                     modifier = Modifier.align(Alignment.TopCenter)
                 )
             }
