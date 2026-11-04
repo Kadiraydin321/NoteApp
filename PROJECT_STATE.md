@@ -106,6 +106,12 @@
   - `app/src/main/java/com/example/noteapp/data/sync/QrSyncManager.kt` (Wi-Fi QR eşleşme yöneticisi)
   - `desktop-electron/src/index.html` & `renderer.js` & `styles/main.css` (Dinamik QR eşleşme, optik veri verici modalı, CSS clamp)
 
+### [2026-11-04 22:45] - Tek Tıkla Masaüstü Başlatıcı & Go Engine Entegrasyonu
+- **Değiştirilen ve Eklenen Dosyalar & İşlemler:**
+  - `baslaticilar/Baslat_NotDefterim.bat`: Çift tıklandığında menüsüz, sessiz ve anında derlenmiş native `notdefterim.exe` çalıştıracak şekilde optimize edildi; exe yoksa Go derlemesini otomatik tetikleyip çalıştıran, o da yoksa Microsoft Edge App modunu (`--app=file:///...`) doğrudan açan çok katmanlı fail-safe zincir tamamlandı.
+  - `Baslat_NotDefterim_Desktop.bat`: [1] numaralı seçenek derlenmiş exe önceliği + otomatik Go derlemesi + Edge App modunu kapsayacak şekilde modernize edildi. Menüye [2] Go Native İkili Derleme seçeneği ve [6] Hızlı Teşhis altında Go/Rust/Port kontrolleri eklendi.
+  - `desktop-native/go-engine/main.go`: Isolated user profile ile pencereli Windows masaüstü deneyimi sağlandı; derlenmiş ikili `desktop-native/target/release/notdefterim.exe` (7 MB) hazırlandı.
+
 ### [2026-11-04 22:15] - Miras Desktop Temizliği & Rust Başlatıcı Modernizasyonu
 - **Değiştirilen Dosyalar & İşlemler:**
   - `settings.gradle.kts`: `:desktop` (eski Compose Multiplatform) modülü tamamen kaldırılarak Android projesi (`:app`) bağımsız bırakıldı. `.\gradlew.bat projects` çıktısıyla Android `:app` yapısının eksiksiz ve yeşil olduğu doğrulandı.
@@ -139,6 +145,7 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] v1.4.4: Tek tıkla bağımsız masaüstü motoru (Go/Wry Native Engine) ve anında başlatıcılar (`Baslat_NotDefterim.bat`, `Baslat_NotDefterim_Desktop.bat`) devreye alındı.
 - [x] v1.4.4: Masaüstü %100 saf Rust (Wry / WebView2) mimarisine taşındı; Kotlin Desktop ve Electron modülleri tamamen arındırıldı.
 - [x] v1.4.4: Android v1.4.4 ile %100 özellik eşdeğerliği (SQLite 18 alan, Wikilinks, Kasa, 8765 Sync, 1000x600 sosyal kart, Win32 Anti-screenshot) sağlandı.
 - [x] v1.4.4: `Baslat_NotDefterim_Desktop.bat` yerel Rust başlatıcı olarak yapılandırıldı.

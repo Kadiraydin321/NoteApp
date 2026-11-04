@@ -23,6 +23,13 @@ node_modules/
 **/node_modules/
 desktop-electron/node_modules/
 
+# Executables & binary builds
+*.exe
+*.dll
+*.so
+*.dylib
+go-engine/bin/
+
 # Local databases & temp files
 *.db
 *.db-wal
