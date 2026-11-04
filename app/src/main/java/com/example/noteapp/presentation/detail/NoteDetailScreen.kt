@@ -109,7 +109,6 @@ import com.example.noteapp.domain.util.TagSuggestionEngine
 import com.example.noteapp.domain.util.VaultExportEngine
 import com.example.noteapp.domain.util.VaultNote
 import com.example.noteapp.domain.util.WordGoalCalculator
-import com.example.noteapp.media.FocusSoundType
 import com.example.noteapp.notification.NotificationHelper
 import com.example.noteapp.presentation.components.AttachmentList
 import com.example.noteapp.presentation.components.AutoResizeText
@@ -386,9 +385,6 @@ fun NoteDetailScreen(
     onNavigateToNote: (Long) -> Unit = {},
     onDuplicateNote: () -> Unit = {},
     onToggleZenMode: () -> Unit = {},
-    onToggleFocusSound: () -> Unit = {},
-    onSelectFocusSound: (FocusSoundType) -> Unit = {},
-    onFocusSoundVolumeChange: (Float) -> Unit = {},
     onToggleTextToSpeech: () -> Unit = {},
     onRestoreVersion: (NoteHistory) -> Unit = {},
     onApplyTemplate: (NoteTemplate) -> Unit = {},
@@ -577,7 +573,9 @@ fun NoteDetailScreen(
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    var expandedAccordionSections by rememberSaveable { mutableStateOf(setOf<String>("appearance")) }
+    var showShareOptionsDialog by rememberSaveable { mutableStateOf(false) }
+    var showCategoryColorDialog by rememberSaveable { mutableStateOf(false) }
+    var showMoreToolsDialog by rememberSaveable { mutableStateOf(false) }
 
     // Donanımsal veya jest ile geri tuşuna basıldığında
     BackHandler {
@@ -1068,6 +1066,569 @@ fun NoteDetailScreen(
         )
     }
 
+    if (showShareOptionsDialog) {
+        AlertDialog(
+            onDismissRequest = { showShareOptionsDialog = false },
+            icon = { Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = {
+                Text(
+                    text = "Notu Paylaş & Dışa Aktar",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // 1. Düz Metin
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showShareOptionsDialog = false
+                                shareNote(asMarkdown = false)
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Description,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Düz Metin Olarak Paylaş", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                Text("Başlık ve içeriği yalın metin formatında paylaşır", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // 2. Markdown Metni
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showShareOptionsDialog = false
+                                shareNote(asMarkdown = true)
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Code,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Markdown Olarak Paylaş", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                Text("Biçimlendirmeleri (.md) koruyarak paylaşır", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // 3. PDF Belgesi
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showShareOptionsDialog = false
+                                scope.launch {
+                                    try {
+                                        val categoryName = categories.find { it.id == state.categoryId }?.name
+                                        val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
+                                        val pdfFile = NoteExporter.exportToPdf(
+                                            context = context,
+                                            title = state.title.ifBlank { "Başlıksız Not" },
+                                            content = state.contentValue.text,
+                                            categoryName = categoryName,
+                                            dateFormatted = dateStr
+                                        )
+                                        NoteExporter.shareFile(context, pdfFile, "application/pdf", "PDF Belgesini Paylaş")
+                                    } catch (e: Exception) {
+                                        snackbarHostState.showSnackbar("PDF oluşturulamadı: ${e.localizedMessage}")
+                                    }
+                                }
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.tertiaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.PictureAsPdf,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("PDF Olarak Dışa Aktar", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                Text("Yazdırılabilir veya arşivlenebilir şık PDF oluşturur", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // 4. Not Kartı Görseli
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showShareOptionsDialog = false
+                                scope.launch {
+                                    try {
+                                        val categoryName = categories.find { it.id == state.categoryId }?.name
+                                        val dateStr = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("tr")).format(Date(state.updatedAt))
+                                        val cardFile = NoteExporter.exportToCardImage(
+                                            context = context,
+                                            title = state.title.ifBlank { "Başlıksız Not" },
+                                            content = state.contentValue.text,
+                                            categoryName = categoryName,
+                                            dateFormatted = dateStr
+                                        )
+                                        NoteExporter.shareFile(context, cardFile, "image/png", "Not Kartını Paylaş")
+                                    } catch (e: Exception) {
+                                        snackbarHostState.showSnackbar("Görsel kart oluşturulamadı: ${e.localizedMessage}")
+                                    }
+                                }
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Image,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Not Kartı / Görsel Olarak Paylaş", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                Text("Sosyal medyada paylaşmak için şık görsel kart üretir", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showShareOptionsDialog = false }) {
+                    Text("Kapat")
+                }
+            }
+        )
+    }
+
+    if (showMoreToolsDialog) {
+        AlertDialog(
+            onDismissRequest = { showMoreToolsDialog = false },
+            icon = { Icon(Icons.Default.Build, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = {
+                Text(
+                    text = "Gelişmiş Not Araçları",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // 1. Versiyon Geçmişi & Revizyonlar
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showMoreToolsDialog = false
+                                showHistorySheet = true
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.History,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Versiyon Geçmişi & Revizyonlar", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                Text("Önceki sürümleri inceleyin ve geri yükleyin", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // 2. Şablon Olarak Kaydet
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showMoreToolsDialog = false
+                                showSaveTemplateDialog = true
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Bookmark,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Şablon Olarak Kaydet", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                Text("Bu notu tekrar kullanılabilir şablon yapın", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // 3. Notu Çoğalt (Kopya Oluştur)
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showMoreToolsDialog = false
+                                onDuplicateNote()
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.tertiaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Notu Çoğalt (Kopya Oluştur)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                Text("Notun tam bir kopyasını anında üretin", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // 4. Metin Analitiği & İstatistikler
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showMoreToolsDialog = false
+                                showStatsDialog = true
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.BarChart,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Metin Analitiği & İstatistikler", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                Text("$wordCount kelime, $charCount karakter, ~$readingTime dk okuma", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // 5. Kasa Dosyası Olarak İndir (.notevault)
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showMoreToolsDialog = false
+                                showExportVaultDialog = true
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Kasa Dosyası Olarak İndir (.notevault)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                Text("Şifreli ve bağımsız kasa formatında yedekleyin", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showMoreToolsDialog = false }) {
+                    Text("Kapat")
+                }
+            }
+        )
+    }
+
+    if (showCategoryColorDialog) {
+        AlertDialog(
+            onDismissRequest = { showCategoryColorDialog = false },
+            icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = {
+                Text(
+                    text = "Kategori & Renk Seç",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Not Rengi Bölümü
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Not Rengi",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(NoteColors) { color ->
+                                val argb = if (color == Color.Transparent) 0 else color.toArgb()
+                                val isSelected = state.color == argb
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(if (color == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant else color)
+                                        .border(
+                                            width = if (isSelected) 2.5.dp else 1.dp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                            shape = CircleShape
+                                        )
+                                        .clickable { onColorChange(argb) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (color == Color.Transparent) {
+                                        Icon(
+                                            Icons.Default.FormatColorReset,
+                                            contentDescription = "Varsayılan",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    } else if (isSelected) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                            tint = if (color.luminance() < 0.5f) Color.White else Color.Black
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    // Kategori Bölümü
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Kategori",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            TextButton(
+                                onClick = {
+                                    showCategoryColorDialog = false
+                                    showAddCategoryDialog = true
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Yeni Ekle", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            item {
+                                FilterChip(
+                                    selected = state.categoryId == null,
+                                    onClick = { onCategoryChange(null) },
+                                    label = { Text("Kategorisiz") },
+                                    leadingIcon = if (state.categoryId == null) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else null,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                            }
+                            items(categories) { category ->
+                                val isSelected = state.categoryId == category.id
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { onCategoryChange(if (isSelected) null else category.id) },
+                                    label = {
+                                        Text(category.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    },
+                                    leadingIcon = {
+                                        if (isSelected) {
+                                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        } else if (category.color != 0) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(10.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(category.color))
+                                            )
+                                        } else null
+                                    },
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showCategoryColorDialog = false }) {
+                    Text("Tamam")
+                }
+            }
+        )
+    }
+
     if (revertConfirmPath != null) {
         AlertDialog(
             onDismissRequest = { revertConfirmPath = null },
@@ -1373,14 +1934,6 @@ fun NoteDetailScreen(
                             )
                         }
 
-                        // 2. Odaklanma Modu (Zen) Butonu
-                        IconButton(onClick = onToggleZenMode) {
-                            Icon(
-                                Icons.Default.SelfImprovement,
-                                contentDescription = "Odaklanma Modu (Zen)",
-                                tint = topBarIconColor
-                            )
-                        }
 
                         // 3. Not İçi Arama ve Değiştirme Butonu
                         IconButton(onClick = { isSearchActive = !isSearchActive }) {
@@ -1428,733 +1981,123 @@ fun NoteDetailScreen(
                             DropdownMenu(
                                 expanded = showMoreMenu,
                                 onDismissRequest = { showMoreMenu = false },
-                                modifier = Modifier
-                                    .widthIn(min = 280.dp, max = 340.dp)
-                                    .heightIn(max = 520.dp)
+                                modifier = Modifier.widthIn(min = 250.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    // 🎨 1. GÖRÜNÜM & OKUMA AKORDİYONU
-                                    val isAppearanceExpanded = expandedAccordionSections.contains("appearance")
-                                    DetailMenuAccordionHeader(
-                                        title = "🎨 Görünüm & Okuma",
-                                        icon = Icons.Default.Palette,
-                                        iconColor = MaterialTheme.colorScheme.primary,
-                                        isExpanded = isAppearanceExpanded,
-                                        itemCount = 5 + (if (isSplitSupported) (if (isSplitPaneActive) 2 else 1) else 0) + (if (hasChecklistItems) 1 else 0),
-                                        onClick = {
-                                            expandedAccordionSections = if (isAppearanceExpanded) expandedAccordionSections - "appearance" else expandedAccordionSections + "appearance"
-                                        }
-                                    )
-
-                                    AnimatedVisibility(
-                                        visible = isAppearanceExpanded,
-                                        enter = expandVertically(animationSpec = tween(220)) + fadeIn(animationSpec = tween(180)),
-                                        exit = shrinkVertically(animationSpec = tween(180)) + fadeOut(animationSpec = tween(140))
-                                    ) {
-                                        Column(modifier = Modifier.fillMaxWidth().padding(start = 6.dp)) {
-                                            // Okuma / Sunum Modu
-                                            DropdownMenuItem(
-                                                text = { Text("📖 Okuma / Sunum Modu") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        imageVector = Icons.AutoMirrored.Filled.ChromeReaderMode,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                },
-                                                onClick = {
-                                                    keyboardController?.hide()
-                                                    focusManager.clearFocus()
-                                                    isPreviewMode = false
-                                                    isPresentationMode = true
-                                                    showMoreMenu = false
-                                                }
-                                            )
-
-                                            // Önizleme / Düzenleme Modu
-                                            DropdownMenuItem(
-                                                text = { Text(if (isPreviewMode) "✏️ Düzenleme Moduna Geç" else "👁️ Önizleme Moduna Geç") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        imageVector = if (isPreviewMode) Icons.Default.Edit else Icons.Default.RemoveRedEye,
-                                                        contentDescription = null,
-                                                        tint = if (isPreviewMode) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                                                    )
-                                                },
-                                                onClick = {
-                                                    keyboardController?.hide()
-                                                    focusManager.clearFocus()
-                                                    isPresentationMode = false
-                                                    isPreviewMode = !isPreviewMode
-                                                    showMoreMenu = false
-                                                }
-                                            )
-
-                                            // Odaklanma Modu (Zen)
-                                            DropdownMenuItem(
-                                                text = { Text("🧘 Odaklanma Modu (Zen)") },
-                                                leadingIcon = { Icon(Icons.Default.SelfImprovement, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    onToggleZenMode()
-                                                }
-                                            )
-
-                                            // Çift Bölmeli Canlı Düzenleyici (Split-Pane)
-                                            if (isSplitSupported) {
-                                                DropdownMenuItem(
-                                                    text = { Text(if (isSplitPaneActive) "🪟 Çift Bölmeli Ekranı Kapat" else "🪟 Çift Bölmeli Canlı Düzenleyici") },
-                                                    leadingIcon = {
-                                                        Icon(
-                                                            imageVector = if (isSplitPaneActive) Icons.Default.ViewStream else Icons.Default.VerticalSplit,
-                                                            contentDescription = null,
-                                                            tint = if (isSplitPaneActive) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                                                        )
-                                                    },
-                                                    onClick = {
-                                                        isSplitPaneActive = !isSplitPaneActive
-                                                        showMoreMenu = false
-                                                    }
-                                                )
-                                                if (isSplitPaneActive) {
-                                                    DropdownMenuItem(
-                                                        text = { Text("Bölme Oranı: ${splitRatio.title}") },
-                                                        leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
-                                                        onClick = {
-                                                            splitRatio = when (splitRatio) {
-                                                                SplitRatio.EQUAL -> SplitRatio.WIDE_EDITOR
-                                                                SplitRatio.WIDE_EDITOR -> SplitRatio.WIDE_PREVIEW
-                                                                SplitRatio.WIDE_PREVIEW -> SplitRatio.EQUAL
-                                                            }
-                                                        }
-                                                    )
-                                                }
-                                            }
-
-                                            // Tek / Çift Sütun Okuma Düzeni
-                                            DropdownMenuItem(
-                                                text = { Text(if (isTwoColumnMode) "📰 Tek Sütun Okuma Düzeni" else "📰 Çift Sütun Okuma Düzeni") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        imageVector = if (isTwoColumnMode) Icons.Default.ViewAgenda else Icons.Default.ViewColumn,
-                                                        contentDescription = null,
-                                                        tint = if (isTwoColumnMode) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                                                    )
-                                                },
-                                                onClick = {
-                                                    isTwoColumnMode = !isTwoColumnMode
-                                                    showMoreMenu = false
-                                                }
-                                            )
-
-                                            // Biçim İşaretlerini Gizle / Göster
-                                            DropdownMenuItem(
-                                                text = { Text(if (hideMarkdownTokens) "Biçim İşaretlerini Göster (*, #)" else "Biçim İşaretlerini Gizle (Temiz)") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        imageVector = if (hideMarkdownTokens) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                                        contentDescription = null
-                                                    )
-                                                },
-                                                onClick = {
-                                                    hideMarkdownTokens = !hideMarkdownTokens
-                                                    showMoreMenu = false
-                                                }
-                                            )
-
-                                            // Tamamlananları Alta Taşı
-                                            if (hasChecklistItems) {
-                                                DropdownMenuItem(
-                                                    text = { Text(if (moveCheckedToBottom) "Maddeleri Metin Sırasında Göster" else "Tamamlananları Alta Taşı") },
-                                                    leadingIcon = {
-                                                        Icon(
-                                                            imageVector = if (moveCheckedToBottom) Icons.Default.FormatLineSpacing else Icons.Default.VerticalAlignBottom,
-                                                            contentDescription = null
-                                                        )
-                                                    },
-                                                    onClick = {
-                                                        val sorted = ChecklistSorter.moveCheckedToBottom(state.contentValue.text)
-                                                        onContentValueChange(TextFieldValue(sorted))
-                                                        moveCheckedToBottom = !moveCheckedToBottom
-                                                        showMoreMenu = false
-                                                    }
-                                                )
-                                            }
-                                        }
+                                // 1. 📌 Sabitle / Sabitlemeyi Kaldır
+                                DropdownMenuItem(
+                                    text = { Text(if (state.isPinned) "Sabitlemeyi Kaldır" else "Başa Sabitle") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.PushPin,
+                                            contentDescription = null,
+                                            tint = if (state.isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        onTogglePin()
                                     }
+                                )
 
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                                    // 🔒 2. GÜVENLİK & KASA AKORDİYONU
-                                    val isSecurityExpanded = expandedAccordionSections.contains("security")
-                                    val currentNoteId = state.currentNoteId ?: 0L
-                                    val hasSavedNote = currentNoteId > 0L
-                                    val isStickyActive = if (hasSavedNote) {
-                                        remember(showMoreMenu, currentNoteId) {
-                                            NotificationHelper(context).isStickyNotificationActive(currentNoteId)
-                                        }
-                                    } else false
-
-                                    DetailMenuAccordionHeader(
-                                        title = "🔒 Güvenlik & Kasa",
-                                        icon = Icons.Default.Lock,
-                                        iconColor = Color(0xFF2E7D32),
-                                        isExpanded = isSecurityExpanded,
-                                        itemCount = 4 + (if (hasSavedNote) 3 else 0),
-                                        onClick = {
-                                            expandedAccordionSections = if (isSecurityExpanded) expandedAccordionSections - "security" else expandedAccordionSections + "security"
-                                        }
-                                    )
-
-                                    AnimatedVisibility(
-                                        visible = isSecurityExpanded,
-                                        enter = expandVertically(animationSpec = tween(220)) + fadeIn(animationSpec = tween(180)),
-                                        exit = shrinkVertically(animationSpec = tween(180)) + fadeOut(animationSpec = tween(140))
-                                    ) {
-                                        Column(modifier = Modifier.fillMaxWidth().padding(start = 6.dp)) {
-                                            // Notu Kilitle / Kilidi Kaldır
-                                            DropdownMenuItem(
-                                                text = { Text(if (state.isLocked) "Kilidi Kaldır" else "Notu Kilitle") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        imageVector = if (state.isLocked) Icons.Default.LockOpen else Icons.Default.Lock,
-                                                        contentDescription = null,
-                                                        tint = if (state.isLocked) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    onToggleLock()
-                                                }
-                                            )
-
-                                            // Versiyon Geçmişi
-                                            DropdownMenuItem(
-                                                text = { Text("🕒 Versiyon Geçmişi (${state.noteHistoryList.size})") },
-                                                leadingIcon = { Icon(Icons.Default.History, contentDescription = null) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showHistorySheet = true
-                                                }
-                                            )
-
-                                            // Notu Çoğalt (Duplicate Note)
-                                            DropdownMenuItem(
-                                                text = { Text("📋 Notu Çoğalt") },
-                                                leadingIcon = { Icon(Icons.Default.CopyAll, contentDescription = null) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    onDuplicateNote()
-                                                }
-                                            )
-
-                                            // Şifreli Kasa (.notevault) Olarak Dışa Aktar
-                                            DropdownMenuItem(
-                                                text = { Text("🔒 Şifreli Kasa (.notevault) Olarak Aktar") },
-                                                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showExportVaultDialog = true
-                                                }
-                                            )
-
-                                            if (hasSavedNote) {
-                                                // Bildirime Sabitle
-                                                DropdownMenuItem(
-                                                    text = { Text(if (isStickyActive) "📌 Bildirim Sabitlemesini Kaldır" else "📌 Bildirime Sabitle (Kalıcı Not)") },
-                                                    leadingIcon = {
-                                                        Icon(
-                                                            imageVector = if (isStickyActive) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                                                            contentDescription = null,
-                                                            tint = if (isStickyActive) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                                                        )
-                                                    },
-                                                    onClick = {
-                                                        showMoreMenu = false
-                                                        val notificationHelper = NotificationHelper(context)
-                                                        if (isStickyActive) {
-                                                            notificationHelper.cancelStickyNotification(currentNoteId)
-                                                            Toast.makeText(context, "📌 Bildirim sabitlemesi kaldırıldı", Toast.LENGTH_SHORT).show()
-                                                        } else {
-                                                            notificationHelper.showStickyNotification(
-                                                                noteId = currentNoteId,
-                                                                title = state.title,
-                                                                content = state.contentValue.text
-                                                            )
-                                                            Toast.makeText(context, "📌 Not bildirim çubuğuna sabitlendi", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    }
-                                                )
-
-                                                // Ana Ekrana Kısayol Ekle
-                                                DropdownMenuItem(
-                                                    text = { Text("📱 Ana Ekrana Kısayol Ekle") },
-                                                    leadingIcon = {
-                                                        Icon(
-                                                            imageVector = Icons.Default.PushPin,
-                                                            contentDescription = null,
-                                                            tint = MaterialTheme.colorScheme.secondary
-                                                        )
-                                                    },
-                                                    onClick = {
-                                                        showMoreMenu = false
-                                                        val success = AppShortcutManager.pinNoteToHomeScreen(
-                                                            context = context,
-                                                            noteId = currentNoteId,
-                                                            noteTitle = state.title
-                                                        )
-                                                        if (success) {
-                                                            Toast.makeText(context, "Kısayol ana ekrana eklendi", Toast.LENGTH_SHORT).show()
-                                                        } else {
-                                                            Toast.makeText(context, "Ana ekrana kısayol ekleme bu cihazda desteklenmiyor", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    }
-                                                )
-
-                                                // Arşivle / Arşivden Çıkar
-                                                DropdownMenuItem(
-                                                    text = { Text(if (state.isArchived) "📦 Arşivden Çıkar" else "📦 Arşivle") },
-                                                    leadingIcon = {
-                                                        Icon(
-                                                            imageVector = if (state.isArchived) Icons.Default.Unarchive else Icons.Default.Archive,
-                                                            contentDescription = null
-                                                        )
-                                                    },
-                                                    onClick = {
-                                                        showMoreMenu = false
-                                                        onArchiveNoteClick()
-                                                    }
-                                                )
-                                            }
-                                        }
+                                // 2. 🔒 Kasa Kilidi ile Koru
+                                DropdownMenuItem(
+                                    text = { Text(if (state.isLocked) "Kasa Kilidini Kaldır" else "Kasa Kilidi ile Koru") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = if (state.isLocked) Icons.Default.LockOpen else Icons.Default.Lock,
+                                            contentDescription = null,
+                                            tint = if (state.isLocked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        onToggleLock()
                                     }
+                                )
 
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                                    // 📤 3. PAYLAŞ & DIŞA AKTAR AKORDİYONU
-                                    val isExportExpanded = expandedAccordionSections.contains("export")
-                                    DetailMenuAccordionHeader(
-                                        title = "📤 Paylaş & Dışa Aktar",
-                                        icon = Icons.Default.Share,
-                                        iconColor = Color(0xFF1976D2),
-                                        isExpanded = isExportExpanded,
-                                        itemCount = 7,
-                                        onClick = {
-                                            expandedAccordionSections = if (isExportExpanded) expandedAccordionSections - "export" else expandedAccordionSections + "export"
-                                        }
-                                    )
-
-                                    AnimatedVisibility(
-                                        visible = isExportExpanded,
-                                        enter = expandVertically(animationSpec = tween(220)) + fadeIn(animationSpec = tween(180)),
-                                        exit = shrinkVertically(animationSpec = tween(180)) + fadeOut(animationSpec = tween(140))
-                                    ) {
-                                        Column(modifier = Modifier.fillMaxWidth().padding(start = 6.dp)) {
-                                            // PDF Olarak Paylaş
-                                            DropdownMenuItem(
-                                                text = { Text("📄 PDF Olarak Paylaş") },
-                                                leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    try {
-                                                        val categoryName = categories.find { it.id == state.categoryId }?.name
-                                                        val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
-                                                        val pdfFile = NoteExporter.exportToPdf(
-                                                            context = context,
-                                                            title = state.title,
-                                                            content = state.contentValue.text,
-                                                            categoryName = categoryName,
-                                                            dateFormatted = dateStr,
-                                                            tags = state.extractedTags
-                                                        )
-                                                        NoteExporter.shareFile(context, pdfFile, "application/pdf", "PDF Belgesini Paylaş")
-                                                    } catch (e: Exception) {
-                                                        Toast.makeText(context, "PDF oluşturulamadı: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            )
-
-                                            // PDF'i İndirilenler'e Kaydet
-                                            DropdownMenuItem(
-                                                text = { Text("💾 PDF'i İndirilenler'e Kaydet") },
-                                                leadingIcon = { Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    try {
-                                                        val categoryName = categories.find { it.id == state.categoryId }?.name
-                                                        val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
-                                                        val pdfFile = NoteExporter.exportToPdf(
-                                                            context = context,
-                                                            title = state.title,
-                                                            content = state.contentValue.text,
-                                                            categoryName = categoryName,
-                                                            dateFormatted = dateStr,
-                                                            tags = state.extractedTags
-                                                        )
-                                                        val savedUri = NoteExporter.saveToDownloads(context, pdfFile, "application/pdf")
-                                                        if (savedUri != null) {
-                                                            Toast.makeText(context, "PDF İndirilenler/NotDefterim klasörüne kaydedildi", Toast.LENGTH_LONG).show()
-                                                        } else {
-                                                            Toast.makeText(context, "Dosya kaydedilemedi", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    } catch (e: Exception) {
-                                                        Toast.makeText(context, "Hata: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            )
-
-                                            // Markdown Olarak Paylaş
-                                            DropdownMenuItem(
-                                                text = { Text("📋 Markdown Olarak Paylaş") },
-                                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    shareNote(asMarkdown = true)
-                                                }
-                                            )
-
-                                            // Düz Metin (.txt) Olarak Paylaş
-                                            DropdownMenuItem(
-                                                text = { Text("📝 Düz Metin (.txt) Olarak Paylaş") },
-                                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    try {
-                                                        val categoryName = categories.find { it.id == state.categoryId }?.name
-                                                        val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
-                                                        val txtFile = NoteExporter.exportToTxt(
-                                                            context = context,
-                                                            title = state.title,
-                                                            content = state.contentValue.text,
-                                                            categoryName = categoryName,
-                                                            dateFormatted = dateStr
-                                                        )
-                                                        NoteExporter.shareFile(context, txtFile, "text/plain", "Metin Dosyasını Paylaş")
-                                                    } catch (e: Exception) {
-                                                        Toast.makeText(context, "Dosya oluşturulamadı: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            )
-
-                                            // Web Sayfası (.html) Olarak Paylaş
-                                            DropdownMenuItem(
-                                                text = { Text("🌐 Web Sayfası (.html) Olarak Paylaş") },
-                                                leadingIcon = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    try {
-                                                        val categoryName = categories.find { it.id == state.categoryId }?.name
-                                                        val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
-                                                        val htmlFile = NoteExporter.exportToHtml(
-                                                            context = context,
-                                                            title = state.title,
-                                                            content = state.contentValue.text,
-                                                            categoryName = categoryName,
-                                                            dateFormatted = dateStr,
-                                                            tags = state.extractedTags
-                                                        )
-                                                        NoteExporter.shareFile(context, htmlFile, "text/html", "HTML Dokümanını Paylaş")
-                                                    } catch (e: Exception) {
-                                                        Toast.makeText(context, "HTML oluşturulamadı: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            )
-
-                                            // HTML'i İndirilenler'e Kaydet
-                                            DropdownMenuItem(
-                                                text = { Text("💾 HTML'i İndirilenler'e Kaydet") },
-                                                leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    try {
-                                                        val categoryName = categories.find { it.id == state.categoryId }?.name
-                                                        val dateStr = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(state.updatedAt))
-                                                        val htmlFile = NoteExporter.exportToHtml(
-                                                            context = context,
-                                                            title = state.title,
-                                                            content = state.contentValue.text,
-                                                            categoryName = categoryName,
-                                                            dateFormatted = dateStr,
-                                                            tags = state.extractedTags
-                                                        )
-                                                        val savedUri = NoteExporter.saveToDownloads(context, htmlFile, "text/html")
-                                                        if (savedUri != null) {
-                                                            Toast.makeText(context, "HTML İndirilenler/NotDefterim klasörüne kaydedildi", Toast.LENGTH_LONG).show()
-                                                        } else {
-                                                            Toast.makeText(context, "Dosya kaydedilemedi", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    } catch (e: Exception) {
-                                                        Toast.makeText(context, "Hata: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            )
-
-                                            // Akıllı Panoya Kopyala
-                                            DropdownMenuItem(
-                                                text = { Text("⚡ Akıllı Panoya Kopyala") },
-                                                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-                                                onClick = {
-                                                    showSmartCopySheet = true
-                                                    showMoreMenu = false
-                                                }
-                                            )
-                                        }
+                                // 3. 📖 Okuma / Sunum Modu
+                                DropdownMenuItem(
+                                    text = { Text(if (isPresentationMode) "Okuma Modunu Kapat" else "Okuma / Sunum Modu") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ChromeReaderMode,
+                                            contentDescription = null,
+                                            tint = if (isPresentationMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        keyboardController?.hide()
+                                        focusManager.clearFocus()
+                                        isPresentationMode = !isPresentationMode
                                     }
+                                )
 
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                                    // 🛠️ 4. ARAÇLAR & ŞABLONLAR AKORDİYONU
-                                    val isToolsExpanded = expandedAccordionSections.contains("tools")
-                                    DetailMenuAccordionHeader(
-                                        title = "🛠️ Araçlar & Şablonlar",
-                                        icon = Icons.Default.Build,
-                                        iconColor = Color(0xFFF57C00),
-                                        isExpanded = isToolsExpanded,
-                                        itemCount = 14,
-                                        onClick = {
-                                            expandedAccordionSections = if (isToolsExpanded) expandedAccordionSections - "tools" else expandedAccordionSections + "tools"
-                                        }
-                                    )
-
-                                    AnimatedVisibility(
-                                        visible = isToolsExpanded,
-                                        enter = expandVertically(animationSpec = tween(220)) + fadeIn(animationSpec = tween(180)),
-                                        exit = shrinkVertically(animationSpec = tween(180)) + fadeOut(animationSpec = tween(140))
-                                    ) {
-                                        Column(modifier = Modifier.fillMaxWidth().padding(start = 6.dp)) {
-                                            // Şablon Uygula
-                                            DropdownMenuItem(
-                                                text = { Text("✨ Şablon Uygula") },
-                                                leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showTemplateSheet = true
-                                                }
-                                            )
-
-                                            // Şablon Olarak Kaydet
-                                            DropdownMenuItem(
-                                                text = { Text("💾 Şablon Olarak Kaydet") },
-                                                leadingIcon = { Icon(Icons.Default.BookmarkAdd, contentDescription = null) },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showSaveTemplateDialog = true
-                                                }
-                                            )
-
-                                            // Hatırlatıcı Ekle / Düzenle
-                                            DropdownMenuItem(
-                                                text = { Text(if (state.reminderTime != null) "⏰ Hatırlatıcıyı Düzenle" else "⏰ Hatırlatıcı Ekle") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        imageVector = if (state.reminderTime != null) Icons.Default.AlarmOn else Icons.Default.AddAlert,
-                                                        contentDescription = null,
-                                                        tint = if (state.reminderTime != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showDateTimePicker()
-                                                    showMoreMenu = false
-                                                }
-                                            )
-
-                                            // Kelime Hedefi Belirle
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        if (state.wordGoal != null) "🎯 Kelime Hedefi (${state.wordGoal} kelime)"
-                                                        else "🎯 Kelime Hedefi Belirle"
-                                                    )
-                                                },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        Icons.Default.TrackChanges,
-                                                        contentDescription = null,
-                                                        tint = if (state.wordGoal != null) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showWordGoalDialog = true
-                                                }
-                                            )
-
-                                            // Not Analizi & Metrikler
-                                            DropdownMenuItem(
-                                                text = { Text("📊 Not Analizi & Metrikler") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        Icons.Default.Analytics,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showInsightsSheet = true
-                                                }
-                                            )
-
-                                            // Not İstatistikleri
-                                            DropdownMenuItem(
-                                                text = { Text("📈 Not İstatistikleri") },
-                                                leadingIcon = { Icon(Icons.Default.Analytics, contentDescription = null) },
-                                                onClick = {
-                                                    showStatsDialog = true
-                                                    showMoreMenu = false
-                                                }
-                                            )
-
-                                            // Akıllı Not Özeti & Çıkarımlar
-                                            DropdownMenuItem(
-                                                text = { Text("🤖 Akıllı Not Özeti & Çıkarımlar") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        Icons.Default.AutoAwesome,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showSummarySheet = true
-                                                }
-                                            )
-
-                                            // Not Bağlantı Haritası (Graf)
-                                            DropdownMenuItem(
-                                                text = { Text("🕸️ Not Bağlantı Haritası (Graf)") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        Icons.Default.Hub,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.secondary
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showGraphSheet = true
-                                                }
-                                            )
-
-                                            // İçindekiler Tablosu (Başlıklar)
-                                            DropdownMenuItem(
-                                                text = { Text("📑 İçindekiler Tablosu (Başlıklar)") },
-                                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                                onClick = {
-                                                    showOutlineDialog = true
-                                                    showMoreMenu = false
-                                                }
-                                            )
-
-                                            // Görev Listesi İşlemleri (Checklist Suite)
-                                            DropdownMenuItem(
-                                                text = { Text("📋 Görev Listesi İşlemleri") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        Icons.Default.Checklist,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showChecklistActionsSheet = true
-                                                }
-                                            )
-
-                                            // Görev Panosu (Kanban)
-                                            DropdownMenuItem(
-                                                text = { Text("🗂️ Görev Panosu (Kanban)") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        Icons.Default.PendingActions,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showTaskBoardSheet = true
-                                                }
-                                            )
-
-                                            // Hızlı Metin Parçacıkları & Makrolar
-                                            DropdownMenuItem(
-                                                text = { Text("⚡ Metin Parçacıkları (Makrolar)") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        Icons.Default.Bolt,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showSnippetPickerSheet = true
-                                                }
-                                            )
-
-                                            // Matematik & LaTeX Formülü
-                                            DropdownMenuItem(
-                                                text = { Text("🧮 Matematik & LaTeX Formülü") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        Icons.Default.Functions,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showMoreMenu = false
-                                                    showMathFormulaSheet = true
-                                                }
-                                            )
-
-                                            // Onay Kutularına Dönüştür / Kaldır
-                                            DropdownMenuItem(
-                                                text = { Text(if (hasChecklistItems) "☑️ Onay Kutularını Kaldır" else "☑️ Onay Kutularına Dönüştür") },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        imageVector = if (hasChecklistItems) Icons.Default.CheckBoxOutlineBlank else Icons.Default.CheckBox,
-                                                        contentDescription = null
-                                                    )
-                                                },
-                                                onClick = {
-                                                    val currentText = state.contentValue.text
-                                                    if (hasChecklistItems) {
-                                                        val stripped = stripChecklist(currentText)
-                                                        onContentValueChange(TextFieldValue(stripped, selection = TextRange(stripped.length)))
-                                                    } else {
-                                                        val converted = convertToChecklist(currentText)
-                                                        onContentValueChange(TextFieldValue(converted, selection = TextRange(converted.length)))
-                                                    }
-                                                    showMoreMenu = false
-                                                }
-                                            )
-                                        }
+                                // 4. 📤 Paylaş & Dışa Aktar (Pop-up Açar)
+                                DropdownMenuItem(
+                                    text = { Text("Paylaş & Dışa Aktar...") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Share,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showShareOptionsDialog = true
                                     }
+                                )
 
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                // 5. 🏷️ Kategori & Renk Seç (Pop-up Açar)
+                                DropdownMenuItem(
+                                    text = { Text("Kategori & Renk Seç...") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Palette,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showCategoryColorDialog = true
+                                    }
+                                )
 
-                                    // Notu Sil (Menü içi hızlı silme)
-                                    DropdownMenuItem(
-                                        text = { Text("Notu Sil", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold) },
-                                        leadingIcon = {
-                                            Icon(
-                                                Icons.Default.Delete,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.error
-                                            )
-                                        },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showDeleteConfirmDialog = true
-                                        }
-                                    )
-                                }
+                                // 6. 🛠️ Diğer Özellikler & Araçlar (Pop-up Açar)
+                                DropdownMenuItem(
+                                    text = { Text("Diğer Özellikler & Araçlar...") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Build,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showMoreToolsDialog = true
+                                    }
+                                )
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                                // 7. 🗑️ Notu Sil (Kırmızı Vurgulu)
+                                DropdownMenuItem(
+                                    text = { Text("Notu Sil", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold) },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showDeleteConfirmDialog = true
+                                    }
+                                )
                             }
                         }
                     }
@@ -2389,11 +2332,6 @@ fun NoteDetailScreen(
                 FocusHudOverlay(
                     wordCount = currentWordCount,
                     characterCount = currentCharCount,
-                    isSoundPlaying = state.isSoundPlaying,
-                    currentSoundType = state.currentFocusSound,
-                    onToggleSound = onToggleFocusSound,
-                    onSelectSoundType = onSelectFocusSound,
-                    onVolumeChange = onFocusSoundVolumeChange,
                     onExitZenMode = onToggleZenMode,
                     isTtsSpeaking = state.isTtsSpeaking,
                     onToggleTts = onToggleTextToSpeech,
@@ -4088,77 +4026,3 @@ fun NoteDetailScreen(
     }
 }
 
-@Composable
-private fun DetailMenuAccordionHeader(
-    title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconColor: Color,
-    isExpanded: Boolean,
-    itemCount: Int,
-    onClick: () -> Unit
-) {
-    val rotation by animateFloatAsState(
-        targetValue = if (isExpanded) 180f else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "accordion_arrow_rotation"
-    )
-
-    Surface(
-        onClick = onClick,
-        color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent,
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconColor,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = if (isExpanded) FontWeight.Bold else FontWeight.SemiBold,
-                    color = if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                ) {
-                    Text(
-                        text = "$itemCount",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Icon(
-                    imageVector = Icons.Default.ExpandMore,
-                    contentDescription = if (isExpanded) "Kapat" else "Genişlet",
-                    modifier = Modifier
-                        .size(20.dp)
-                        .rotate(rotation),
-                    tint = if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}

@@ -1,7 +1,7 @@
 # 📌 Proje Durumu & Hafıza Kartı (PROJECT_STATE)
 
-**Son Güncelleme:** 2026-11-04 17:00
-**Aktif Sürüm / Durum:** v1.4.3 / Kararlı & Emülatör Doğrulamalı
+**Son Güncelleme:** 2026-11-04 20:30
+**Aktif Sürüm / Durum:** v1.4.4 (versionCode 35) / Kararlı & Emülatör Doğrulamalı
 **Teknoloji Yığını:** Rust Wry / Tauri (`desktop-native`), Node.js / Electron 33 (`desktop-electron`), Kotlin Jetpack Compose Room SQLite (`app` Android), Compose Multiplatform (`desktop`), CameraX & ML Kit Barcode, Vanilla JS, CSS3 Glassmorphism
 
 ---
@@ -29,7 +29,13 @@
 ## 2. ⚡ Aktif ve Tamamlanmış Özellikler
 - [x] **Otomatik & Yedekli Uygulama İçi Güncelleme (In-App Update Pipeline):** `AppUpdateManager` ile `apk` ve `main` dalları üzerinden çift kanallı `version.json` denetimi, arka planda kesintisiz indirme ve Android `FileProvider` ile tek tıkla doğrudan APK kurulumu.
 - [x] **Okuma Modu Onarımı & Geliştirmesi:** Markdown render ve koyu tema zıtlık kontrast sorunu çözüldü, üst çubuğa doğrudan erişilebilir Okuma Modu butonu eklendi, font boyutu (A-/A+) ve satır aralığı ölçekleyici optimize edildi.
-- [x] **3 Nokta Menüsü Akordiyon Mimarisi:** Karmaşık 30+ maddelik menü 4 ana akordiyon başlığı altında ("Görünüm & Okuma", "Güvenlik & Kasa", "Paylaş & Dışa Aktar", "Araçlar & Şablonlar") `AnimatedVisibility`, akıcı geçişler ve taşma önleyici dikey kaydırma (`verticalScroll`) ile yeniden yapılandırıldı.
+- [x] **Yalınlaştırılmış 3 Nokta Ana Eylemler Menüsü & Pop-up Mimarisi:** Karmaşık akordiyon katmanları arındırılarak doğrudan erişilebilir ana eylemler listesine dönüştürüldü; Paylaş ve Araçlar özelleştirilmiş alt pop-up pencerelerine delege edildi.
+- [x] **Notu Paylaş & Dışa Aktar Pop-up'ı (`ShareOptionsDialog`):** Düz Metin, Markdown, PDF Belgesi ve Not Kartı PNG formatlarında tek tıkla paylaşım ve dışa aktarma modülü.
+- [x] **Gelişmiş Not Araçları Pop-up'ı (`MoreToolsDialog`):** Versiyon Geçmişi, Şablon Olarak Kaydet, Notu Çoğalt, Metin İstatistikleri ve .notevault Kasa İndirme işlemlerini tek pencerede toplayan modern arayüz.
+- [x] **Kategori & Renk Seçim Pop-up'ı:** Not düzenleme arayüzünü ferahlatan, renk paleti ve kategori etiketlerini pop-up modal üzerinden yöneten yapı.
+- [x] **Kullanıcı .notevault Kasa Entegrasyonu & Biyometrik Parmak İzi:** Kullanıcının 2526 şifreli kasası çözümlendi; gereksiz kör onay diyalogları kaldırılarak tek dokunuşla parmak izi/PIN ile doğrudan kilit açma sağlandı.
+- [x] **Masaüstü Electron Senkronizasyonu (Port 8765):** `desktop-electron` uygulaması başlatıldı, LAN Wi-Fi HTTP 8765 REST senkronizasyonu çift yönlü hazırlandı.
+- [x] **Odaklanma/Meditasyon Modülü Temizliği:** Kullanıcı deneyimini sadeleştirmek amacıyla yoga/meditasyon ikonu ve arka plan ortam sesleri motoru tamamen kod tabanından silindi.
 - [x] **Responsive & Auto-Sizing Tasarım (Taşma Koruması):** `AutoResizeText.kt` dinamik yazı boyutu bileşeni, CSS `clamp()` ve `text-overflow: ellipsis` Android ve Masaüstü arayüzlerine entegre edildi. Metin taşmaları yerine font otomatik küçülerek tasarım korunuyor.
 - [x] **Masaüstü QR Kod Eşleştirme & Wi-Fi Senkronizasyonu:** Masaüstünde dinamik yerel IP, port 8765 ve PIN içeren QR kod oluşturucu; Android'de kamerayla tarayıp sıfır yapılandırmayla anında çift yönlü LAN Wi-Fi eşleşmesi.
 - [x] **Kamera ile Animasyonlu Optik Veri Aktarımı (Air-Gapped Optical Stream):** Masaüstünde verilerin 220 karakterlik parçalar halinde yüksek hızlı (10-15 FPS) 2D barkod akışı olarak yüzdelik göstergeyle oynatılması; Android kamerasında CameraX ve ML Kit ile kareleri toplayıp CRC32 ile birleştirerek çevrimdışı/ağsız not aktarımı.
@@ -44,6 +50,23 @@
 ---
 
 ## 3. 📝 Son Değişiklikler ve Sürüm Günlüğü (Changelog)
+
+### [2026-11-04 20:30] - v1.4.4 (versionCode 35): 3 Nokta Menüsü Sadeleştirme, Pop-up Modülleri, Şifresiz/Biyometrik Kasa ve Electron Masaüstü Senkronizasyonu
+- **Eklenen ve İyileştirilen Özellikler:**
+  - **Masaüstü Electron Senkronizasyon Başlatıcı:** `desktop-electron` uygulaması çalıştırıldı; Port 8765 üzerinde HTTP REST LAN senkronizasyonu hazırlandı.
+  - **3 Nokta Menüsü Sadeleştirme:** Karmaşık akordiyon yapısı yerine doğrudan tıklanabilir ana eylemler menüsüne dönüştürüldü; dikey kaydırma ve pop-up tetikleyiciler entegre edildi.
+  - **Notu Paylaş & Dışa Aktar Pop-up'ı (`ShareOptionsDialog`):** Düz Metin, Markdown (.md), PDF Belgesi ve görsel Not Kartı (PNG) dışa aktarımı tek pop-up diyalogda toplandı.
+  - **Gelişmiş Not Araçları Pop-up'ı (`MoreToolsDialog`):** Versiyon Geçmişi, Şablon Olarak Kaydet, Notu Çoğalt, Metin İstatistikleri ve .notevault Kasa İndirme eylemleri ayrı bir alt araç modalına taşındı.
+  - **Kategori & Renk Seçim Pop-up'ı:** Not detay arayüzündeki kalabalık önlenerek renk ve kategori seçimi modern bir pop-up diyalog ile ayrıştırıldı.
+  - **Kasa Şifresi ve Biyometrik Giriş Optimizasyonu:** Kullanıcının 2526 şifreli .notevault kasası çözümlendi; kör onay diyaloğu kaldırılarak parmak izi / biyometrik doğrulama ile doğrudan ve kesintisiz kilit açma sağlandı.
+  - **Gereksiz Meditasyon/Yoga ve Ses Motoru Kaldırıldı:** Odaklanma sesleri ve yoga ikonu kod tabanından arındırılarak uygulamanın bellek ve boyut verimliliği artırıldı.
+- **Değiştirilen ve Eklenen Dosyalar:**
+  - `app/src/main/java/com/example/noteapp/presentation/detail/NoteDetailScreen.kt` (3 nokta menü, pop-up tetikleyicileri, yoga ikonu temizliği)
+  - `app/src/main/java/com/example/noteapp/presentation/detail/dialogs/ShareOptionsDialog.kt` (Paylaş ve dışa aktar pop-up)
+  - `app/src/main/java/com/example/noteapp/presentation/detail/dialogs/MoreToolsDialog.kt` (Gelişmiş araçlar pop-up)
+  - `app/src/main/java/com/example/noteapp/presentation/components/CategoryColorPicker.kt`
+  - `app/src/main/java/com/example/noteapp/presentation/settings/SettingsScreen.kt` & `SettingsViewModel.kt` (Biyometrik kasa akışı)
+  - `desktop-electron/` (Port 8765 senkronizasyon sunucusu aktif)
 
 ### [2026-11-04 17:00] - v1.4.0: Okuma Modu, Akordiyon Menü Mimarisi, Auto-Sizing, QR Kod Eşleştirme, Optik Veri Akışı ve Canlı Emülatör Doğrulaması
 - **Eklenen ve İyileştirilen Özellikler:**
@@ -89,6 +112,9 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] v1.4.4: 3 nokta menüsü sadeleştirildi, ShareOptionsDialog, MoreToolsDialog ve Kategori/Renk pop-up'ları eklendi.
+- [x] v1.4.4: Meditasyon/yoga ve odaklanma ses motoru arındırıldı; .notevault (2526) biyometrik şifresiz açılış sağlandı.
+- [x] v1.4.4: Masaüstü Electron başlatıldı, Port 8765 senkronizasyonu doğrulandı, Release APK (versionCode: 35) hazırlandı.
 - [x] v1.4.3: Sesli okuma (Text-to-Speech / TTS) motoru, Android 11+ paket görünürlüğü, Focus HUD overlay buton geri bildirimi, Release APK derlemesi (versionCode: 34, 4.25 MB) ve GitHub apk/main dağıtımı tamamlandı.
 - [x] v1.4.2: Release APK derlendi (versionCode: 33, 4.25 MB), kör [Tamam] diyaloğu kaldırılarak doğrudan parmak izi/PIN akışı bağlandı, version.json güncellendi ve apk/main dalları GitHub'a dağıtıldı.
 - [x] v1.4.2: Gerçek kullanıcı .notevault dosyasının kriptografik başlık analizi ve PIN eşleştirmesi tamamlandı ('2526', AES-256-GCM ZIP arşivi deşifrelendi).

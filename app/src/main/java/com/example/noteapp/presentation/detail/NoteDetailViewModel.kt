@@ -18,8 +18,8 @@ import com.example.noteapp.data.template.TemplateManager
 import com.example.noteapp.media.AudioPlayer
 import com.example.noteapp.media.AudioRecorder
 import com.example.noteapp.media.FileStorageHelper
-import com.example.noteapp.media.FocusAudioSynthesizer
-import com.example.noteapp.media.FocusSoundType
+
+
 import com.example.noteapp.media.TextToSpeechHelper
 import com.example.noteapp.notification.AlarmScheduler
 import com.example.noteapp.data.settings.AppSettingsManager
@@ -81,9 +81,9 @@ data class NoteDetailState(
     val extractedWikilinks: List<String> = emptyList(),
     val extractedTags: List<String> = emptyList(),
     val isZenMode: Boolean = false,
-    val isSoundPlaying: Boolean = false,
+
     val isTtsSpeaking: Boolean = false,
-    val currentFocusSound: FocusSoundType = FocusSoundType.PINK_NOISE,
+
     val noteHistoryList: List<NoteHistory> = emptyList(),
     val audioPlaybackSpeed: Float = 1.0f,
     val recordingDurationSec: Int = 0,
@@ -108,7 +108,7 @@ class NoteDetailViewModel @Inject constructor(
     private val settingsManager: AppSettingsManager,
     private val cryptoManager: NoteCryptoManager,
     private val templateManager: TemplateManager,
-    private val focusAudioSynthesizer: FocusAudioSynthesizer,
+
     private val noteGoalManager: NoteGoalManager,
     private val ttsHelper: TextToSpeechHelper,
     savedStateHandle: SavedStateHandle
@@ -1169,35 +1169,9 @@ class NoteDetailViewModel @Inject constructor(
         }
     }
 
-    // Odaklanma (Zen) Modu & Rahatlatıcı Ortam Sesi
+    // Odaklanma & Pomodoro Modu
     fun toggleZenMode() {
-        val nextMode = !_state.value.isZenMode
-        _state.value = _state.value.copy(isZenMode = nextMode)
-        if (!nextMode && _state.value.isSoundPlaying) {
-            focusAudioSynthesizer.stop()
-            _state.value = _state.value.copy(isSoundPlaying = false)
-        }
-    }
-
-    fun toggleFocusSound() {
-        if (_state.value.isSoundPlaying) {
-            focusAudioSynthesizer.stop()
-            _state.value = _state.value.copy(isSoundPlaying = false)
-        } else {
-            focusAudioSynthesizer.start(_state.value.currentFocusSound)
-            _state.value = _state.value.copy(isSoundPlaying = true)
-        }
-    }
-
-    fun selectFocusSound(soundType: FocusSoundType) {
-        _state.value = _state.value.copy(currentFocusSound = soundType)
-        if (_state.value.isSoundPlaying) {
-            focusAudioSynthesizer.start(soundType)
-        }
-    }
-
-    fun setFocusSoundVolume(volume: Float) {
-        focusAudioSynthesizer.setVolume(volume)
+        _state.value = _state.value.copy(isZenMode = !_state.value.isZenMode)
     }
 
     fun toggleTextToSpeech(onFeedback: ((isSpeaking: Boolean, warningMessage: String?) -> Unit)? = null): Boolean {
@@ -1289,7 +1263,7 @@ class NoteDetailViewModel @Inject constructor(
         playbackJob?.cancel()
         audioPlayer.release()
         ttsHelper.stop()
-        focusAudioSynthesizer.stop()
+
         audioRecorder.release()
         checkAndDiscardIfEmptyOrSave()
     }

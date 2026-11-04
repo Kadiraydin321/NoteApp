@@ -1,8 +1,8 @@
 {
-  "versionCode": 34,
-  "versionName": "1.4.3",
-  "buildTime": 1730745200,
+  "versionCode": 35,
+  "versionName": "1.4.4",
+  "buildTime": 1730752000,
   "releaseDate": "04.11.2026",
-  "changeLog": "v1.4.3: Sesli okuma (Text-to-Speech / TTS) motoru, Android 11+ servis görünürlüğü, oynat/durdur buton geri bildirimi ve Markdown konuşma temizleyicisi entegre edildi.",
+  "changeLog": "v1.4.4: 3 nokta pop-up menü, gelişmiş araçlar pop-up'ı, TTS sesli okuma onarımı, yoga sesi temizliği ve kasa şifre optimizasyonu.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }

@@ -704,9 +704,9 @@ class MainActivity : FragmentActivity() {
                             onClearJustEditedImage = { justEditedImagePath = null },
                             onFontSizeChange = viewModel::onFontSizeChange,
                             onToggleZenMode = viewModel::toggleZenMode,
-                            onToggleFocusSound = viewModel::toggleFocusSound,
-                            onSelectFocusSound = viewModel::selectFocusSound,
-                            onFocusSoundVolumeChange = viewModel::setFocusSoundVolume,
+
+
+
                             onToggleTextToSpeech = {
                                 viewModel.toggleTextToSpeech { _, warningMsg ->
                                     if (warningMsg != null) {

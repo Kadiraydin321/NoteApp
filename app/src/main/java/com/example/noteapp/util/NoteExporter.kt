@@ -990,6 +990,119 @@ $bodyHtml
         return lines
     }
 
+    /**
+     * Notu sosyal medya ve mesajlaşma için görsel kart (PNG) olarak oluşturur.
+     */
+    fun exportToCardImage(
+        context: Context,
+        title: String,
+        content: String,
+        categoryName: String? = null,
+        dateFormatted: String? = null
+    ): File {
+        val width = 1080
+        val minHeight = 900
+        val padding = 70f
+
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 50f
+            color = Color.parseColor("#1C1B1F")
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val metaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 28f
+            color = Color.parseColor("#79747E")
+        }
+        val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 34f
+            color = Color.parseColor("#49454F")
+            typeface = Typeface.DEFAULT
+        }
+        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FFFDF5")
+        }
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E7E0EC")
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 24f
+            color = Color.parseColor("#9E9E9E")
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+        }
+
+        val maxWidth = width - (padding * 2)
+        val bodyLines = mutableListOf<String>()
+        val paragraphs = content.lines()
+        for (para in paragraphs.take(40)) {
+            if (para.isBlank()) {
+                bodyLines.add("")
+            } else {
+                bodyLines.addAll(wrapText(para, bodyPaint, maxWidth))
+            }
+        }
+
+        val contentHeight = bodyLines.size * 48f
+        val calculatedHeight = (padding + 80f + 50f + contentHeight + 120f + padding).toInt()
+        val finalHeight = maxOf(minHeight, calculatedHeight)
+
+        val bitmap = android.graphics.Bitmap.createBitmap(width, finalHeight, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        // Arka plan
+        canvas.drawColor(Color.parseColor("#F4F2F7"))
+        val cardRect = RectF(padding / 2, padding / 2, width - (padding / 2), finalHeight - (padding / 2))
+        canvas.drawRoundRect(cardRect, 28f, 28f, cardPaint)
+        canvas.drawRoundRect(cardRect, 28f, 28f, borderPaint)
+
+        var y = padding + 50f
+        // Başlık
+        val displayTitle = title.ifBlank { "Başlıksız Not" }
+        val titleLines = wrapText(displayTitle, titlePaint, maxWidth)
+        for (line in titleLines) {
+            canvas.drawText(line, padding, y, titlePaint)
+            y += 60f
+        }
+
+        // Meta (Kategori & Tarih)
+        val metaText = listOfNotNull(categoryName?.takeIf { it.isNotBlank() }, dateFormatted).joinToString(" • ")
+        if (metaText.isNotBlank()) {
+            y += 10f
+            canvas.drawText(metaText, padding, y, metaPaint)
+            y += 38f
+        }
+
+        // Çizgi
+        y += 10f
+        val linePaint = Paint().apply {
+            color = Color.parseColor("#E0E0E0")
+            strokeWidth = 2f
+        }
+        canvas.drawLine(padding, y, width - padding, y, linePaint)
+        y += 45f
+
+        // İçerik
+        for (line in bodyLines) {
+            if (line.isNotEmpty()) {
+                canvas.drawText(line, padding, y, bodyPaint)
+            }
+            y += 48f
+        }
+
+        // Footer
+        canvas.drawText("Not Defterim ile paylaşıldı", padding, finalHeight - padding, footerPaint)
+
+        val exportDir = File(context.cacheDir, "exports").apply { mkdirs() }
+        cleanOldExports(exportDir)
+        val cleanTitle = title.take(20).replace(Regex("[^a-zA-Z0-9_-]"), "_").ifBlank { "Not" }
+        val imageFile = File(exportDir, "${cleanTitle}_Kart.png")
+        FileOutputStream(imageFile).use { out ->
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+        }
+        return imageFile
+    }
+
     private fun cleanOldExports(exportDir: File) {
         try {
             val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L

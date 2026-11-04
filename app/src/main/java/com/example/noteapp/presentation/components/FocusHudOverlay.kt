@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeMute
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
@@ -24,18 +23,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.noteapp.media.FocusSoundType
 import kotlinx.coroutines.delay
 
 @Composable
 fun FocusHudOverlay(
     wordCount: Int,
     characterCount: Int,
-    isSoundPlaying: Boolean,
-    currentSoundType: FocusSoundType,
-    onToggleSound: () -> Unit,
-    onSelectSoundType: (FocusSoundType) -> Unit,
-    onVolumeChange: (Float) -> Unit,
     onExitZenMode: () -> Unit,
     isTtsSpeaking: Boolean = false,
     onToggleTts: () -> Unit = {},
@@ -45,8 +38,6 @@ fun FocusHudOverlay(
     var isTimerRunning by remember { mutableStateOf(false) }
     var isBreakMode by remember { mutableStateOf(false) } // false: 25m focus, true: 5m break
     var remainingSeconds by remember { mutableStateOf(25 * 60) }
-    var showSoundMenu by remember { mutableStateOf(false) }
-    var soundVolume by remember { mutableStateOf(0.5f) }
 
     // Pomodoro Timer Loop
     LaunchedEffect(isTimerRunning, remainingSeconds) {
@@ -137,7 +128,7 @@ fun FocusHudOverlay(
                         .width(1.dp)
                 )
 
-                // 1. Sesli Okuma (TTS Hoparlör) Butonu
+                // Sesli Okuma (TTS Hoparlör) Butonu
                 Surface(
                     shape = CircleShape,
                     color = if (isTtsSpeaking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
@@ -155,22 +146,6 @@ fun FocusHudOverlay(
                             contentDescription = if (isTtsSpeaking) "Sesli Okumayı Durdur" else "Sesli Oku",
                             tint = if (isTtsSpeaking) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
-                // 2. Ses Butonu
-                Surface(
-                    shape = CircleShape,
-                    color = if (isSoundPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clickable { showSoundMenu = !showSoundMenu }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = if (isSoundPlaying) currentSoundType.iconEmoji else "🔇",
-                            fontSize = 15.sp
                         )
                     }
                 }
@@ -214,93 +189,6 @@ fun FocusHudOverlay(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
-                }
-            }
-        }
-
-        // Ses Seçim Menüsü
-        AnimatedVisibility(visible = showSoundMenu) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp,
-                shadowElevation = 8.dp,
-                modifier = Modifier
-                    .padding(top = 10.dp)
-                    .widthIn(max = 320.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "🎧 Odaklanma Sesleri",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Switch(
-                            checked = isSoundPlaying,
-                            onCheckedChange = { onToggleSound() },
-                            modifier = Modifier.height(24.dp)
-                        )
-                    }
-
-                    FocusSoundType.values().forEach { sound ->
-                        val isSelected = currentSoundType == sound
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onSelectSoundType(sound)
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(sound.iconEmoji, fontSize = 16.sp)
-                                Text(
-                                    text = sound.title,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                    // Ses Seviyesi
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (soundVolume < 0.1f) Icons.AutoMirrored.Filled.VolumeMute else Icons.AutoMirrored.Filled.VolumeUp,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Slider(
-                            value = soundVolume,
-                            onValueChange = {
-                                soundVolume = it
-                                onVolumeChange(it)
-                            },
-                            valueRange = 0.05f..1f,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
                 }
             }
         }
