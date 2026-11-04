@@ -161,7 +161,8 @@ fun MarkdownPreview(
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = fontSize.sp,
                                     lineHeight = computedLineHeight,
-                                    letterSpacing = computedLetterSpacing
+                                    letterSpacing = computedLetterSpacing,
+                                    color = contentColor
                                 )
                             )
                         }
@@ -614,17 +615,32 @@ fun MarkdownText(
     modifier: Modifier = Modifier,
     onLinkClick: (String) -> Unit
 ) {
-    androidx.compose.foundation.text.ClickableText(
-        text = text,
-        style = style,
-        modifier = modifier,
-        onClick = { offset ->
-            text.getStringAnnotations(tag = "backlink", start = offset, end = offset)
-                .firstOrNull()?.let { annotation ->
-                    onLinkClick(annotation.item)
-                }
-        }
-    )
+    val hasBacklinks = remember(text) {
+        text.getStringAnnotations(tag = "backlink", start = 0, end = text.length).isNotEmpty()
+    }
+    val effectiveColor = if (style.color != Color.Unspecified) style.color else LocalContentColor.current
+    val effectiveStyle = style.copy(color = effectiveColor)
+
+    if (hasBacklinks) {
+        @Suppress("DEPRECATION")
+        androidx.compose.foundation.text.ClickableText(
+            text = text,
+            style = effectiveStyle,
+            modifier = modifier,
+            onClick = { offset ->
+                text.getStringAnnotations(tag = "backlink", start = offset, end = offset)
+                    .firstOrNull()?.let { annotation ->
+                        onLinkClick(annotation.item)
+                    }
+            }
+        )
+    } else {
+        Text(
+            text = text,
+            style = effectiveStyle,
+            modifier = modifier
+        )
+    }
 }
 
 /**

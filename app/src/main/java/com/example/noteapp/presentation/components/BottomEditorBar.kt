@@ -306,7 +306,12 @@ fun BottomEditorBar(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text(if (isRecordingAudio) "Durdur" else "Ses", style = MaterialTheme.typography.labelMedium)
+                                    AutoResizeText(
+                                        text = if (isRecordingAudio) "Durdur" else "Ses",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        minFontSize = 10.sp
+                                    )
                                 }
 
                                 // 4. Zaman Damgası
@@ -344,11 +349,13 @@ fun BottomEditorBar(
                                             modifier = Modifier.size(18.dp),
                                             tint = MaterialTheme.colorScheme.primary
                                         )
-                                        Text(
+                                        AutoResizeText(
                                             text = "Yazı Boyutu",
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = panelContentColor
+                                            color = panelContentColor,
+                                            maxLines = 1,
+                                            minFontSize = 10.sp
                                         )
                                     }
 
@@ -371,12 +378,14 @@ fun BottomEditorBar(
                                             shape = RoundedCornerShape(8.dp),
                                             color = if (isAppDark) Color(0x33FFFFFF) else Color(0x18000000)
                                         ) {
-                                            Text(
+                                            AutoResizeText(
                                                 text = "${noteFontSize.toInt()} sp",
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold,
                                                 color = panelContentColor,
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                                maxLines = 1,
+                                                minFontSize = 9.sp,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                             )
                                         }
 
@@ -630,9 +639,11 @@ fun BottomEditorBar(
                                         ) {
                                             Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                if (selectedBackgroundImage != null) "Arka Planı Değiştir" else "Arka Plan Resmi Seç",
-                                                style = MaterialTheme.typography.labelMedium
+                                            AutoResizeText(
+                                                text = if (selectedBackgroundImage != null) "Arka Planı Değiştir" else "Arka Plan Resmi Seç",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                maxLines = 1,
+                                                minFontSize = 10.sp
                                             )
                                         }
 
@@ -699,7 +710,14 @@ fun BottomEditorBar(
                                     FilterChip(
                                         selected = isSelected,
                                         onClick = { onCategoryChange(if (isSelected) null else category.id) },
-                                        label = { Text(category.name) },
+                                        label = {
+                                            AutoResizeText(
+                                                text = category.name,
+                                                maxLines = 1,
+                                                minFontSize = 9.sp,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
                                         shape = RoundedCornerShape(12.dp),
                                         leadingIcon = {
                                             if (isSelected) {
@@ -894,11 +912,12 @@ fun BottomEditorBar(
                                     tint = dockIconColor.copy(alpha = 0.75f)
                                 )
                                 Spacer(Modifier.width(4.dp))
-                                Text(
+                                AutoResizeText(
                                     text = if (hasExtraBadges) "$wordCount k" else "$wordCount k · ~${readingTime} dk",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                                     color = dockIconColor.copy(alpha = 0.85f),
                                     maxLines = 1,
+                                    minFontSize = 8.5.sp,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }

@@ -95,7 +95,7 @@ fn handle_api_request(
                 categories,
                 is_vault_unlocked: crypto.is_unlocked(),
             };
-            serde_json::to_vec(&ApiResponse { result: bundle }).unwrap()
+            serde_json::to_vec(&ApiResponse { result: bundle }).unwrap_or_default()
         }
         "createNote" => {
             if let Ok(mut note) = serde_json::from_value::<Note>(payload.get("note").cloned().unwrap_or_default()) {
@@ -108,7 +108,7 @@ fn handle_api_request(
                 note.updated_at = now;
                 if let Ok(id) = db.insert_note(&note) {
                     note.id = id;
-                    serde_json::to_vec(&ApiResponse { result: note }).unwrap()
+                    serde_json::to_vec(&ApiResponse { result: note }).unwrap_or_default()
                 } else {
                     serde_json::to_vec(&ApiError {
                         error: "Not oluşturulamadı".to_string(),
@@ -126,10 +126,10 @@ fn handle_api_request(
             if let Ok(note) = serde_json::from_value::<Note>(payload.get("note").cloned().unwrap_or_default()) {
                 if note.id == 0 {
                     let id = db.insert_note(&note).unwrap_or(0);
-                    serde_json::to_vec(&ApiResponse { result: id }).unwrap()
+                    serde_json::to_vec(&ApiResponse { result: id }).unwrap_or_default()
                 } else {
                     db.update_note(&note).ok();
-                    serde_json::to_vec(&ApiResponse { result: true }).unwrap()
+                    serde_json::to_vec(&ApiResponse { result: true }).unwrap_or_default()
                 }
             } else {
                 serde_json::to_vec(&ApiError {
@@ -141,7 +141,7 @@ fn handle_api_request(
         "moveToTrash" => {
             if let Some(id) = payload.get("id").and_then(|v| v.as_i64()) {
                 db.move_to_trash(id).ok();
-                serde_json::to_vec(&ApiResponse { result: true }).unwrap()
+                serde_json::to_vec(&ApiResponse { result: true }).unwrap_or_default()
             } else {
                 serde_json::to_vec(&ApiError {
                     error: "Geçersiz ID".to_string(),
@@ -152,7 +152,7 @@ fn handle_api_request(
         "restoreFromTrash" => {
             if let Some(id) = payload.get("id").and_then(|v| v.as_i64()) {
                 db.restore_from_trash(id).ok();
-                serde_json::to_vec(&ApiResponse { result: true }).unwrap()
+                serde_json::to_vec(&ApiResponse { result: true }).unwrap_or_default()
             } else {
                 serde_json::to_vec(&ApiError {
                     error: "Geçersiz ID".to_string(),
@@ -163,7 +163,7 @@ fn handle_api_request(
         "deletePermanently" => {
             if let Some(id) = payload.get("id").and_then(|v| v.as_i64()) {
                 db.delete_permanently(id).ok();
-                serde_json::to_vec(&ApiResponse { result: true }).unwrap()
+                serde_json::to_vec(&ApiResponse { result: true }).unwrap_or_default()
             } else {
                 serde_json::to_vec(&ApiError {
                     error: "Geçersiz ID".to_string(),
@@ -173,18 +173,18 @@ fn handle_api_request(
         }
         "emptyTrash" => {
             db.empty_trash().ok();
-            serde_json::to_vec(&ApiResponse { result: true }).unwrap()
+            serde_json::to_vec(&ApiResponse { result: true }).unwrap_or_default()
         }
         "addCategory" => {
             let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("Yeni Kategori");
             let color = payload.get("color").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
             let id = db.insert_category(name, color).unwrap_or(0);
-            serde_json::to_vec(&ApiResponse { result: id }).unwrap()
+            serde_json::to_vec(&ApiResponse { result: id }).unwrap_or_default()
         }
         "deleteCategory" => {
             if let Some(id) = payload.get("id").and_then(|v| v.as_i64()) {
                 db.delete_category(id).ok();
-                serde_json::to_vec(&ApiResponse { result: true }).unwrap()
+                serde_json::to_vec(&ApiResponse { result: true }).unwrap_or_default()
             } else {
                 serde_json::to_vec(&ApiError {
                     error: "Geçersiz ID".to_string(),
@@ -194,19 +194,19 @@ fn handle_api_request(
         }
         "syncGetState" => {
             let s = sync.get_state();
-            serde_json::to_vec(&ApiResponse { result: s }).unwrap()
+            serde_json::to_vec(&ApiResponse { result: s }).unwrap_or_default()
         }
         "syncStart" => {
             sync.start();
-            serde_json::to_vec(&ApiResponse { result: true }).unwrap()
+            serde_json::to_vec(&ApiResponse { result: true }).unwrap_or_default()
         }
         "syncStop" => {
             sync.stop();
-            serde_json::to_vec(&ApiResponse { result: true }).unwrap()
+            serde_json::to_vec(&ApiResponse { result: true }).unwrap_or_default()
         }
         "syncRefreshPin" => {
             let new_pin = sync.refresh_pin();
-            serde_json::to_vec(&ApiResponse { result: new_pin }).unwrap()
+            serde_json::to_vec(&ApiResponse { result: new_pin }).unwrap_or_default()
         }
         "backupExport" => {
             let now = std::time::SystemTime::now()
@@ -219,7 +219,7 @@ fn handle_api_request(
                     result: format!("{}\nKonum: {}", msg, target_path.display()),
                 })
                 .unwrap(),
-                Err(e) => serde_json::to_vec(&ApiError { error: e }).unwrap(),
+                Err(e) => serde_json::to_vec(&ApiError { error: e }).unwrap_or_default(),
             }
         }
         "vaultStatus" => {
@@ -227,12 +227,12 @@ fn handle_api_request(
                 has_password: crypto.has_master_password(),
                 is_unlocked: crypto.is_unlocked(),
             };
-            serde_json::to_vec(&ApiResponse { result: status }).unwrap()
+            serde_json::to_vec(&ApiResponse { result: status }).unwrap_or_default()
         }
         "vaultSetup" => {
             if let Some(pwd) = payload.get("password").and_then(|v| v.as_str()) {
                 let ok = crypto.setup_master_password(pwd);
-                serde_json::to_vec(&ApiResponse { result: ok }).unwrap()
+                serde_json::to_vec(&ApiResponse { result: ok }).unwrap_or_default()
             } else {
                 serde_json::to_vec(&ApiError {
                     error: "Şifre gerekli".to_string(),
@@ -243,7 +243,7 @@ fn handle_api_request(
         "vaultUnlock" => {
             if let Some(pwd) = payload.get("password").and_then(|v| v.as_str()) {
                 let ok = crypto.unlock_vault(pwd);
-                serde_json::to_vec(&ApiResponse { result: ok }).unwrap()
+                serde_json::to_vec(&ApiResponse { result: ok }).unwrap_or_default()
             } else {
                 serde_json::to_vec(&ApiError {
                     error: "Şifre gerekli".to_string(),
@@ -253,7 +253,7 @@ fn handle_api_request(
         }
         "vaultLock" => {
             crypto.lock_vault();
-            serde_json::to_vec(&ApiResponse { result: true }).unwrap()
+            serde_json::to_vec(&ApiResponse { result: true }).unwrap_or_default()
         }
         "setAntiScreenshot" => {
             let enable = payload.get("enable").and_then(|v| v.as_bool()).unwrap_or(true);
@@ -269,7 +269,7 @@ fn handle_api_request(
                     SetWindowDisplayAffinity(hwnd, affinity).ok();
                 }
             }
-            serde_json::to_vec(&ApiResponse { result: enable }).unwrap()
+            serde_json::to_vec(&ApiResponse { result: enable }).unwrap_or_default()
         }
         _ => serde_json::to_vec(&ApiError {
             error: "Bilinmeyen komut".to_string(),

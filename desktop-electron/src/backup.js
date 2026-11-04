@@ -229,11 +229,25 @@ class BackupManager {
       // Restore attachments
       let restoredAttachmentsCount = 0;
       const attachmentEntries = Object.keys(zip.files).filter(f => f.startsWith('attachments/') && !zip.files[f].dir);
+      const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024; // 50MB per attachment
 
       for (const entryName of attachmentEntries) {
+        const rawFileName = path.basename(entryName);
+        if (!rawFileName || rawFileName === '.' || rawFileName === '..') continue;
+        
+        const destPath = path.resolve(this.attachmentsDir, rawFileName);
+        // Zip Slip / Path Traversal koruması
+        if (!destPath.startsWith(path.resolve(this.attachmentsDir))) {
+          console.warn('Güvensiz zip eki yolu atlandı (Zip Slip engellendi):', entryName);
+          continue;
+        }
+
         const fileData = await zip.files[entryName].async('nodebuffer');
-        const fileName = path.basename(entryName);
-        const destPath = path.join(this.attachmentsDir, fileName);
+        if (fileData.length > MAX_ATTACHMENT_SIZE) {
+          console.warn('50MB sınırını aşan ek dosya atlandı:', rawFileName);
+          continue;
+        }
+
         fs.writeFileSync(destPath, fileData);
         restoredAttachmentsCount++;
       }

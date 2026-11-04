@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.noteapp.domain.model.Category
 
 /**
@@ -157,12 +158,13 @@ fun CategoryBadge(
                         .background(catColor)
                 )
             }
-            Text(
+            AutoResizeText(
                 text = "#${category.name}",
                 style = MaterialTheme.typography.labelSmall,
                 color = catColor.copy(alpha = 0.95f),
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
+                minFontSize = 8.5.sp,
                 overflow = TextOverflow.Ellipsis
             )
         }

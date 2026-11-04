@@ -67,6 +67,7 @@ import com.example.noteapp.data.settings.CardCornerStyle
 import com.example.noteapp.data.settings.CardElevationStyle
 import com.example.noteapp.domain.model.Category
 import com.example.noteapp.domain.model.Note
+import com.example.noteapp.presentation.components.AutoResizeText
 import com.example.noteapp.presentation.components.CategoryBadge
 import com.example.noteapp.presentation.components.parseMarkdownCardPreview
 import com.example.noteapp.presentation.theme.getNoteColorSpec
@@ -270,8 +271,8 @@ fun NoteCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (note.title.isNotEmpty()) {
-                        Text(
-                            text = if (isConcealed) androidx.compose.ui.text.AnnotatedString(note.title)
+                        AutoResizeText(
+                            annotatedText = if (isConcealed) androidx.compose.ui.text.AnnotatedString(note.title)
                             else if (searchQuery.isNotBlank()) com.example.noteapp.domain.util.TextHighlightHelper.highlightQuery(
                                 text = note.title,
                                 query = searchQuery,
@@ -285,6 +286,7 @@ fun NoteCard(
                             ),
                             color = colorSpec.contentColor,
                             maxLines = 2,
+                            minFontSize = 11.5.sp,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
@@ -484,7 +486,7 @@ fun NoteCard(
                                 color = colorSpec.contentColor.copy(alpha = 0.07f),
                                 border = BorderStroke(1.dp, colorSpec.contentColor.copy(alpha = 0.14f))
                             ) {
-                                Text(
+                                AutoResizeText(
                                     text = "#$tag",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontSize = 11.sp,
@@ -493,6 +495,7 @@ fun NoteCard(
                                     color = colorSpec.contentColor.copy(alpha = 0.88f),
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                     maxLines = 1,
+                                    minFontSize = 8.5.sp,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
@@ -514,13 +517,15 @@ fun NoteCard(
                         modifier = Modifier.weight(1f, fill = false)
                     ) {
                         // Tarih etiketi
-                        Text(
+                        AutoResizeText(
                             text = formattedDate,
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Normal
                             ),
-                            color = colorSpec.secondaryColor
+                            color = colorSpec.secondaryColor,
+                            maxLines = 1,
+                            minFontSize = 8.5.sp
                         )
 
                         if (note.reminderTime != null && note.reminderTime > 0) {
@@ -708,8 +713,8 @@ fun CompactNoteCard(
                     Pair(highlightedTitle, preview)
                 }
 
-                Text(
-                    text = buildAnnotatedString {
+                AutoResizeText(
+                    annotatedText = buildAnnotatedString {
                         withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = colorSpec.contentColor)) {
                             append(titleSnippet.first)
                         }
@@ -722,16 +727,19 @@ fun CompactNoteCard(
                     },
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.5.sp),
                     maxLines = 1,
+                    minFontSize = 9.5.sp,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
 
                 Spacer(Modifier.width(8.dp))
 
-                Text(
+                AutoResizeText(
                     text = dateStr,
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    color = colorSpec.secondaryColor
+                    color = colorSpec.secondaryColor,
+                    maxLines = 1,
+                    minFontSize = 8.5.sp
                 )
             }
 
@@ -759,12 +767,13 @@ fun CompactNoteCard(
                             shape = RoundedCornerShape(6.dp),
                             color = colorSpec.contentColor.copy(alpha = 0.08f)
                         ) {
-                            Text(
+                            AutoResizeText(
                                 text = "#$categoryName",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = colorSpec.contentColor.copy(alpha = 0.85f),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 maxLines = 1,
+                                minFontSize = 8.5.sp,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
@@ -785,11 +794,13 @@ fun CompactNoteCard(
                                     tint = if (checklistStats.isAllCompleted) MaterialTheme.colorScheme.primary else colorSpec.iconTint,
                                     modifier = Modifier.size(11.dp)
                                 )
-                                Text(
+                                AutoResizeText(
                                     text = "${checklistStats.completedCount}/${checklistStats.totalCount}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = colorSpec.contentColor.copy(alpha = 0.85f),
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    minFontSize = 8.sp
                                 )
                             }
                         }

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const QRCode = require('qrcode');
 
 const DatabaseManager = require('./src/db');
 const CryptoManager = require('./src/crypto');
@@ -174,6 +175,112 @@ function setupIpcHandlers(appDir, attachmentsDir) {
   ipcMain.handle('sync:refreshPin', () => {
     syncServer.refreshPin();
     return true;
+  });
+
+  // CRC32 implementation for IEEE 802.3 standard (compatible with java.util.zip.CRC32)
+  const crc32Table = (() => {
+    const table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let j = 0; j < 8; j++) {
+        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      table[i] = c >>> 0;
+    }
+    return table;
+  })();
+
+  function computeCrc32(str) {
+    const bytes = Buffer.from(str, 'utf8');
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) {
+      crc = (crc >>> 8) ^ crc32Table[(crc ^ bytes[i]) & 0xFF];
+    }
+    return ((crc ^ 0xFFFFFFFF) >>> 0);
+  }
+
+  // QR Code Generator API
+  ipcMain.handle('qr:generate', async (_, text, options = {}) => {
+    try {
+      const opts = {
+        errorCorrectionLevel: options.errorCorrectionLevel || 'M',
+        type: 'image/png',
+        quality: 0.92,
+        margin: options.margin !== undefined ? options.margin : 2,
+        width: options.width || 300,
+        color: {
+          dark: options.dark || '#000000',
+          light: options.light || '#ffffff'
+        }
+      };
+      const dataUrl = await QRCode.toDataURL(text, opts);
+      return { success: true, dataUrl };
+    } catch (err) {
+      console.error('QR Generator Error:', err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Optical Air-Gapped Stream Preparation
+  ipcMain.handle('optical:prepareChunks', async (_, options = {}) => {
+    try {
+      const chunkSize = options.chunkSize || 240; // Optimal for QR readability at 10-15 FPS
+      const notes = dbManager.getActiveNotes();
+      const categories = dbManager.getAllCategories();
+
+      const payload = {
+        version: 1,
+        type: 'noteapp_backup',
+        exportedAt: Date.now(),
+        notes: notes.map(n => ({
+          title: n.title || '',
+          content: n.content || '',
+          isPinned: Boolean(n.isPinned),
+          isArchived: Boolean(n.isArchived),
+          color: n.color || 0,
+          categoryName: n.categoryName || null,
+          categoryColor: n.categoryColor || 0,
+          reminderTime: n.reminderTime || null,
+          createdAt: n.createdAt || Date.now(),
+          updatedAt: n.updatedAt || Date.now()
+        })),
+        categories: categories.map(c => ({
+          name: c.name,
+          color: c.color
+        }))
+      };
+
+      const fullJson = JSON.stringify(payload);
+      const totalLen = fullJson.length;
+      const totalChunks = Math.max(1, Math.ceil(totalLen / chunkSize));
+      const crc32Val = computeCrc32(fullJson);
+
+      const chunks = [];
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, totalLen);
+        const chunkSlice = fullJson.slice(start, end);
+        chunks.push({
+          s: i + 1,       // 1-indexed sequence number
+          t: totalChunks, // total number of chunks
+          d: chunkSlice,  // data slice
+          c: crc32Val     // total payload crc32 checksum
+        });
+      }
+
+      return {
+        success: true,
+        notesCount: notes.length,
+        categoriesCount: categories.length,
+        totalBytes: totalLen,
+        totalChunks,
+        checksum: crc32Val,
+        chunks
+      };
+    } catch (err) {
+      console.error('Optical Chunks Prepare Error:', err);
+      return { success: false, error: err.message };
+    }
   });
 
   // System Handlers

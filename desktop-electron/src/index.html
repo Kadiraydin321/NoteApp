@@ -86,6 +86,10 @@
           <span>Wi-Fi Senkronizasyon</span>
           <span id="syncStatusDot" class="status-dot"></span>
         </button>
+        <button id="btnOpticalTransferDialog" class="sidebar-tool-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          <span>Optik QR Aktarım (Air-Gapped)</span>
+        </button>
         <button id="btnBackupDialog" class="sidebar-tool-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           <span>Yedek Al / Yükle (.zip)</span>
@@ -324,31 +328,125 @@
       <h3>📶 Wi-Fi Senkronizasyon (Android & Masaüstü)</h3>
       <p>Aynı yerel Wi-Fi ağına bağlı Android telefonunuzla notlarınızı eşitleyin.</p>
       
-      <div class="sync-info-box">
-        <div class="info-row">
-          <span>Sunucu Durumu:</span>
-          <span id="syncServerStatusText" class="status-badge">Kapalı</span>
+      <div class="sync-two-col-layout">
+        <div class="sync-info-box">
+          <div class="info-row">
+            <span>Sunucu Durumu:</span>
+            <span id="syncServerStatusText" class="status-badge">Kapalı</span>
+          </div>
+          <div class="info-row">
+            <span>Yerel Bağlantı Adresi:</span>
+            <strong id="syncServerUrlText">http://127.0.0.1:8765</strong>
+          </div>
+          <div class="info-row">
+            <span>Eşleşme PIN Kodu:</span>
+            <span id="syncPinBadge" class="pin-badge">----</span>
+          </div>
+          <div class="sync-actions-row" style="margin-top: 14px;">
+            <button id="btnStartSyncServer" class="btn-primary">Sunucuyu Başlat</button>
+            <button id="btnStopSyncServer" class="btn-secondary" style="display: none;">Sunucuyu Durdur</button>
+            <button id="btnRefreshPin" class="btn-secondary">Yeni PIN Üret</button>
+          </div>
         </div>
-        <div class="info-row">
-          <span>Yerel Bağlantı Adresi:</span>
-          <strong id="syncServerUrlText">http://127.0.0.1:8765</strong>
-        </div>
-        <div class="info-row">
-          <span>Eşleşme PIN Kodu:</span>
-          <span id="syncPinBadge" class="pin-badge">----</span>
+
+        <div class="sync-qr-section">
+          <div class="sync-qr-wrapper">
+            <img id="syncQrImage" class="sync-qr-image" alt="Eşleşme QR Kodu" style="display: none;" />
+            <div id="syncQrPlaceholder" class="sync-qr-placeholder">
+              <span>QR Kod için sunucuyu başlatın</span>
+            </div>
+          </div>
+          <p class="sync-qr-subtext">📱 Android uygulamasında <strong>"Masaüstü QR Kodunu Tara"</strong> butonuna basarak bu kodu okutun.</p>
         </div>
       </div>
-
-      <div class="sync-actions-row">
-        <button id="btnStartSyncServer" class="btn-primary">Sunucuyu Başlat</button>
-        <button id="btnStopSyncServer" class="btn-secondary" style="display: none;">Sunucuyu Durdur</button>
-        <button id="btnRefreshPin" class="btn-secondary">Yeni PIN Üret</button>
-      </div>
-
-      <p class="sync-help-tip">💡 Telefonunuzdaki "Not Defterim" uygulamasında Ayarlar &gt; "Wi-Fi Senkronizasyon" bölümüne yukarıdaki adresi ve PIN kodunu giriniz.</p>
 
       <div class="modal-buttons">
+        <button id="btnOpenOpticalFromSync" class="btn-secondary" style="margin-right: auto;">📷 Optik QR Aktarımı (Air-Gapped)</button>
         <button id="btnCloseSyncModal" class="btn-secondary">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3.1. Kamera ile Animasyonlu Optik Veri Aktarımı (Air-Gapped Optical Stream) Modal -->
+  <div id="modalOpticalStream" class="modal-overlay">
+    <div class="modal-card modal-wide optical-modal-card">
+      <div class="optical-modal-header">
+        <div>
+          <h3>📷 Kamera ile Optik Not Aktarımı (Air-Gapped Stream)</h3>
+          <p>İnternet, Wi-Fi veya Bluetooth olmadan; veriler saniyede 10-15 karelik optik QR kod akışına dönüştürülür.</p>
+        </div>
+      </div>
+
+      <div class="optical-content-layout">
+        <!-- Sol: QR Akış Ekranı -->
+        <div class="optical-qr-viewport">
+          <div class="optical-qr-box">
+            <img id="opticalQrImage" alt="Optical QR Stream" src="" style="display: none;" />
+            <div id="opticalQrPlaceholder" class="optical-placeholder">
+              <span>Kareler Hazırlanıyor...</span>
+            </div>
+          </div>
+          <div class="optical-frame-badge" id="opticalFrameBadge">Kare: 0 / 0</div>
+        </div>
+
+        <!-- Sağ: Kontroller ve İstatistikler -->
+        <div class="optical-controls-pane">
+          <div class="optical-stats-card">
+            <div class="info-row">
+              <span>Aktarılacak Not:</span>
+              <strong id="opticalNotesCount">0 not</strong>
+            </div>
+            <div class="info-row">
+              <span>Toplam Boyut:</span>
+              <strong id="opticalTotalBytes">0 bayt</strong>
+            </div>
+            <div class="info-row">
+              <span>Toplam Kare (Chunk):</span>
+              <strong id="opticalTotalChunks">0 kare</strong>
+            </div>
+            <div class="info-row">
+              <span>Veri Checksum (CRC32):</span>
+              <strong id="opticalChecksum">0x00000000</strong>
+            </div>
+          </div>
+
+          <div class="optical-progress-container">
+            <div class="optical-progress-labels">
+              <span>Aktarım İlerlemesi</span>
+              <span id="opticalPercentLabel">%0</span>
+            </div>
+            <div class="optical-progress-track">
+              <div id="opticalProgressBar" class="optical-progress-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- Oynatma Kontrolleri -->
+          <div class="optical-playback-row">
+            <button id="btnOpticalPrevFrame" class="btn-secondary" title="Önceki Kare">⏮</button>
+            <button id="btnOpticalPlayPause" class="btn-primary" style="min-width: 120px;">⏸ Duraklat</button>
+            <button id="btnOpticalNextFrame" class="btn-secondary" title="Sonraki Kare">⏭</button>
+          </div>
+
+          <!-- FPS Hız Ayarı -->
+          <div class="optical-speed-row">
+            <span>Yayın Hızı:</span>
+            <div class="speed-chips" id="opticalFpsSelector">
+              <button class="speed-chip" data-fps="5">5 FPS</button>
+              <button class="speed-chip" data-fps="8">8 FPS</button>
+              <button class="speed-chip active" data-fps="10">10 FPS</button>
+              <button class="speed-chip" data-fps="12">12 FPS</button>
+              <button class="speed-chip" data-fps="15">15 FPS</button>
+            </div>
+          </div>
+
+          <p class="optical-instruction-tip">
+            💡 Android cihazınızda <strong>Ayarlar &gt; "Optik / Kamera ile Not Al"</strong> ekranını açıp kameranızı bu alandaki QR koda doğrultun. Kareler döngüsel olarak akar, kaçırılan kareler otomatik yakalanır.
+          </p>
+        </div>
+      </div>
+
+      <div class="modal-buttons">
+        <button id="btnCloseOpticalModal" class="btn-secondary">Kapat</button>
       </div>
     </div>
   </div>

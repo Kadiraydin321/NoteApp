@@ -51,6 +51,16 @@ contextBridge.exposeInMainWorld('api', {
     }
   },
 
+  // QR Code Generation API
+  qr: {
+    generate: (text, options) => ipcRenderer.invoke('qr:generate', text, options)
+  },
+
+  // Optical Air-Gapped Stream API
+  optical: {
+    prepareChunks: (options) => ipcRenderer.invoke('optical:prepareChunks', options)
+  },
+
   // System & OS Features
   system: {
     saveDrawing: (dataUrl) => ipcRenderer.invoke('system:saveDrawing', dataUrl),

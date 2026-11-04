@@ -22,12 +22,12 @@ struct BackupMetadata {
 pub struct BackupManager;
 
 impl BackupManager {
-    pub fn export_backup_zip(db: &Database, target_path: &Path) -> Result<String, String> {
+    pub fn create_backup_zip_buffer(db: &Database) -> Result<Vec<u8>, String> {
         let notes = db.get_all_notes().map_err(|e| e.to_string())?;
         let categories = db.get_categories().map_err(|e| e.to_string())?;
 
-        let file = File::create(target_path).map_err(|e| format!("Dosya oluşturulamadı: {}", e))?;
-        let mut zip = ZipWriter::new(file);
+        let buffer = std::io::Cursor::new(Vec::new());
+        let mut zip = ZipWriter::new(buffer);
 
         let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
@@ -48,7 +48,7 @@ impl BackupManager {
         // 3. metadata.json
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_millis() as i64;
         let meta = BackupMetadata {
             version: 1,
@@ -63,30 +63,53 @@ impl BackupManager {
         zip.write_all(meta_json.as_bytes())
             .map_err(|e| e.to_string())?;
 
-        zip.finish().map_err(|e| e.to_string())?;
-        Ok(format!("Yedek başarıyla alındı: {} not, {} kategori", notes.len(), categories.len()))
+        let cursor = zip.finish().map_err(|e| e.to_string())?;
+        Ok(cursor.into_inner())
     }
 
-    #[allow(dead_code)]
-    pub fn import_backup_zip(db: &Database, source_path: &Path) -> Result<String, String> {
-        let file = File::open(source_path).map_err(|e| format!("Dosya açılamadı: {}", e))?;
-        let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Geçersiz zip arşivi: {}", e))?;
+    pub fn restore_backup_zip_buffer(db: &Database, buffer: &[u8]) -> Result<(usize, usize), String> {
+        let cursor = std::io::Cursor::new(buffer);
+        let mut archive = zip::ZipArchive::new(cursor).map_err(|e| format!("Geçersiz zip arşivi: {}", e))?;
 
         let mut notes_json = String::new();
         let mut cats_json = String::new();
 
+        const MAX_ENTRY_SIZE: u64 = 50 * 1024 * 1024; // 50MB max per entry
+        const MAX_ARCHIVE_ENTRIES: usize = 10_000;
+
+        if archive.len() > MAX_ARCHIVE_ENTRIES {
+            return Err("Zip arşivi çok fazla girdi içeriyor (maksimum 10000)".to_string());
+        }
+
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-            let file_name = match file.name() {
-                Ok(name) => name.to_string(),
-                Err(_) => continue,
+            
+            // Zip Slip / Path Traversal koruması: enclosed_name() None dönerse '..' veya mutlak yol vardır
+            let enclosed = match file.enclosed_name() {
+                Some(p) => p.to_path_buf(),
+                None => continue, // Güvensiz path traversal girişlerini yoksay
             };
+
+            let file_name = enclosed.to_string_lossy().to_string();
+            if file.size() > MAX_ENTRY_SIZE {
+                return Err(format!("Dosya çok büyük: {} ({} bytes)", file_name, file.size()));
+            }
+
             match file_name.as_str() {
                 "notes.json" => {
-                    file.read_to_string(&mut notes_json).map_err(|e| e.to_string())?;
+                    // Zip bomb koruması: Açılmış veriyi de MAX_ENTRY_SIZE ile sınırla
+                    let mut reader = (&mut file).take(MAX_ENTRY_SIZE + 1);
+                    reader.read_to_string(&mut notes_json).map_err(|e| e.to_string())?;
+                    if notes_json.len() as u64 > MAX_ENTRY_SIZE {
+                        return Err("notes.json izin verilen 50MB sınırını aşıyor".to_string());
+                    }
                 }
                 "categories.json" => {
-                    file.read_to_string(&mut cats_json).map_err(|e| e.to_string())?;
+                    let mut reader = (&mut file).take(MAX_ENTRY_SIZE + 1);
+                    reader.read_to_string(&mut cats_json).map_err(|e| e.to_string())?;
+                    if cats_json.len() as u64 > MAX_ENTRY_SIZE {
+                        return Err("categories.json izin verilen 50MB sınırını aşıyor".to_string());
+                    }
                 }
                 _ => {}
             }
@@ -103,9 +126,28 @@ impl BackupManager {
             serde_json::from_str(&cats_json).unwrap_or_default()
         };
 
+        let notes_count = notes.len();
+        let cats_count = categories.len();
+
         db.replace_all_notes(&notes, &categories)
             .map_err(|e| format!("Veritabanı geri yüklenemedi: {}", e))?;
 
-        Ok(format!("Yedek başarıyla yüklendi: {} not, {} kategori aktarıldı", notes.len(), categories.len()))
+        Ok((notes_count, cats_count))
+    }
+
+    pub fn export_backup_zip(db: &Database, target_path: &Path) -> Result<String, String> {
+        let bytes = Self::create_backup_zip_buffer(db)?;
+        let mut file = File::create(target_path).map_err(|e| format!("Dosya oluşturulamadı: {}", e))?;
+        file.write_all(&bytes).map_err(|e| format!("Dosyaya yazılamadı: {}", e))?;
+        Ok(format!("Yedek başarıyla alındı ({} bayt)", bytes.len()))
+    }
+
+    #[allow(dead_code)]
+    pub fn import_backup_zip(db: &Database, source_path: &Path) -> Result<String, String> {
+        let mut file = File::open(source_path).map_err(|e| format!("Dosya açılamadı: {}", e))?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).map_err(|e| format!("Dosya okunamadı: {}", e))?;
+        let (notes_count, cats_count) = Self::restore_backup_zip_buffer(db, &buffer)?;
+        Ok(format!("Yedek başarıyla yüklendi: {} not, {} kategori aktarıldı", notes_count, cats_count))
     }
 }

@@ -11,3 +11,26 @@ captures/
 .cxx
 *.apk
 .kotlin/
+
+# Rust & Cargo targets
+target/
+**/target/
+desktop-native/target/
+installer/target/
+
+# Node & Electron dependencies
+node_modules/
+**/node_modules/
+desktop-electron/node_modules/
+
+# Local databases & temp files
+*.db
+*.db-wal
+*.db-shm
+test_tmp_*/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

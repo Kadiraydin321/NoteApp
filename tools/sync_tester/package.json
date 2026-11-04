@@ -1,0 +1,29 @@
+{
+  "name": "tools-sync-tester",
+  "version": "2.0.0",
+  "description": "Cross-Platform LAN/Wi-Fi Synchronization Test Suite & Verification Framework",
+  "main": "run_tests.js",
+  "scripts": {
+    "test": "node run_tests.js --mock",
+    "test:local": "node run_tests.js --host 127.0.0.1 --port 8765",
+    "test:discover": "node run_tests.js --discover",
+    "test:py": "python run_tests.py --mock",
+    "mock": "node mock_server.js --port 8765 --pin 1234",
+    "mock:py": "python mock_server.py 8765 1234"
+  },
+  "keywords": [
+    "wifi-sync",
+    "lan-sync",
+    "test-suite",
+    "verification",
+    "sha256",
+    "data-integrity",
+    "stress-testing",
+    "cross-platform"
+  ],
+  "author": "Antigravity Engineering",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -15,6 +15,10 @@ import com.example.noteapp.data.settings.AppSettings
 import com.example.noteapp.data.settings.AppSettingsManager
 import com.example.noteapp.data.settings.WidgetFilterMode
 import com.example.noteapp.data.sync.DesktopSyncClient
+import com.example.noteapp.data.sync.OpticalImportResult
+import com.example.noteapp.data.sync.OpticalTransferManager
+import com.example.noteapp.data.sync.QrSyncManager
+import com.example.noteapp.data.sync.SyncQrPayload
 import com.example.noteapp.data.sync.SyncResult
 import com.example.noteapp.data.sync.SyncServerStatus
 import com.example.noteapp.data.updater.AppUpdateManager
@@ -74,7 +78,9 @@ class SettingsViewModel @Inject constructor(
     private val backupManager: BackupManager,
     private val desktopSyncClient: DesktopSyncClient,
     private val updateManager: AppUpdateManager,
-    private val maintenanceManager: DatabaseMaintenanceManager
+    private val maintenanceManager: DatabaseMaintenanceManager,
+    val qrSyncManager: QrSyncManager,
+    val opticalTransferManager: OpticalTransferManager
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> = settingsManager.settings
@@ -407,6 +413,31 @@ class SettingsViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    /**
+     * Masaüstü QR kodundan taranan IP ve PIN bilgilerini işler, otomatik bağlantıyı başlatır.
+     */
+    fun onQrSyncScanned(payload: SyncQrPayload) {
+        viewModelScope.launch {
+            settingsManager.setLastSyncHost(payload.ip)
+            settingsManager.setLastSyncPin(payload.pin)
+            _syncUiState.value = _syncUiState.value.copy(
+                discoveredHost = payload.ip,
+                message = "Masaüstü QR okundu (${payload.ip}:${payload.port}, PIN: ${payload.pin}). Bağlanıyor..."
+            )
+            checkSyncConnection(payload.ip)
+        }
+    }
+
+    /**
+     * Optik akıştan not aktarımı tamamlandığında tetiklenir.
+     */
+    fun onOpticalTransferCompleted(result: OpticalImportResult) {
+        _syncUiState.value = _syncUiState.value.copy(
+            message = result.message,
+            isSuccess = true
+        )
     }
 
     /**

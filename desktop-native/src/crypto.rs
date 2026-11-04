@@ -16,6 +16,24 @@ const SALT_LEN: usize = 16;
 const IV_LEN: usize = 12;
 const PBKDF2_ITERATIONS: u32 = 65536;
 
+fn zeroize_bytes(slice: &mut [u8]) {
+    for b in slice.iter_mut() {
+        unsafe { std::ptr::write_volatile(b, 0) };
+    }
+    std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+}
+
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 #[derive(Serialize, Deserialize)]
 struct VaultConfig {
     salt: String,
@@ -66,7 +84,7 @@ impl CryptoManager {
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_millis() as i64;
 
         let config = VaultConfig {
@@ -77,7 +95,9 @@ impl CryptoManager {
 
         if let Ok(json) = serde_json::to_string_pretty(&config) {
             let path = Self::config_path();
-            fs::create_dir_all(path.parent().unwrap()).ok();
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).ok();
+            }
             if fs::write(path, json).is_ok() {
                 return self.unlock_vault(password);
             }
@@ -98,18 +118,29 @@ impl CryptoManager {
                     hasher.update(password.as_bytes());
                     let computed_hash = hasher.finalize();
 
-                    if computed_hash.as_slice() == stored_hash.as_slice() {
+                    if constant_time_eq(computed_hash.as_slice(), stored_hash.as_slice()) {
                         let mut key = [0u8; 32];
-                        pbkdf2::pbkdf2::<hmac::Hmac<Sha256>>(
+                        let pbkdf2_res = pbkdf2::pbkdf2::<hmac::Hmac<Sha256>>(
                             password.as_bytes(),
                             &salt,
                             PBKDF2_ITERATIONS,
                             &mut key,
-                        )
-                        .ok();
+                        );
 
-                        let mut lock = self.session_key.write().unwrap();
+                        if pbkdf2_res.is_err() {
+                            zeroize_bytes(&mut key);
+                            return false;
+                        }
+
+                        let mut lock = match self.session_key.write() {
+                            Ok(l) => l,
+                            Err(_) => {
+                                zeroize_bytes(&mut key);
+                                return false;
+                            }
+                        };
                         *lock = Some(key);
+                        zeroize_bytes(&mut key);
                         return true;
                     }
                 }
@@ -119,12 +150,16 @@ impl CryptoManager {
     }
 
     pub fn lock_vault(&self) {
-        let mut lock = self.session_key.write().unwrap();
-        *lock = None;
+        if let Ok(mut lock) = self.session_key.write() {
+            if let Some(ref mut key) = *lock {
+                zeroize_bytes(key);
+            }
+            *lock = None;
+        }
     }
 
     pub fn is_unlocked(&self) -> bool {
-        self.session_key.read().unwrap().is_some()
+        self.session_key.read().map(|k| k.is_some()).unwrap_or(false)
     }
 
     #[allow(dead_code)]
@@ -132,17 +167,32 @@ impl CryptoManager {
         if plain_text.is_empty() {
             return String::new();
         }
-        let lock = self.session_key.read().unwrap();
-        let key_bytes = match *lock {
+        let lock = match self.session_key.read() {
+            Ok(l) => l,
+            Err(_) => return plain_text.to_string(),
+        };
+        let mut key_bytes = match *lock {
             Some(k) => k,
-            None => return plain_text.to_string(),
+            None => return "[ENC_ERR: Vault locked]".to_string(),
         };
 
         let mut iv = [0u8; IV_LEN];
         rand::rng().fill(&mut iv[..]);
 
-        let cipher = Aes256Gcm::new_from_slice(&key_bytes).unwrap();
-        let nonce = Nonce::try_from(iv.as_slice()).unwrap();
+        let cipher = match Aes256Gcm::new_from_slice(&key_bytes) {
+            Ok(c) => {
+                zeroize_bytes(&mut key_bytes);
+                c
+            }
+            Err(_) => {
+                zeroize_bytes(&mut key_bytes);
+                return plain_text.to_string();
+            }
+        };
+        let nonce = match Nonce::try_from(iv.as_slice()) {
+            Ok(n) => n,
+            Err(_) => return plain_text.to_string(),
+        };
 
         match cipher.encrypt(&nonce, plain_text.as_bytes()) {
             Ok(ciphertext) => {
@@ -160,20 +210,36 @@ impl CryptoManager {
         if !cipher_text.starts_with(PREFIX) {
             return cipher_text.to_string();
         }
-        let lock = self.session_key.read().unwrap();
-        let key_bytes = match *lock {
+        let lock = match self.session_key.read() {
+            Ok(l) => l,
+            Err(_) => return "[🔒 Kilitli Not - Kasayı Açınız]".to_string(),
+        };
+        let mut key_bytes = match *lock {
             Some(k) => k,
             None => return "[🔒 Kilitli Not - Kasayı Açınız]".to_string(),
         };
 
         let base64_data = &cipher_text[PREFIX.len()..];
         if let Ok(combined) = BASE64_STANDARD.decode(base64_data) {
-            if combined.len() < IV_LEN {
+            if combined.len() < IV_LEN + 16 {
+                zeroize_bytes(&mut key_bytes);
                 return "[Bozuk Şifreli İçerik]".to_string();
             }
             let (iv, ciphertext) = combined.split_at(IV_LEN);
-            let cipher = Aes256Gcm::new_from_slice(&key_bytes).unwrap();
-            let nonce = Nonce::try_from(iv).unwrap();
+            let cipher = match Aes256Gcm::new_from_slice(&key_bytes) {
+                Ok(c) => {
+                    zeroize_bytes(&mut key_bytes);
+                    c
+                }
+                Err(_) => {
+                    zeroize_bytes(&mut key_bytes);
+                    return "[Şifre Çözülemedi - Hatalı Anahtar]".to_string();
+                }
+            };
+            let nonce = match Nonce::try_from(iv) {
+                Ok(n) => n,
+                Err(_) => return "[Bozuk Şifreli İçerik]".to_string(),
+            };
 
             match cipher.decrypt(&nonce, ciphertext) {
                 Ok(decrypted_bytes) => {
@@ -182,7 +248,14 @@ impl CryptoManager {
                 Err(_) => "[Şifre Çözülemedi - Hatalı Anahtar]".to_string(),
             }
         } else {
+            zeroize_bytes(&mut key_bytes);
             "[Bozuk Base64 Verisi]".to_string()
         }
+    }
+}
+
+impl Drop for CryptoManager {
+    fn drop(&mut self) {
+        self.lock_vault();
     }
 }

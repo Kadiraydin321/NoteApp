@@ -9,6 +9,7 @@ plugins {
 android {
     namespace = "com.example.noteapp"
     compileSdk = 35
+    buildToolsVersion = "36.1.0"
 
     defaultConfig {
         applicationId = "com.example.noteapp"
@@ -75,8 +76,17 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.androidx.work.runtime.ktx)
 
-    // ML Kit OCR
+    // ML Kit OCR & Barcode Scanning
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1")
+
+    // CameraX
+    implementation("androidx.camera:camera-camera2:1.4.1")
+    implementation("androidx.camera:camera-lifecycle:1.4.1")
+    implementation("androidx.camera:camera-view:1.4.1")
+
+    // ZXing Core
+    implementation("com.google.zxing:core:3.5.3")
 
     debugImplementation(libs.androidx.ui.tooling)
     testImplementation("junit:junit:4.13.2")

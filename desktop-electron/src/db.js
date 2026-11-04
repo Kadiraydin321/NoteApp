@@ -57,10 +57,12 @@ class DatabaseManager {
   }
 
   createTables() {
+    this.db.run('PRAGMA foreign_keys = ON;');
+
     this.db.run(`
       CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
+        name TEXT NOT NULL UNIQUE,
         color INTEGER NOT NULL DEFAULT 0
       );
     `);
@@ -85,6 +87,16 @@ class DatabaseManager {
         backgroundImage TEXT,
         FOREIGN KEY (categoryId) REFERENCES categories(id) ON DELETE SET NULL
       );
+    `);
+
+    this.db.run(`
+      CREATE INDEX IF NOT EXISTS idx_notes_deleted ON notes(isDeleted);
+      CREATE INDEX IF NOT EXISTS idx_notes_archived ON notes(isArchived);
+      CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(isPinned);
+      CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updatedAt);
+      CREATE INDEX IF NOT EXISTS idx_notes_category ON notes(categoryId);
+      CREATE INDEX IF NOT EXISTS idx_notes_composite ON notes(isDeleted, isArchived, isPinned, updatedAt);
+      CREATE INDEX IF NOT EXISTS idx_notes_trash ON notes(isDeleted, deletedAt);
     `);
   }
 
@@ -289,7 +301,8 @@ class DatabaseManager {
   }
 
   restoreFromTrash(id) {
-    this.db.run('UPDATE notes SET isDeleted = 0, deletedAt = NULL WHERE id = ?', [id]);
+    const now = Date.now();
+    this.db.run('UPDATE notes SET isDeleted = 0, deletedAt = NULL, updatedAt = ? WHERE id = ?', [now, id]);
     this.save();
   }
 

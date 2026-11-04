@@ -66,7 +66,7 @@ class CryptoManager {
         .update(Buffer.from(password, 'utf8'))
         .digest();
 
-      if (crypto.timingSafeEqual(storedHash, computedHash)) {
+      if (storedHash.length === computedHash.length && crypto.timingSafeEqual(storedHash, computedHash)) {
         // Derive AES-256 session key using PBKDF2
         this.sessionKey = crypto.pbkdf2Sync(
           Buffer.from(password, 'utf8'),
@@ -85,6 +85,9 @@ class CryptoManager {
   }
 
   lockVault() {
+    if (this.sessionKey && Buffer.isBuffer(this.sessionKey)) {
+      this.sessionKey.fill(0);
+    }
     this.sessionKey = null;
     this.isVaultUnlocked = false;
   }

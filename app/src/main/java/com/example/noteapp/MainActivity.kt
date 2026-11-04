@@ -870,6 +870,10 @@ class MainActivity : FragmentActivity() {
                             onDismissMaintenanceMessage = viewModel::dismissMaintenanceMessage,
                             onTrashRetentionPolicyChange = viewModel::setTrashRetentionPolicy,
                             onLockTimeoutPolicyChange = viewModel::setLockTimeoutPolicy,
+                            qrSyncManager = viewModel.qrSyncManager,
+                            opticalTransferManager = viewModel.opticalTransferManager,
+                            onQrSyncScanned = viewModel::onQrSyncScanned,
+                            onOpticalTransferComplete = viewModel::onOpticalTransferCompleted,
                             onBackClick = {
                                 navController.popBackStack()
                             }

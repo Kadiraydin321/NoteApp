@@ -1008,6 +1008,8 @@ function setupEventListeners() {
   // Modals Triggers
   document.getElementById('btnAddCategory').onclick = () => openCategoryModal();
   document.getElementById('btnSyncDialog').onclick = () => openSyncModal();
+  const btnOpt = document.getElementById('btnOpticalTransferDialog');
+  if (btnOpt) btnOpt.onclick = () => openOpticalTransferModal();
   document.getElementById('btnBackupDialog').onclick = () => openBackupDialog();
   document.getElementById('btnSecurityDialog').onclick = () => openSecurityModal();
   document.getElementById('btnSetReminder').onclick = () => openReminderModal();
@@ -1432,25 +1434,33 @@ async function checkReminders() {
 async function openSyncModal() {
   openModal('modalSync');
   const state = await api.sync.getState();
-  updateSyncDialogUI(state);
+  await updateSyncDialogUI(state);
 
   document.getElementById('btnStartSyncServer').onclick = async () => {
     await api.sync.start();
     const st = await api.sync.getState();
-    updateSyncDialogUI(st);
+    await updateSyncDialogUI(st);
   };
 
   document.getElementById('btnStopSyncServer').onclick = async () => {
     await api.sync.stop();
     const st = await api.sync.getState();
-    updateSyncDialogUI(st);
+    await updateSyncDialogUI(st);
   };
 
   document.getElementById('btnRefreshPin').onclick = async () => {
     await api.sync.refreshPin();
     const st = await api.sync.getState();
-    updateSyncDialogUI(st);
+    await updateSyncDialogUI(st);
   };
+
+  const btnOpenOptical = document.getElementById('btnOpenOpticalFromSync');
+  if (btnOpenOptical) {
+    btnOpenOptical.onclick = () => {
+      closeModal('modalSync');
+      openOpticalTransferModal();
+    };
+  }
 
   document.getElementById('btnCloseSyncModal').onclick = () => {
     closeModal('modalSync');
@@ -1458,13 +1468,15 @@ async function openSyncModal() {
   };
 }
 
-function updateSyncDialogUI(state) {
+async function updateSyncDialogUI(state) {
   const statusBadge = document.getElementById('syncServerStatusText');
   const urlText = document.getElementById('syncServerUrlText');
   const pinBadge = document.getElementById('syncPinBadge');
   const btnStart = document.getElementById('btnStartSyncServer');
   const btnStop = document.getElementById('btnStopSyncServer');
   const statusDot = document.getElementById('syncStatusDot');
+  const qrImage = document.getElementById('syncQrImage');
+  const qrPlaceholder = document.getElementById('syncQrPlaceholder');
 
   if (state.isRunning) {
     statusBadge.textContent = 'Aktif';
@@ -1474,6 +1486,24 @@ function updateSyncDialogUI(state) {
     btnStart.style.display = 'none';
     btnStop.style.display = 'inline-block';
     statusDot.classList.add('active');
+
+    // Dinamik Wi-Fi Eşleşme QR Kodu Üret
+    try {
+      const qrPayload = JSON.stringify({
+        type: 'noteapp_sync',
+        ip: state.localIp,
+        port: state.port,
+        pin: state.pairingPin
+      });
+      const qrResult = await api.qr.generate(qrPayload, { width: 200, margin: 1, errorCorrectionLevel: 'M' });
+      if (qrResult.success && qrImage) {
+        qrImage.src = qrResult.dataUrl;
+        qrImage.style.display = 'block';
+        if (qrPlaceholder) qrPlaceholder.style.display = 'none';
+      }
+    } catch (err) {
+      console.error('Wi-Fi QR generation failed:', err);
+    }
   } else {
     statusBadge.textContent = 'Kapalı';
     statusBadge.className = 'status-badge';
@@ -1482,6 +1512,197 @@ function updateSyncDialogUI(state) {
     btnStart.style.display = 'inline-block';
     btnStop.style.display = 'none';
     statusDot.classList.remove('active');
+
+    if (qrImage) qrImage.style.display = 'none';
+    if (qrPlaceholder) qrPlaceholder.style.display = 'block';
+  }
+}
+
+// -------------------------------------------------------------
+// AIR-GAPPED OPTICAL STREAM MODAL (ANIMATED QR)
+// -------------------------------------------------------------
+let opticalStreamState = {
+  data: null,
+  currentIndex: 0,
+  isPlaying: true,
+  fps: 10,
+  intervalId: null,
+  qrCache: new Map()
+};
+
+async function openOpticalTransferModal() {
+  openModal('modalOpticalStream');
+
+  // Reset state
+  if (opticalStreamState.intervalId) {
+    clearInterval(opticalStreamState.intervalId);
+    opticalStreamState.intervalId = null;
+  }
+  opticalStreamState.currentIndex = 0;
+  opticalStreamState.isPlaying = true;
+  opticalStreamState.qrCache.clear();
+
+  const qrImage = document.getElementById('opticalQrImage');
+  const qrPlaceholder = document.getElementById('opticalQrPlaceholder');
+  const frameBadge = document.getElementById('opticalFrameBadge');
+  const btnPlayPause = document.getElementById('btnOpticalPlayPause');
+  const notesCountElem = document.getElementById('opticalNotesCount');
+  const totalBytesElem = document.getElementById('opticalTotalBytes');
+  const totalChunksElem = document.getElementById('opticalTotalChunks');
+  const checksumElem = document.getElementById('opticalChecksum');
+  const percentLabel = document.getElementById('opticalPercentLabel');
+  const progressBar = document.getElementById('opticalProgressBar');
+
+  if (qrPlaceholder) {
+    qrPlaceholder.style.display = 'flex';
+    qrPlaceholder.querySelector('span').textContent = 'Kareler Hazırlanıyor...';
+  }
+  if (qrImage) qrImage.style.display = 'none';
+
+  // Parçaları hazırla
+  const res = await api.optical.prepareChunks({ chunkSize: 220 });
+  if (!res.success || !res.chunks || res.chunks.length === 0) {
+    alert('Aktarılacak not bulunamadı veya hata oluştu: ' + (res.error || 'Bilinmeyen hata'));
+    closeModal('modalOpticalStream');
+    return;
+  }
+
+  opticalStreamState.data = res;
+  notesCountElem.textContent = `${res.notesCount} not (${res.categoriesCount} kategori)`;
+  totalBytesElem.textContent = `${(res.totalBytes / 1024).toFixed(1)} KB (${res.totalBytes} B)`;
+  totalChunksElem.textContent = `${res.totalChunks} kare`;
+  checksumElem.textContent = '0x' + (res.checksum >>> 0).toString(16).toUpperCase().padStart(8, '0');
+
+  // İlk kareyi hemen üretip göster
+  await renderOpticalFrame(0);
+
+  // Arka planda sonraki kareleri önbelleğe al
+  preloadOpticalFrames(res.chunks);
+
+  // Oynatma döngüsünü başlat
+  startOpticalPlayback();
+
+  // Buton Olayları
+  btnPlayPause.onclick = () => {
+    opticalStreamState.isPlaying = !opticalStreamState.isPlaying;
+    if (opticalStreamState.isPlaying) {
+      btnPlayPause.textContent = '⏸ Duraklat';
+      startOpticalPlayback();
+    } else {
+      btnPlayPause.textContent = '▶ Oynat';
+      if (opticalStreamState.intervalId) {
+        clearInterval(opticalStreamState.intervalId);
+        opticalStreamState.intervalId = null;
+      }
+    }
+  };
+
+  document.getElementById('btnOpticalPrevFrame').onclick = async () => {
+    pauseOptical();
+    const total = opticalStreamState.data.totalChunks;
+    opticalStreamState.currentIndex = (opticalStreamState.currentIndex - 1 + total) % total;
+    await renderOpticalFrame(opticalStreamState.currentIndex);
+  };
+
+  document.getElementById('btnOpticalNextFrame').onclick = async () => {
+    pauseOptical();
+    const total = opticalStreamState.data.totalChunks;
+    opticalStreamState.currentIndex = (opticalStreamState.currentIndex + 1) % total;
+    await renderOpticalFrame(opticalStreamState.currentIndex);
+  };
+
+  // FPS Selector
+  document.querySelectorAll('#opticalFpsSelector .speed-chip').forEach(chip => {
+    chip.onclick = () => {
+      document.querySelectorAll('#opticalFpsSelector .speed-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      opticalStreamState.fps = parseInt(chip.dataset.fps, 10) || 10;
+      if (opticalStreamState.isPlaying) {
+        startOpticalPlayback();
+      }
+    };
+  });
+
+  document.getElementById('btnCloseOpticalModal').onclick = () => {
+    pauseOptical();
+    closeModal('modalOpticalStream');
+  };
+}
+
+function pauseOptical() {
+  opticalStreamState.isPlaying = false;
+  const btn = document.getElementById('btnOpticalPlayPause');
+  if (btn) btn.textContent = '▶ Oynat';
+  if (opticalStreamState.intervalId) {
+    clearInterval(opticalStreamState.intervalId);
+    opticalStreamState.intervalId = null;
+  }
+}
+
+function startOpticalPlayback() {
+  if (opticalStreamState.intervalId) {
+    clearInterval(opticalStreamState.intervalId);
+  }
+  const intervalMs = Math.max(50, Math.round(1000 / opticalStreamState.fps));
+  opticalStreamState.intervalId = setInterval(async () => {
+    if (!opticalStreamState.data || opticalStreamState.data.totalChunks === 0) return;
+    const total = opticalStreamState.data.totalChunks;
+    opticalStreamState.currentIndex = (opticalStreamState.currentIndex + 1) % total;
+    await renderOpticalFrame(opticalStreamState.currentIndex);
+  }, intervalMs);
+}
+
+async function renderOpticalFrame(index) {
+  if (!opticalStreamState.data) return;
+  const chunks = opticalStreamState.data.chunks;
+  const total = opticalStreamState.data.totalChunks;
+  const chunk = chunks[index];
+  if (!chunk) return;
+
+  const qrImage = document.getElementById('opticalQrImage');
+  const qrPlaceholder = document.getElementById('opticalQrPlaceholder');
+  const frameBadge = document.getElementById('opticalFrameBadge');
+  const percentLabel = document.getElementById('opticalPercentLabel');
+  const progressBar = document.getElementById('opticalProgressBar');
+
+  const frameNum = index + 1;
+  const pct = Math.round((frameNum / total) * 100);
+
+  if (frameBadge) frameBadge.textContent = `Kare: ${frameNum} / ${total}`;
+  if (percentLabel) percentLabel.textContent = `%${pct}`;
+  if (progressBar) progressBar.style.width = `${pct}%`;
+
+  let dataUrl = opticalStreamState.qrCache.get(index);
+  if (!dataUrl) {
+    const payloadStr = JSON.stringify(chunk);
+    const qrRes = await api.qr.generate(payloadStr, { width: 300, margin: 2, errorCorrectionLevel: 'M' });
+    if (qrRes.success) {
+      dataUrl = qrRes.dataUrl;
+      opticalStreamState.qrCache.set(index, dataUrl);
+    }
+  }
+
+  if (dataUrl && qrImage) {
+    qrImage.src = dataUrl;
+    qrImage.style.display = 'block';
+    if (qrPlaceholder) qrPlaceholder.style.display = 'none';
+  }
+}
+
+async function preloadOpticalFrames(chunks) {
+  for (let i = 0; i < chunks.length; i++) {
+    if (opticalStreamState.qrCache.has(i)) continue;
+    try {
+      const payloadStr = JSON.stringify(chunks[i]);
+      const res = await api.qr.generate(payloadStr, { width: 300, margin: 2, errorCorrectionLevel: 'M' });
+      if (res.success) {
+        opticalStreamState.qrCache.set(i, res.dataUrl);
+      }
+    } catch (_) {}
+    // UI bloklamamak için minik bekleme
+    if (i % 3 === 0) {
+      await new Promise(r => setTimeout(r, 10));
+    }
   }
 }
 

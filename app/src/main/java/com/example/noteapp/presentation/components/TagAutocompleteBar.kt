@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -61,13 +62,16 @@ fun TagAutocompleteBar(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(15.dp)
                     )
-                    Text(
+                    AutoResizeText(
                         text = if (query.isNotBlank()) "Etiket: #$query" else "Kullanılan Etiketler",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
                         ),
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        minFontSize = 9.sp,
+                        overflow = TextOverflow.Ellipsis
                     )
                     if (suggestions.isNotEmpty()) {
                         Surface(
@@ -116,10 +120,13 @@ fun TagAutocompleteBar(
                         SuggestionChip(
                             onClick = { onSelectTag(query) },
                             label = {
-                                Text(
-                                    "+#$query",
+                                AutoResizeText(
+                                    text = "+#$query",
                                     fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.labelMedium
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                    minFontSize = 9.sp,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             },
                             icon = {
@@ -144,10 +151,13 @@ fun TagAutocompleteBar(
                     SuggestionChip(
                         onClick = { onSelectTag(tag) },
                         label = {
-                            Text(
-                                "#$tag",
+                            AutoResizeText(
+                                text = "#$tag",
                                 fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.labelMedium
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                minFontSize = 9.sp,
+                                overflow = TextOverflow.Ellipsis
                             )
                         },
                         colors = SuggestionChipDefaults.suggestionChipColors(

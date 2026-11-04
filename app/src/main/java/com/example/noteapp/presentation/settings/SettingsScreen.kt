@@ -50,8 +50,14 @@ import com.example.noteapp.biometric.BiometricPromptManager
 import com.example.noteapp.biometric.BiometricResult
 import com.example.noteapp.biometric.findFragmentActivity
 import com.example.noteapp.data.settings.*
+import com.example.noteapp.data.sync.OpticalImportResult
+import com.example.noteapp.data.sync.OpticalTransferManager
+import com.example.noteapp.data.sync.QrSyncManager
+import com.example.noteapp.data.sync.SyncQrPayload
 import com.example.noteapp.data.updater.UpdateStatus
 import com.example.noteapp.presentation.detail.NoteColors
+import com.example.noteapp.presentation.sync.OpticalQrScannerDialog
+import com.example.noteapp.presentation.sync.ScannerMode
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
@@ -101,6 +107,10 @@ fun SettingsScreen(
     onDismissMaintenanceMessage: () -> Unit = {},
     onTrashRetentionPolicyChange: (TrashRetentionPolicy) -> Unit = {},
     onLockTimeoutPolicyChange: (LockTimeoutPolicy) -> Unit = {},
+    qrSyncManager: QrSyncManager? = null,
+    opticalTransferManager: OpticalTransferManager? = null,
+    onQrSyncScanned: (SyncQrPayload) -> Unit = {},
+    onOpticalTransferComplete: (OpticalImportResult) -> Unit = {},
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -164,6 +174,8 @@ fun SettingsScreen(
         mutableStateOf(settings.lastSyncPin)
     }
     var syncClearExisting by remember { mutableStateOf(false) }
+    var showScannerDialog by remember { mutableStateOf(false) }
+    var activeScannerMode by remember { mutableStateOf(ScannerMode.WIFI_SYNC_PAIRING) }
 
     LaunchedEffect(syncUiState.discoveredHost) {
         syncUiState.discoveredHost?.let {
@@ -1154,10 +1166,42 @@ fun SettingsScreen(
                         }
 
                         Text(
-                            "Bilgisayarınızdaki 'Not Defterim Masaüstü' uygulaması ile yerel ağ üzerinden kablosuz eşitleme yapın.",
+                            "Bilgisayarınızdaki 'Not Defterim Masaüstü' uygulaması ile yerel ağ üzerinden kablosuz eşitleme yapın veya optik QR akışıyla tamamen kablosuz/ağsız not aktarın.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        // 1. Masaüstü QR Kodunu Tara Butonu
+                        Button(
+                            onClick = {
+                                activeScannerMode = ScannerMode.WIFI_SYNC_PAIRING
+                                showScannerDialog = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 46.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Masaüstü QR Kodunu Tara 📷", fontWeight = FontWeight.Bold)
+                        }
+
+                        // 2. Optik Not Aktarımı (Air-Gapped QR Stream) Butonu
+                        OutlinedButton(
+                            onClick = {
+                                activeScannerMode = ScannerMode.OPTICAL_STREAM
+                                showScannerDialog = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 46.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Optik / Kamera ile Not Al (Air-Gapped Stream)", fontWeight = FontWeight.SemiBold)
+                        }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -2211,6 +2255,25 @@ fun SettingsScreen(
                 ) {
                     Text("Tamam")
                 }
+            }
+        )
+    }
+
+    // 7.1. QR & Optik Akış Tarayıcı Dialog
+    if (showScannerDialog && qrSyncManager != null && opticalTransferManager != null) {
+        OpticalQrScannerDialog(
+            mode = activeScannerMode,
+            qrSyncManager = qrSyncManager,
+            opticalTransferManager = opticalTransferManager,
+            onDismiss = { showScannerDialog = false },
+            onWifiSyncScanned = { payload ->
+                syncHostInput = payload.ip
+                syncPinInput = payload.pin
+                onQrSyncScanned(payload)
+                showScannerDialog = false
+            },
+            onOpticalTransferComplete = { result ->
+                onOpticalTransferComplete(result)
             }
         )
     }

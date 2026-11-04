@@ -39,15 +39,17 @@ impl Database {
     }
 
     fn get_conn(&self) -> Result<Connection> {
-        Connection::open(&self.db_path)
+        let conn = Connection::open(&self.db_path)?;
+        conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+        Ok(conn)
     }
 
     fn init_schema(&self) -> Result<()> {
         let conn = self.get_conn()?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS categories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
                 color INTEGER NOT NULL DEFAULT 0
             );",
             [],
@@ -55,7 +57,7 @@ impl Database {
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS notes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER PRIMARY KEY,
                 title TEXT NOT NULL,
                 content TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
@@ -74,6 +76,16 @@ impl Database {
                 FOREIGN KEY (categoryId) REFERENCES categories(id) ON DELETE SET NULL
             );",
             [],
+        )?;
+
+        conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_notes_deleted ON notes(isDeleted);
+             CREATE INDEX IF NOT EXISTS idx_notes_archived ON notes(isArchived);
+             CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(isPinned);
+             CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updatedAt);
+             CREATE INDEX IF NOT EXISTS idx_notes_category ON notes(categoryId);
+             CREATE INDEX IF NOT EXISTS idx_notes_composite ON notes(isDeleted, isArchived, isPinned, updatedAt);
+             CREATE INDEX IF NOT EXISTS idx_notes_trash ON notes(isDeleted, deletedAt);"
         )?;
 
         Ok(())
@@ -215,10 +227,10 @@ impl Database {
         let conn = self.get_conn()?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_millis() as i64;
         conn.execute(
-            "UPDATE notes SET isDeleted = 1, deletedAt = ?1 WHERE id = ?2",
+            "UPDATE notes SET isDeleted = 1, deletedAt = ?1, updatedAt = ?1, isPinned = 0 WHERE id = ?2",
             params![now, id],
         )?;
         Ok(())
@@ -226,9 +238,13 @@ impl Database {
 
     pub fn restore_from_trash(&self, id: i64) -> Result<()> {
         let conn = self.get_conn()?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
         conn.execute(
-            "UPDATE notes SET isDeleted = 0, deletedAt = NULL WHERE id = ?1",
-            params![id],
+            "UPDATE notes SET isDeleted = 0, deletedAt = NULL, updatedAt = ?1 WHERE id = ?2",
+            params![now, id],
         )?;
         Ok(())
     }
