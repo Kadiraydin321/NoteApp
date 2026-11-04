@@ -300,12 +300,23 @@ class SettingsViewModel @Inject constructor(
     /**
      * Seçilen ZIP yedek dosyasından notları ve medyaları içe aktarır.
      */
-    fun importBackupFromUri(uri: Uri, clearExisting: Boolean, vaultPassword: String? = null) {
+    fun importBackupFromUri(
+        uri: Uri,
+        clearExisting: Boolean,
+        vaultPassword: String? = null,
+        candidatePasswords: List<String> = emptyList()
+    ) {
         viewModelScope.launch {
             _backupUiState.value = BackupUiState(isOperating = true, operationTitle = "Yedek verileri geri yükleniyor...")
             try {
                 app.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val result = backupManager.restoreBackup(inputStream, clearExisting, vaultPassword)
+                    val candidates = candidatePasswords.toMutableList()
+                    settingsManager.settings.value.masterPin?.let {
+                        if (it.isNotBlank() && !candidates.contains(it)) {
+                            candidates.add(it)
+                        }
+                    }
+                    val result = backupManager.restoreBackup(inputStream, clearExisting, vaultPassword, candidates)
                     when (result) {
                         is RestoreResult.Success -> {
                             _backupUiState.value = BackupUiState(
@@ -317,7 +328,7 @@ class SettingsViewModel @Inject constructor(
                         is RestoreResult.NeedsPassword -> {
                             _backupUiState.value = BackupUiState(
                                 isOperating = false,
-                                message = "Bu yedek dosyası Kasa Kilidi ile şifrelenmiştir. Lütfen kasa kilidini giriniz.",
+                                message = "Bu yedek dosyası Kasa Kilidi ile şifrelenmiştir. Lütfen kasa kilidini girin veya parmak izinizi doğrulayın.",
                                 isSuccess = false
                             )
                         }

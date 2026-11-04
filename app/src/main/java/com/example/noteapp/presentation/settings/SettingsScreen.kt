@@ -116,6 +116,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
+    var showBackupOptionsDialog by remember { mutableStateOf(false) }
     var showExportPasswordDialog by remember { mutableStateOf(false) }
     var isSharePending by remember { mutableStateOf(false) }
     var vaultPasswordForExport by remember { mutableStateOf("") }
@@ -1057,73 +1058,21 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Buton 1: Cihaza / Dosyalara Kaydet
+                // Tek Ana Buton: Notları Yedekle & Dışa Aktar
                 Button(
                     onClick = {
-                        isSharePending = false
-                        if (isBiometricAvailable) {
-                            promptManager?.showBiometricPrompt(
-                                title = "Yedeklemeyi Onayla",
-                                description = "Notlarınızı dışa aktarmak için parmak izinizi kullanın",
-                                onResult = { result ->
-                                    if (result is BiometricResult.AuthenticationSuccess) {
-                                        vaultPasswordForExport = settings.masterPin ?: ""
-                                        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                                        val ext = if (vaultPasswordForExport.isNotBlank()) "notevault" else "zip"
-                                        createDocumentLauncher.launch("NoteApp_Yedek_$dateStr.$ext")
-                                    } else if (result !is BiometricResult.AuthenticationFailed) {
-                                        vaultPasswordForExport = settings.masterPin ?: ""
-                                        showExportPasswordDialog = true
-                                    }
-                                }
-                            )
-                        } else {
-                            vaultPasswordForExport = settings.masterPin ?: ""
-                            showExportPasswordDialog = true
-                        }
+                        showBackupOptionsDialog = true
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
                 ) {
-                    Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Kasa Kilidi ile Yedekle (.notevault / .zip)")
+                    Text("📦 Notları Yedekle & Dışa Aktar", fontWeight = FontWeight.SemiBold)
                 }
 
-                // Buton 2: Paylaş Menüsü ile Dışa Aktar
-                OutlinedButton(
-                    onClick = {
-                        isSharePending = true
-                        if (isBiometricAvailable) {
-                            promptManager?.showBiometricPrompt(
-                                title = "Yedeklemeyi Onayla",
-                                description = "Notlarınızı paylaşmak için parmak izinizi kullanın",
-                                onResult = { result ->
-                                    if (result is BiometricResult.AuthenticationSuccess) {
-                                        vaultPasswordForExport = settings.masterPin ?: ""
-                                        onExportAndShare(context, vaultPasswordForExport.ifBlank { null })
-                                    } else if (result !is BiometricResult.AuthenticationFailed) {
-                                        vaultPasswordForExport = settings.masterPin ?: ""
-                                        showExportPasswordDialog = true
-                                    }
-                                }
-                            )
-                        } else {
-                            vaultPasswordForExport = settings.masterPin ?: ""
-                            showExportPasswordDialog = true
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Kasa Kilidi ile Yedeği Paylaş / Gönder")
-                }
-
-                // Buton 3: Yedeği İçe Aktar
+                // Temiz Tek Buton: Yedekten Geri Yükle
                 FilledTonalButton(
                     onClick = {
                         openDocumentLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
@@ -1134,7 +1083,7 @@ fun SettingsScreen(
                 ) {
                     Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Yedekten Geri Yükle (İçe Aktar)")
+                    Text("📥 Yedekten Geri Yükle", fontWeight = FontWeight.SemiBold)
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
@@ -1809,6 +1758,283 @@ fun SettingsScreen(
     // İLETİŞİM KUTULARI VE MODERN DİALOGLAR (M3 TASARIM & 48DP BUTONLAR)
     // =========================================================================
 
+    // 0. Yedekleme Seçenekleri Pop-up Penceresi
+    if (showBackupOptionsDialog) {
+        AlertDialog(
+            onDismissRequest = { showBackupOptionsDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.Inventory2,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Yedekleme Seçenekleri",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Notlarınızı, eklerinizi ve verilerinizi nasıl yedeklemek istersiniz?",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // 1. Standart ZIP Yedekleme
+                    Surface(
+                        onClick = {
+                            showBackupOptionsDialog = false
+                            isSharePending = false
+                            vaultPasswordForExport = ""
+                            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                            createDocumentLauncher.launch("NoteApp_Yedek_$dateStr.zip")
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.FolderZip,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "📁 Standart ZIP Yedekleme",
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "Notlar, sesler, çizimler ve tüm medya ekleri şifresiz ZIP olarak kaydedilir.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // 2. Kasa Kilidi ile Şifreli (.notevault)
+                    Surface(
+                        onClick = {
+                            showBackupOptionsDialog = false
+                            isSharePending = false
+                            vaultPasswordForExport = settings.masterPin ?: ""
+                            showExportPasswordDialog = true
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF2E7D32).copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = Color(0xFF2E7D32),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "🔒 Kasa Kilidi ile Şifreli (.notevault)",
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "AES-256-GCM ve Kasa PIN'iniz ile uçtan uca şifreli güvenlik yedeği.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // 3. Parmak İzi ile Güvenli Yedek
+                    Surface(
+                        onClick = {
+                            showBackupOptionsDialog = false
+                            isSharePending = false
+                            if (isBiometricAvailable) {
+                                promptManager?.showBiometricPrompt(
+                                    title = "Yedeklemeyi Onayla",
+                                    description = "Notlarınızı dışa aktarmak için parmak izinizi kullanın",
+                                    onResult = { result ->
+                                        if (result is BiometricResult.AuthenticationSuccess) {
+                                            vaultPasswordForExport = settings.masterPin ?: ""
+                                            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                                            val ext = if (vaultPasswordForExport.isNotBlank()) "notevault" else "zip"
+                                            createDocumentLauncher.launch("NoteApp_Yedek_$dateStr.$ext")
+                                        } else if (result !is BiometricResult.AuthenticationFailed) {
+                                            vaultPasswordForExport = settings.masterPin ?: ""
+                                            showExportPasswordDialog = true
+                                        }
+                                    }
+                                )
+                            } else {
+                                vaultPasswordForExport = settings.masterPin ?: ""
+                                showExportPasswordDialog = true
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF1976D2).copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Fingerprint,
+                                    contentDescription = null,
+                                    tint = Color(0xFF1976D2),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "👆 Parmak İzi ile Güvenli Yedek",
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "Biyometrik onay ile donanımsal korumalı hızlı cihaz yedeği.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // 4. Paylaş / Gönder
+                    Surface(
+                        onClick = {
+                            showBackupOptionsDialog = false
+                            isSharePending = true
+                            vaultPasswordForExport = settings.masterPin ?: ""
+                            if (isBiometricAvailable) {
+                                promptManager?.showBiometricPrompt(
+                                    title = "Yedeklemeyi Onayla",
+                                    description = "Notlarınızı paylaşmak için parmak izinizi kullanın",
+                                    onResult = { result ->
+                                        if (result is BiometricResult.AuthenticationSuccess) {
+                                            onExportAndShare(context, vaultPasswordForExport.ifBlank { null })
+                                        } else if (result !is BiometricResult.AuthenticationFailed) {
+                                            showExportPasswordDialog = true
+                                        }
+                                    }
+                                )
+                            } else {
+                                onExportAndShare(context, vaultPasswordForExport.ifBlank { null })
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFE65100).copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = null,
+                                    tint = Color(0xFFE65100),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "📤 Paylaş / Gönder",
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "Yedeği oluşturup doğrudan WhatsApp, Drive veya Mail ile paylaşın.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(
+                    onClick = { showBackupOptionsDialog = false }
+                ) {
+                    Text("Vazgeç")
+                }
+            }
+        )
+    }
+
     // 1. Kasa Kilidi ile Dışa Aktarma Penceresi
     if (showExportPasswordDialog) {
         AlertDialog(
@@ -1967,6 +2193,48 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyMedium
                     )
 
+                    if (isBiometricAvailable) {
+                        FilledTonalButton(
+                            onClick = {
+                                promptManager?.showBiometricPrompt(
+                                    title = "Yedek Kilidini Aç",
+                                    description = "Yedek dosyasını geri yüklemek için parmak izinizi doğrulayın",
+                                    onResult = { result ->
+                                        if (result is BiometricResult.AuthenticationSuccess) {
+                                            showImportConfirmDialog = false
+                                            val pass = importPasswordInput.ifBlank { settings.masterPin }
+                                            pendingImportUri = null
+                                            importPasswordInput = ""
+                                            onImportFromUri(uri, false, pass)
+                                        }
+                                    }
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 44.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Parmak İzi ile Doğrula & Geri Yükle")
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Text(
+                                "veya şifre ile",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        }
+                    }
+
                     OutlinedTextField(
                         value = importPasswordInput,
                         onValueChange = { importPasswordInput = it },
@@ -2001,7 +2269,7 @@ fun SettingsScreen(
                     Button(
                         onClick = {
                             showImportConfirmDialog = false
-                            val pass = importPasswordInput.ifBlank { null }
+                            val pass = importPasswordInput.ifBlank { settings.masterPin }
                             pendingImportUri = null
                             importPasswordInput = ""
                             onImportFromUri(uri, false, pass)
@@ -2020,7 +2288,7 @@ fun SettingsScreen(
                     FilledTonalButton(
                         onClick = {
                             showImportConfirmDialog = false
-                            val pass = importPasswordInput.ifBlank { null }
+                            val pass = importPasswordInput.ifBlank { settings.masterPin }
                             pendingImportUri = null
                             importPasswordInput = ""
                             onImportFromUri(uri, true, pass)

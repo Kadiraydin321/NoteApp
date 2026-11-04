@@ -1,8 +1,8 @@
 {
-  "versionCode": 31,
-  "versionName": "1.4.0",
-  "buildTime": 1730737700,
+  "versionCode": 32,
+  "versionName": "1.4.1",
+  "buildTime": 1730739900,
   "releaseDate": "04.11.2026",
-  "changeLog": "v1.4.0: Okuma modu düzeltmesi, 4 kategorili akordiyon menü, hava boşluklu optik QR akış aktarımı (15 FPS), masaüstü QR LAN senkronizasyonu, AutoResizeText taşma koruması ve sadeleştirilmiş tek sürüm arayüzü.",
+  "changeLog": "v1.4.1: Biyometrik parmak iziyle şifreli yedeklerin şifre sormadan doğrudan parmak iziyle veya otomatik Kasa PIN eşleştirmesiyle geri yüklenmesi (mevcut yedeklerin tam kurtarılması) ve yedekleme seçeneklerinin tek bir modern pop-up altında toplanması.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }

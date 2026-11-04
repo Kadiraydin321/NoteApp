@@ -1,7 +1,7 @@
 # 📌 Proje Durumu & Hafıza Kartı (PROJECT_STATE)
 
 **Son Güncelleme:** 2026-11-04 17:00
-**Aktif Sürüm / Durum:** v1.4.0 / Kararlı & Emülatör Doğrulamalı
+**Aktif Sürüm / Durum:** v1.4.1 / Kararlı & Emülatör Doğrulamalı
 **Teknoloji Yığını:** Rust Wry / Tauri (`desktop-native`), Node.js / Electron 33 (`desktop-electron`), Kotlin Jetpack Compose Room SQLite (`app` Android), Compose Multiplatform (`desktop`), CameraX & ML Kit Barcode, Vanilla JS, CSS3 Glassmorphism
 
 ---
@@ -89,6 +89,7 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] v1.4.1: Biyometrik parmak iziyle şifreli yedek geri yükleme, tek butonlu modern yedekleme pop-up'ı, Release APK derlemesi (versionCode: 32, 4.46 MB) ve GitHub apk/main dağıtımı tamamlandı.
 - [x] v1.4.0: Release APK derlendi (versionCode: 31, 4.44 MB), version.json hazırlandı ve apk/main dalları GitHub'a dağıtıldı.
 - [x] v1.4.0: GitHub Uzak Depo Yedeklemesi tamamlandı (`commit: cb39152`, `branch: main` -> `git@github.com:Kadiraydin321/NoteApp.git`).
 - [x] v1.4.0: Android canlı emülatör doğrulaması %100 yeşil (13/13 fonksiyon ve hotfix bizzat kanıtlandı).

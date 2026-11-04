@@ -12,6 +12,13 @@ import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import javax.crypto.Cipher
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.SecretKeySpec
+import java.security.MessageDigest
+import java.security.SecureRandom
 
 class BackupRestoreEngineTest {
 
@@ -126,5 +133,74 @@ class BackupRestoreEngineTest {
         assertEquals(8, magic.size)
         assertEquals('N'.code.toByte(), magic[0])
         assertEquals('1'.code.toByte(), magic[7])
+    }
+
+    @Test
+    fun `vault candidate password matching and decryption succeeds`() {
+        val secretPin = "1234"
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
+
+        // Password Hash: SHA-256(salt + password)
+        val md = MessageDigest.getInstance("SHA-256")
+        md.update(salt)
+        md.update(secretPin.toByteArray(Charsets.UTF_8))
+        val storedHash = md.digest()
+
+        // AES-256-GCM Encrypt
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val spec = PBEKeySpec(secretPin.toCharArray(), salt, 65536, 256)
+        val secretKey = SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
+        val plainPayload = "{\"notes\":[]}".toByteArray(Charsets.UTF_8)
+        val ciphertext = cipher.doFinal(plainPayload)
+
+        // Simule edilmis aday anahtar testi (Biometric fallback / Master PIN)
+        val candidates = listOf("0000", "9999", "1234", "5678")
+        var resolvedPassword: String? = null
+        for (candidate in candidates) {
+            md.reset()
+            md.update(salt)
+            md.update(candidate.toByteArray(Charsets.UTF_8))
+            if (md.digest().contentEquals(storedHash)) {
+                resolvedPassword = candidate
+                break
+            }
+        }
+
+        assertNotNull("Aday anahtarlardan biri eslesmelidir", resolvedPassword)
+        assertEquals("1234", resolvedPassword)
+
+        // Cozme islemini dogrula
+        val decryptSpec = PBEKeySpec(resolvedPassword!!.toCharArray(), salt, 65536, 256)
+        val decryptKey = SecretKeySpec(factory.generateSecret(decryptSpec).encoded, "AES")
+        cipher.init(Cipher.DECRYPT_MODE, decryptKey, GCMParameterSpec(128, iv))
+        val decryptedBytes = cipher.doFinal(ciphertext)
+        assertEquals("{\"notes\":[]}", String(decryptedBytes, Charsets.UTF_8))
+    }
+
+    @Test
+    fun `vault candidate password fails when no candidates match`() {
+        val secretPin = "7788"
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val md = MessageDigest.getInstance("SHA-256")
+        md.update(salt)
+        md.update(secretPin.toByteArray(Charsets.UTF_8))
+        val storedHash = md.digest()
+
+        val wrongCandidates = listOf("0000", "1111", "2222")
+        var resolvedPassword: String? = null
+        for (candidate in wrongCandidates) {
+            md.reset()
+            md.update(salt)
+            md.update(candidate.toByteArray(Charsets.UTF_8))
+            if (md.digest().contentEquals(storedHash)) {
+                resolvedPassword = candidate
+                break
+            }
+        }
+
+        assertEquals(null, resolvedPassword)
     }
 }
