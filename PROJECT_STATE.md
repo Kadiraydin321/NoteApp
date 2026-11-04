@@ -19,10 +19,15 @@
   - `desktop-electron/src/`: SQLite veritabanı (`db.js`), PBKDF2/AES-GCM kasa (`crypto.js`), ZIP/Container yedekleme (`backup.js`), HTTP 8765 senkronizasyon sunucusu (`sync-server.js`).
   - `desktop-native/src/`: Rust SQLite motoru (`db.rs`), zeroize güvenli kripto (`crypto.rs`), Zip-Slip korumalı yedekleyici (`backup.rs`), tiny_http Wi-Fi sunucusu (`sync_server.rs`).
   - `tools/sync_tester/`: Herhangi bir projede kullanılabilir bağımsız Wi-Fi & LAN senkronizasyon doğrulama kütüphanesi (Node.js & Python).
+- **Otomatik ve Yedekli APK Dağıtım Protokolü (Fail-Safe In-App Update Pipeline):**
+  - **Sürüm ve Dal Senkronizasyon Kuralı:** Her sürüm yayınında `versionCode` artırılır. Üretilen `NoteApp-release.apk` ve sürüm metadata dosyası `version.json`, hem `main` hem de `apk` dağıtım dalına (`origin/apk`) otomatik aktarılarak yayınlanır.
+  - **Çift Kanallı Yedekli Güncelleme Motoru (`AppUpdateManager`):** Uygulama içi güncelleme servisi birincil olarak raw CDN (`raw.githubusercontent.com/.../apk/version.json`) üzerinden `versionCode` kontrolü sağlar; erişim engeli veya gecikmelerde GitHub Commits API ve Releases API yedek kanallarına geçiş yapar.
+  - **Doğrudan Tek Tıkla Kurulum Güvencesi:** Kullanıcının manuel GitHub aramasına gerek kalmadan doğrudan uygulama içinden (Ayarlar veya otomatik bildirim modalı) arka planda indirme (`SupervisorJob` + `Dispatchers.IO`) ve `FileProvider` ile tek tıkla APK kurulumu garanti altına alınır.
 
 ---
 
 ## 2. ⚡ Aktif ve Tamamlanmış Özellikler
+- [x] **Otomatik & Yedekli Uygulama İçi Güncelleme (In-App Update Pipeline):** `AppUpdateManager` ile `apk` ve `main` dalları üzerinden çift kanallı `version.json` denetimi, arka planda kesintisiz indirme ve Android `FileProvider` ile tek tıkla doğrudan APK kurulumu.
 - [x] **Okuma Modu Onarımı & Geliştirmesi:** Markdown render ve koyu tema zıtlık kontrast sorunu çözüldü, üst çubuğa doğrudan erişilebilir Okuma Modu butonu eklendi, font boyutu (A-/A+) ve satır aralığı ölçekleyici optimize edildi.
 - [x] **3 Nokta Menüsü Akordiyon Mimarisi:** Karmaşık 30+ maddelik menü 4 ana akordiyon başlığı altında ("Görünüm & Okuma", "Güvenlik & Kasa", "Paylaş & Dışa Aktar", "Araçlar & Şablonlar") `AnimatedVisibility`, akıcı geçişler ve taşma önleyici dikey kaydırma (`verticalScroll`) ile yeniden yapılandırıldı.
 - [x] **Responsive & Auto-Sizing Tasarım (Taşma Koruması):** `AutoResizeText.kt` dinamik yazı boyutu bileşeni, CSS `clamp()` ve `text-overflow: ellipsis` Android ve Masaüstü arayüzlerine entegre edildi. Metin taşmaları yerine font otomatik küçülerek tasarım korunuyor.
