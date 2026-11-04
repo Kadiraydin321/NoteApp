@@ -178,6 +178,7 @@ fun SettingsScreen(
     var syncClearExisting by remember { mutableStateOf(false) }
     var showScannerDialog by remember { mutableStateOf(false) }
     var activeScannerMode by remember { mutableStateOf(ScannerMode.WIFI_SYNC_PAIRING) }
+    var showManualConnection by remember { mutableStateOf(false) }
 
     LaunchedEffect(syncUiState.discoveredHost) {
         syncUiState.discoveredHost?.let {
@@ -1123,12 +1124,12 @@ fun SettingsScreen(
                         }
 
                         Text(
-                            "Bilgisayarınızdaki 'Not Defterim Masaüstü' uygulaması ile yerel ağ üzerinden kablosuz eşitleme yapın veya optik QR akışıyla tamamen kablosuz/ağsız not aktarın.",
+                            "Bilgisayarınızdaki 'Not Defterim Masaüstü' uygulaması ile kamera veya yerel ağ üzerinden IP/Port girmeden tek tıkla eşitleyin.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        // 1. Masaüstü QR Kodunu Tara Butonu
+                        // 1. Birincil Eylem: Masaüstü QR Kodunu Tara (Kamera ile Tek Tıkla Eşitle)
                         Button(
                             onClick = {
                                 activeScannerMode = ScannerMode.WIFI_SYNC_PAIRING
@@ -1136,15 +1137,42 @@ fun SettingsScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .heightIn(min = 52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Column(horizontalAlignment = Alignment.Start) {
+                                Text("Masaüstü QR Kodunu Tara 📷", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                Text("Kamera ile Tek Tıkla Eşitle", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+
+                        // 2. İkincil Eylem: Ağda Otomatik Bul ve Eşitle 🔍
+                        FilledTonalButton(
+                            onClick = { onAutoDiscoverServer(syncHostInput) },
+                            enabled = !syncUiState.isDiscovering && !syncUiState.isOperating,
+                            modifier = Modifier
+                                .fillMaxWidth()
                                 .heightIn(min = 46.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Masaüstü QR Kodunu Tara 📷", fontWeight = FontWeight.Bold)
+                            if (syncUiState.isDiscovering) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Wi-Fi Ağı Taranıyor...")
+                            } else {
+                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Ağda Otomatik Bul ve Eşitle 🔍", fontWeight = FontWeight.SemiBold)
+                            }
                         }
 
-                        // 2. Optik Not Aktarımı (Air-Gapped QR Stream) Butonu
+                        // 3. Üçüncü Eylem: Optik / Kamera ile Not Al (Air-Gapped Stream)
                         OutlinedButton(
                             onClick = {
                                 activeScannerMode = ScannerMode.OPTICAL_STREAM
@@ -1152,138 +1180,161 @@ fun SettingsScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(min = 46.dp),
+                                .heightIn(min = 44.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Optik / Kamera ile Not Al (Air-Gapped Stream)", fontWeight = FontWeight.SemiBold)
+                            Text("Optik / Kamera ile Not Al (Air-Gapped Stream)", fontWeight = FontWeight.Medium)
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = syncHostInput,
-                                onValueChange = { syncHostInput = it },
-                                label = { Text("Bilgisayar IP") },
-                                placeholder = { Text("192.168.1.X") },
-                                singleLine = true,
-                                modifier = Modifier.weight(1.8f)
-                            )
-                            OutlinedTextField(
-                                value = syncPinInput,
-                                onValueChange = { if (it.length <= 4 && it.all { c -> c.isDigit() }) syncPinInput = it },
-                                label = { Text("PIN") },
-                                placeholder = { Text("4 Hane") },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FilledTonalButton(
-                                onClick = { onAutoDiscoverServer(syncHostInput) },
-                                enabled = !syncUiState.isDiscovering && !syncUiState.isOperating,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 44.dp)
-                            ) {
-                                if (syncUiState.isDiscovering) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Taranıyor...")
-                                } else {
-                                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Ağda Bul 🔍")
-                                }
-                            }
-
-                            OutlinedButton(
-                                onClick = { onCheckSyncConnection(syncHostInput) },
-                                enabled = syncHostInput.isNotBlank() && !syncUiState.statusChecking && !syncUiState.isOperating,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 44.dp)
-                            ) {
-                                if (syncUiState.statusChecking) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Bağlanıyor...")
-                                } else {
-                                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Test Et")
-                                }
-                            }
-                        }
-
+                        // Bağlantı Durum Kartı ve Hızlı Eşitleme Butonları
                         if (syncUiState.isConnected == true) {
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        "✓ Bağlandı: ${syncUiState.serverStatus?.appName ?: "Masaüstü"} (${syncUiState.serverStatus?.notesCount ?: 0} not)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            "✓ Bağlandı: ${syncUiState.serverStatus?.appName ?: "Masaüstü"} (${syncUiState.serverStatus?.notesCount ?: 0} not)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { onSendNotesToDesktop(syncHostInput, syncPinInput, syncClearExisting, settings.masterPin) },
+                                            enabled = syncHostInput.isNotBlank() && syncPinInput.length == 4 && !syncUiState.isOperating,
+                                            modifier = Modifier.weight(1f).heightIn(min = 40.dp),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Gönder 📤")
+                                        }
+
+                                        FilledTonalButton(
+                                            onClick = { onPullNotesFromDesktop(syncHostInput, syncPinInput, syncClearExisting, settings.masterPin) },
+                                            enabled = syncHostInput.isNotBlank() && syncPinInput.length == 4 && !syncUiState.isOperating,
+                                            modifier = Modifier.weight(1f).heightIn(min = 40.dp),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Çek 📥")
+                                        }
+                                    }
                                 }
                             }
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Mevcut Notların Üzerine Yaz", style = MaterialTheme.typography.bodySmall)
-                            Switch(
-                                checked = syncClearExisting,
-                                onCheckedChange = { syncClearExisting = it }
+                        // İşlem veya Bilgi Mesajı
+                        if (syncUiState.isOperating) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    syncUiState.operationTitle ?: "İşlem yapılıyor...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else if (!syncUiState.message.isNullOrBlank()) {
+                            Text(
+                                syncUiState.message ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (syncUiState.isSuccess == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                             )
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        // 4. İsteğe Bağlı Katlanabilir Akordiyon: Gelişmiş / Manuel Bağlantı
+                        TextButton(
+                            onClick = { showManualConnection = !showManualConnection },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Button(
-                                onClick = { onSendNotesToDesktop(syncHostInput, syncPinInput, syncClearExisting, settings.masterPin) },
-                                enabled = syncHostInput.isNotBlank() && syncPinInput.length == 4 && !syncUiState.isOperating,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 44.dp)
-                            ) {
-                                Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Gönder 📤")
-                            }
+                            Icon(
+                                if (showManualConnection) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "Gelişmiş / Manuel Bağlantı (İsteğe Bağlı)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
-                            FilledTonalButton(
-                                onClick = { onPullNotesFromDesktop(syncHostInput, syncPinInput, syncClearExisting, settings.masterPin) },
-                                enabled = syncHostInput.isNotBlank() && syncPinInput.length == 4 && !syncUiState.isOperating,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 44.dp)
-                            ) {
-                                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Çek 📥")
+                        AnimatedVisibility(visible = showManualConnection) {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = syncHostInput,
+                                        onValueChange = { syncHostInput = it },
+                                        label = { Text("Bilgisayar IP") },
+                                        placeholder = { Text("192.168.1.X") },
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1.8f)
+                                    )
+                                    OutlinedTextField(
+                                        value = syncPinInput,
+                                        onValueChange = { if (it.length <= 4 && it.all { c -> c.isDigit() }) syncPinInput = it },
+                                        label = { Text("PIN") },
+                                        placeholder = { Text("4 Hane") },
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1f),
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { onCheckSyncConnection(syncHostInput) },
+                                        enabled = syncHostInput.isNotBlank() && !syncUiState.statusChecking && !syncUiState.isOperating,
+                                        modifier = Modifier.weight(1f).heightIn(min = 40.dp)
+                                    ) {
+                                        if (syncUiState.statusChecking) {
+                                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Bağlanıyor...")
+                                        } else {
+                                            Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Test Et")
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Mevcut Notların Üzerine Yaz", style = MaterialTheme.typography.bodySmall)
+                                    Switch(
+                                        checked = syncClearExisting,
+                                        onCheckedChange = { syncClearExisting = it }
+                                    )
+                                }
                             }
                         }
                     }

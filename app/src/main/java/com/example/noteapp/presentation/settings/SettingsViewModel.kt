@@ -448,7 +448,27 @@ class SettingsViewModel @Inject constructor(
                 discoveredHost = payload.ip,
                 message = "Masaüstü QR okundu (${payload.ip}:${payload.port}, PIN: ${payload.pin}). Bağlanıyor..."
             )
-            checkSyncConnection(payload.ip)
+            val connRes = desktopSyncClient.checkConnection(payload.ip)
+            if (connRes.isSuccess) {
+                val status = connRes.getOrThrow()
+                _syncUiState.value = _syncUiState.value.copy(
+                    isConnected = true,
+                    serverStatus = status,
+                    message = "Masaüstüne bağlandı: ${status.appName} (${status.notesCount} not). Eşitleniyor..."
+                )
+                pullNotesFromDesktop(
+                    host = payload.ip,
+                    pin = payload.pin,
+                    clearExisting = false,
+                    vaultPassword = settings.value.masterPin
+                )
+            } else {
+                _syncUiState.value = _syncUiState.value.copy(
+                    isConnected = false,
+                    message = connRes.exceptionOrNull()?.message ?: "Masaüstüne bağlanılamadı.",
+                    isSuccess = false
+                )
+            }
         }
     }
 

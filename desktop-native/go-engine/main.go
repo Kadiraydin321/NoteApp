@@ -85,6 +85,60 @@ type SyncState struct {
 	LastMessage      string `json:"lastMessage"`
 }
 
+// MarshalJSON hem camelCase hem snake_case alanları aynı anda JSON çıktısına ekler
+func (s SyncState) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"isRunning":         s.IsRunning,
+		"is_running":        s.IsRunning,
+		"port":              s.Port,
+		"pin":               s.PIN,
+		"pairing_pin":       s.PIN,
+		"connectedClients":  s.ConnectedClients,
+		"connected_clients": s.ConnectedClients,
+		"localIp":           s.LocalIP,
+		"local_ip":          s.LocalIP,
+		"lastMessage":       s.LastMessage,
+		"last_message":      s.LastMessage,
+	})
+}
+
+// UnmarshalJSON hem camelCase hem snake_case anahtarları sorunsuz çözümler
+func (s *SyncState) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if v, ok := raw["isRunning"].(bool); ok {
+		s.IsRunning = v
+	} else if v, ok := raw["is_running"].(bool); ok {
+		s.IsRunning = v
+	}
+	if v, ok := raw["port"].(float64); ok {
+		s.Port = int(v)
+	}
+	if v, ok := raw["pin"].(string); ok {
+		s.PIN = v
+	} else if v, ok := raw["pairing_pin"].(string); ok {
+		s.PIN = v
+	}
+	if v, ok := raw["connectedClients"].(float64); ok {
+		s.ConnectedClients = int(v)
+	} else if v, ok := raw["connected_clients"].(float64); ok {
+		s.ConnectedClients = int(v)
+	}
+	if v, ok := raw["localIp"].(string); ok {
+		s.LocalIP = v
+	} else if v, ok := raw["local_ip"].(string); ok {
+		s.LocalIP = v
+	}
+	if v, ok := raw["lastMessage"].(string); ok {
+		s.LastMessage = v
+	} else if v, ok := raw["last_message"].(string); ok {
+		s.LastMessage = v
+	}
+	return nil
+}
+
 type VaultStatus struct {
 	HasPassword bool `json:"hasPassword"`
 	IsUnlocked  bool `json:"isUnlocked"`
@@ -467,21 +521,151 @@ func findEdgePath() string {
 }
 
 func getLocalIP() string {
-	addrs, err := net.InterfaceAddrs()
+	// 1. Öncelik: Varsayılan ağ geçidi üzerinden çıkış IP'sini tespit et (OS Routing Table)
+	conn, err := net.DialTimeout("udp", "8.8.8.8:80", 250*time.Millisecond)
+	if err == nil {
+		localAddr := conn.LocalAddr().(*net.UDPAddr)
+		_ = conn.Close()
+		ipStr := localAddr.IP.String()
+		if !localAddr.IP.IsLoopback() && (strings.HasPrefix(ipStr, "192.168.") || strings.HasPrefix(ipStr, "10.") || strings.HasPrefix(ipStr, "172.")) {
+			return ipStr
+		}
+	}
+
+	// 2. Öncelik: Ağ arayüzlerini tara, sanal adaptörleri (WSL, Hyper-V, VirtualBox) ele
+	ifaces, err := net.Interfaces()
 	if err != nil {
 		return "127.0.0.1"
 	}
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				ipStr := ipnet.IP.String()
-				if strings.HasPrefix(ipStr, "192.168.") || strings.HasPrefix(ipStr, "10.") || strings.HasPrefix(ipStr, "172.") {
-					return ipStr
+
+	var tier1, tier2, tier3, tier4 string
+
+	for _, iface := range ifaces {
+		// Kapalı veya loopback arayüzleri atla
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		nameLower := strings.ToLower(iface.Name)
+		// Sanal adaptör filtreleri
+		isVirtual := strings.Contains(nameLower, "vethernet") ||
+			strings.Contains(nameLower, "wsl") ||
+			strings.Contains(nameLower, "virtual") ||
+			strings.Contains(nameLower, "vmware") ||
+			strings.Contains(nameLower, "hyper-v") ||
+			strings.Contains(nameLower, "docker") ||
+			strings.Contains(nameLower, "teredo") ||
+			strings.Contains(nameLower, "tailscale") ||
+			strings.Contains(nameLower, "pseudo")
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			ipnet, ok := addr.(*net.IPNet)
+			if !ok || ipnet.IP.IsLoopback() || ipnet.IP.To4() == nil {
+				continue
+			}
+
+			ipStr := ipnet.IP.String()
+			isPhysical := strings.Contains(nameLower, "wi-fi") ||
+				strings.Contains(nameLower, "wlan") ||
+				strings.Contains(nameLower, "wireless") ||
+				strings.Contains(nameLower, "ethernet") ||
+				strings.Contains(nameLower, "yerel") ||
+				strings.Contains(nameLower, "eth") ||
+				strings.Contains(nameLower, "en")
+
+			if strings.HasPrefix(ipStr, "192.168.") {
+				if isPhysical && !isVirtual && tier1 == "" {
+					tier1 = ipStr
+				} else if !isVirtual && tier2 == "" {
+					tier2 = ipStr
 				}
+			} else if strings.HasPrefix(ipStr, "10.") && !isVirtual && tier3 == "" {
+				tier3 = ipStr
+			} else if strings.HasPrefix(ipStr, "172.") && !isVirtual && tier4 == "" {
+				tier4 = ipStr
 			}
 		}
 	}
+
+	if tier1 != "" {
+		return tier1
+	}
+	if tier2 != "" {
+		return tier2
+	}
+	if tier3 != "" {
+		return tier3
+	}
+	if tier4 != "" {
+		return tier4
+	}
+
+	// Son çare: Herhangi bir IPv4
+	addrs, _ := net.InterfaceAddrs()
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
+			return ipnet.IP.String()
+		}
+	}
+
 	return "127.0.0.1"
+}
+
+// UDP LAN Otomatik Keşif Dinleyicisi (UDP Auto-Discovery Responder)
+// Android cihazdan broadcast veya unicast olarak "NOTEDEFTERIM_DISCOVER" paketi geldiğinde
+// masaüstünün IP, Port ve PIN bilgilerini anında geri döner.
+func startUDPDiscoveryResponder(httpPort int, syncState *SyncState, mu *sync.Mutex) {
+	pc, err := net.ListenPacket("udp4", ":8765")
+	if err != nil {
+		// Port meşgulse sessizce bekle
+		return
+	}
+	defer pc.Close()
+
+	buf := make([]byte, 2048)
+	for {
+		n, clientAddr, err := pc.ReadFrom(buf)
+		if err != nil {
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+
+		msg := strings.TrimSpace(string(buf[:n]))
+		if strings.Contains(msg, "NOTEDEFTERIM_DISCOVER") {
+			mu.Lock()
+			currentPin := syncState.PIN
+			localIP := syncState.LocalIP
+			mu.Unlock()
+
+			if localIP == "" || localIP == "127.0.0.1" {
+				localIP = getLocalIP()
+			}
+
+			// Yanıt paketi (hem JSON hem NOTEDEFTERIM_DISCOVER_RESPONSE: prefix'i desteklenir)
+			respPayload := map[string]interface{}{
+				"status":      "ok",
+				"appName":     "NotDefterim Masaüstü",
+				"version":     "1.4.4",
+				"ip":          localIP,
+				"localIp":     localIP,
+				"local_ip":    localIP,
+				"port":        httpPort,
+				"pin":         currentPin,
+				"pairing_pin": currentPin,
+				"requiresPin": true,
+			}
+			jsonBytes, _ := json.Marshal(respPayload)
+			responseMsg := "NOTEDEFTERIM_DISCOVER_RESPONSE:" + string(jsonBytes)
+
+			// Göndericiye UDP üzerinden yanıt dön
+			_, _ = pc.WriteTo([]byte(responseMsg), clientAddr)
+		}
+	}
 }
 
 func generatePIN() string {
@@ -596,29 +780,37 @@ func main() {
 	uiDir := findUIDir()
 
 	// Wi-Fi Senkronizasyon Durumu
+	localIP := getLocalIP()
 	syncState := &SyncState{
 		IsRunning:        true,
 		Port:             8765,
 		PIN:              generatePIN(),
 		ConnectedClients: 0,
-		LocalIP:          getLocalIP(),
-		LastMessage:      "Hazır",
+		LocalIP:          localIP,
+		LastMessage:      "Hazır - Bağlantı Bekleniyor",
 	}
 	var syncMu sync.Mutex
 
 	// Port 8765'i dinle (Android LAN Sync & Native UI Portu)
-	listener, err := net.Listen("tcp", "127.0.0.1:8765")
+	// Hem yerel (127.0.0.1) hem de LAN üzerinden telefon bağlantılarını kabul etmek için tüm arayüzleri (:8765) dinle
+	listener, err := net.Listen("tcp", ":8765")
 	if err != nil {
-		// Port 8765 meşgulse dinamik porta geç
-		listener, err = net.Listen("tcp", "127.0.0.1:0")
+		// Port :8765 meşgulse yerel 127.0.0.1:8765 veya dinamik porta geç
+		listener, err = net.Listen("tcp", "127.0.0.1:8765")
 		if err != nil {
-			fmt.Printf("TCP port açılamadı: %v\n", err)
-			return
+			listener, err = net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				fmt.Printf("TCP port açılamadı: %v\n", err)
+				return
+			}
 		}
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 	syncState.Port = port
 	appURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+
+	// Arka planda UDP LAN Otomatik Keşif Dinleyicisini Başlat
+	go startUDPDiscoveryResponder(port, syncState, &syncMu)
 
 	mux := http.NewServeMux()
 

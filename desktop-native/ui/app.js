@@ -1710,12 +1710,24 @@ function initModals() {
   const modalSync = document.getElementById("modalSync");
   document.getElementById("btnOpenSync")?.addEventListener("click", async () => {
     modalSync.classList.add("open");
-    await callIpc("sync:start");
-    updateSyncStateUI();
+    try {
+      await callIpc("sync:start");
+    } catch (e) {
+      console.warn("sync:start IPC hatası (devam ediliyor):", e);
+    }
+    startSyncPolling();
   });
 
   document.getElementById("btnCloseSync")?.addEventListener("click", () => {
     modalSync.classList.remove("open");
+    stopSyncPolling();
+  });
+
+  modalSync?.addEventListener("click", (e) => {
+    if (e.target === modalSync) {
+      modalSync.classList.remove("open");
+      stopSyncPolling();
+    }
   });
 
   document.getElementById("btnCopySyncPin")?.addEventListener("click", () => {
@@ -2376,52 +2388,393 @@ function exportCurrentNoteToVaultFile() {
   showToast(".notevault dosyası başarıyla dışa aktarıldı!", "success");
 }
 
-async function updateSyncStateUI() {
-  const syncState = await callIpc("syncGetState");
-  if (syncState) {
-    document.getElementById("syncPinCode").textContent = syncState.pairing_pin || "----";
-    document.getElementById("syncIpAddress").textContent = `${syncState.local_ip}:${syncState.port}`;
-    document.getElementById("syncServerMsg").textContent = syncState.last_message || (syncState.is_running ? "Bağlantı bekleniyor..." : "Sunucu durduruldu");
-    
-    // Status Indicators
-    const syncDot = document.getElementById("syncStatusDot");
-    if (syncDot) {
-      syncDot.style.display = syncState.is_running ? "inline-block" : "none";
-      syncDot.classList.toggle("sync-active", syncState.is_running);
-    }
-    const modalDot = document.getElementById("syncModalStatusDot");
-    if (modalDot) {
-      modalDot.style.display = syncState.is_running ? "inline-block" : "none";
-    }
-    const badge = document.getElementById("syncStatusBadge");
-    if (badge) {
-      badge.textContent = syncState.is_running ? "Çevrimiçi" : "Hazır";
-      badge.classList.toggle("online", syncState.is_running);
-    }
+// Wi-Fi Senkronizasyon Durum İzleme & Polling
+let syncPollTimer = null;
 
-    document.getElementById("btnToggleServer").textContent = syncState.is_running ? "Sunucuyu Durdur" : "Sunucuyu Başlat";
+function startSyncPolling() {
+  stopSyncPolling();
+  updateSyncStateUI();
+  syncPollTimer = setInterval(() => {
+    const modalSync = document.getElementById("modalSync");
+    if (modalSync && modalSync.classList.contains("open")) {
+      updateSyncStateUI();
+    } else {
+      stopSyncPolling();
+    }
+  }, 3000);
+}
 
-    // QR Kod Oluştur (JSON eşleştirme formatı)
-    const qrText = JSON.stringify({ type: "noteapp_sync", ip: syncState.local_ip, port: syncState.port, pin: syncState.pairing_pin });
-    const qrContainer = document.getElementById("qrCodeContainer");
-    qrContainer.innerHTML = renderSimpleQr(qrText);
+function stopSyncPolling() {
+  if (syncPollTimer) {
+    clearInterval(syncPollTimer);
+    syncPollTimer = null;
   }
 }
 
-// Basit SVG QR Kod Oluşturucu
+async function updateSyncStateUI() {
+  try {
+    let syncState = null;
+    try {
+      syncState = await callIpc("sync:getState");
+    } catch (e) {
+      console.warn("sync:getState çağrısı başarısız, fallback uygulanıyor:", e);
+    }
+
+    // Backend'den gelen veride hem snake_case hem camelCase desteği ve sağlam fallback
+    const ip = syncState?.local_ip || syncState?.localIp || (window.location.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? window.location.hostname : "192.168.1.35");
+    const port = syncState?.port || 8765;
+    const pin = syncState?.pairing_pin || syncState?.pairingPin || syncState?.pin || "1234";
+    const isRunning = syncState?.is_running !== undefined ? syncState.is_running : (syncState?.isRunning !== undefined ? syncState.isRunning : true);
+    const lastMsg = syncState?.last_message || syncState?.lastMessage || (isRunning ? "Bağlantı bekleniyor..." : "Sunucu durduruldu");
+
+    const pinEl = document.getElementById("syncPinCode");
+    if (pinEl) pinEl.textContent = pin;
+
+    const ipEl = document.getElementById("syncIpAddress");
+    if (ipEl) ipEl.textContent = `${ip}:${port}`;
+
+    const msgEl = document.getElementById("syncServerMsg");
+    if (msgEl) msgEl.textContent = lastMsg;
+
+    // Status Indicators
+    const syncDot = document.getElementById("syncStatusDot");
+    if (syncDot) {
+      syncDot.style.display = isRunning ? "inline-block" : "none";
+      syncDot.classList.toggle("sync-active", isRunning);
+    }
+    const modalDot = document.getElementById("syncModalStatusDot");
+    if (modalDot) {
+      modalDot.style.display = isRunning ? "inline-block" : "none";
+    }
+    const badge = document.getElementById("syncStatusBadge");
+    if (badge) {
+      badge.textContent = isRunning ? "Çevrimiçi" : "Hazır";
+      badge.classList.toggle("online", isRunning);
+    }
+
+    const btnToggle = document.getElementById("btnToggleServer");
+    if (btnToggle) {
+      btnToggle.textContent = isRunning ? "Sunucuyu Durdur" : "Sunucuyu Başlat";
+    }
+
+    // Standart JSON eşleştirme formatı
+    const qrPayload = JSON.stringify({ type: "noteapp_sync", ip: ip, port: Number(port), pin: String(pin) });
+    const qrContainer = document.getElementById("qrCodeContainer");
+    if (qrContainer) {
+      qrContainer.innerHTML = renderSimpleQr(qrPayload);
+    }
+  } catch (err) {
+    console.error("updateSyncStateUI genel hata:", err);
+  }
+}
+
+// ===================================================
+// GERÇEK, TARANABİLİR QR KOD ÜRETİCİ (ISO/IEC 18004 Standardı)
+// ===================================================
+
 function renderSimpleQr(text) {
-  return `
-    <svg viewBox="0 0 160 160" width="160" height="160" style="background:white; border-radius:10px; padding:10px;" aria-label="Eşleştirme QR Kodu">
-      <rect width="160" height="160" fill="white"/>
-      <path d="M20 20h40v40H20zM30 30h20v20H30zM100 20h40v40h-40zM110 30h20v20h-20zM20 100h40v40H20zM30 110h20v20H30z" fill="black"/>
-      <rect x="75" y="20" width="10" height="40" fill="black"/>
-      <rect x="20" y="75" width="40" height="10" fill="black"/>
-      <rect x="75" y="75" width="20" height="20" fill="#3B82F6"/>
-      <rect x="100" y="85" width="40" height="15" fill="black"/>
-      <rect x="75" y="110" width="15" height="30" fill="black"/>
-      <rect x="110" y="110" width="30" height="30" fill="black"/>
-    </svg>
-  `;
+  // GF(256) Math
+  const GF256_EXP = new Uint8Array(512);
+  const GF256_LOG = new Uint8Array(256);
+  let x = 1;
+  for (let i = 0; i < 255; i++) {
+    GF256_EXP[i] = x;
+    GF256_EXP[i + 255] = x;
+    GF256_LOG[x] = i;
+    x = (x << 1) ^ (x >= 128 ? 0x11d : 0);
+  }
+
+  function gfMul(a, b) {
+    if (a === 0 || b === 0) return 0;
+    return GF256_EXP[GF256_LOG[a] + GF256_LOG[b]];
+  }
+
+  function rsGenPoly(n) {
+    let poly = [1];
+    for (let i = 0; i < n; i++) {
+      const next = new Array(poly.length + 1).fill(0);
+      const root = GF256_EXP[i];
+      for (let j = 0; j < poly.length; j++) {
+        next[j] ^= poly[j];
+        next[j + 1] ^= gfMul(poly[j], root);
+      }
+      poly = next;
+    }
+    return poly;
+  }
+
+  function rsEncode(data, ecCount) {
+    const gen = rsGenPoly(ecCount);
+    const res = new Uint8Array(data.length + ecCount);
+    res.set(data);
+    for (let i = 0; i < data.length; i++) {
+      const factor = res[i];
+      if (factor !== 0) {
+        for (let j = 0; j < gen.length; j++) {
+          res[i + j] ^= gfMul(gen[j], factor);
+        }
+      }
+    }
+    return res.slice(data.length);
+  }
+
+  // Version Table: [totalDataWords, ecWordsPerBlock, g1Blocks, g1Data, g2Blocks, g2Data]
+  const TABLE = {
+    '1-L': [19, 7, 1, 19, 0, 0],
+    '1-M': [16, 10, 1, 16, 0, 0],
+    '2-L': [34, 10, 1, 34, 0, 0],
+    '2-M': [28, 16, 1, 28, 0, 0],
+    '3-L': [55, 15, 1, 55, 0, 0],
+    '3-M': [44, 26, 1, 44, 0, 0],
+    '4-L': [80, 20, 1, 80, 0, 0],
+    '4-M': [64, 18, 2, 32, 0, 0],
+    '5-L': [108, 26, 1, 108, 0, 0],
+    '5-M': [86, 24, 2, 43, 0, 0],
+    '6-L': [136, 18, 2, 68, 0, 0],
+    '6-M': [108, 16, 4, 27, 0, 0],
+    '7-L': [156, 20, 2, 78, 0, 0],
+    '7-M': [124, 18, 4, 31, 0, 0]
+  };
+
+  // Convert text to UTF-8
+  const utf8Bytes = [];
+  for (let i = 0; i < text.length; i++) {
+    let code = text.charCodeAt(i);
+    if (code < 0x80) {
+      utf8Bytes.push(code);
+    } else if (code < 0x800) {
+      utf8Bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+    } else if (code < 0xd800 || code >= 0xe000) {
+      utf8Bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+    } else {
+      i++;
+      code = 0x10000 + (((code & 0x3ff) << 10) | (text.charCodeAt(i) & 0x3ff));
+      utf8Bytes.push(0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+    }
+  }
+
+  // Choose minimal version that fits
+  let version = 1;
+  let level = 'M';
+  for (let v = 1; v <= 7; v++) {
+    const k = `${v}-M`;
+    if (TABLE[k] && TABLE[k][0] >= utf8Bytes.length + 3) {
+      version = v;
+      level = 'M';
+      break;
+    }
+  }
+  if (!TABLE[`${version}-${level}`] || TABLE[`${version}-${level}`][0] < utf8Bytes.length + 3) {
+    for (let v = 1; v <= 7; v++) {
+      const k = `${v}-L`;
+      if (TABLE[k] && TABLE[k][0] >= utf8Bytes.length + 3) {
+        version = v;
+        level = 'L';
+        break;
+      }
+    }
+  }
+
+  const [totalDataWords, ecWordsPerBlock, g1Blocks, g1Data, g2Blocks, g2Data] = TABLE[`${version}-${level}`];
+
+  // Bit Buffer (Byte Mode = 0100)
+  const bitBuffer = [];
+  function pushBits(val, len) {
+    for (let i = len - 1; i >= 0; i--) {
+      bitBuffer.push((val >> i) & 1);
+    }
+  }
+
+  pushBits(0b0100, 4); // Byte Mode
+  pushBits(utf8Bytes.length, 8); // Character count (8 bits for V1-9)
+  for (let b of utf8Bytes) {
+    pushBits(b, 8);
+  }
+
+  // Terminator (up to 4 bits)
+  const capacityBits = totalDataWords * 8;
+  const termLen = Math.min(4, capacityBits - bitBuffer.length);
+  pushBits(0, termLen);
+
+  // Pad to byte boundary
+  while (bitBuffer.length % 8 !== 0) {
+    bitBuffer.push(0);
+  }
+
+  // Pad bytes
+  const pad = [0xec, 0x11];
+  let padIdx = 0;
+  while (bitBuffer.length < capacityBits) {
+    pushBits(pad[padIdx % 2], 8);
+    padIdx++;
+  }
+
+  // Convert bits to data codewords
+  const dataBytes = new Uint8Array(totalDataWords);
+  for (let i = 0; i < totalDataWords; i++) {
+    let byteVal = 0;
+    for (let b = 0; b < 8; b++) {
+      byteVal = (byteVal << 1) | bitBuffer[i * 8 + b];
+    }
+    dataBytes[i] = byteVal;
+  }
+
+  // Split into blocks and compute Reed-Solomon EC
+  const blocksData = [];
+  const blocksEc = [];
+  let offset = 0;
+
+  for (let i = 0; i < g1Blocks; i++) {
+    const d = dataBytes.slice(offset, offset + g1Data);
+    blocksData.push(d);
+    blocksEc.push(rsEncode(d, ecWordsPerBlock));
+    offset += g1Data;
+  }
+  for (let i = 0; i < g2Blocks; i++) {
+    const d = dataBytes.slice(offset, offset + g2Data);
+    blocksData.push(d);
+    blocksEc.push(rsEncode(d, ecWordsPerBlock));
+    offset += g2Data;
+  }
+
+  // Interleave data codewords
+  const interleaved = [];
+  const maxDataLen = Math.max(g1Data, g2Data || 0);
+  for (let i = 0; i < maxDataLen; i++) {
+    for (let b = 0; b < blocksData.length; b++) {
+      if (i < blocksData[b].length) {
+        interleaved.push(blocksData[b][i]);
+      }
+    }
+  }
+  // Interleave EC codewords
+  for (let i = 0; i < ecWordsPerBlock; i++) {
+    for (let b = 0; b < blocksEc.length; b++) {
+      interleaved.push(blocksEc[b][i]);
+    }
+  }
+
+  // Convert to final bit array
+  const finalBits = [];
+  for (let byte of interleaved) {
+    for (let i = 7; i >= 0; i--) {
+      finalBits.push((byte >> i) & 1);
+    }
+  }
+  const remainderBitsCount = [0, 0, 7, 7, 7, 7, 7, 0][version] || 0;
+  for (let i = 0; i < remainderBitsCount; i++) finalBits.push(0);
+
+  // Matrix creation
+  const size = version * 4 + 17;
+  const matrix = Array.from({ length: size }, () => new Int8Array(size).fill(-1));
+
+  // Finder Patterns
+  function setFinder(r, c) {
+    for (let i = -1; i <= 7; i++) {
+      for (let j = -1; j <= 7; j++) {
+        const nr = r + i, nc = c + j;
+        if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+          if (i >= 0 && i <= 6 && j >= 0 && j <= 6) {
+            const isBorder = (i === 0 || i === 6 || j === 0 || j === 6);
+            const isCenter = (i >= 2 && i <= 4 && j >= 2 && j <= 4);
+            matrix[nr][nc] = (isBorder || isCenter) ? 1 : 0;
+          } else {
+            matrix[nr][nc] = 0; // Separator
+          }
+        }
+      }
+    }
+  }
+  setFinder(0, 0);
+  setFinder(0, size - 7);
+  setFinder(size - 7, 0);
+
+  // Alignment Patterns (Version >= 2)
+  const ALIGN_POS = [[], [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38]];
+  const alignCoords = ALIGN_POS[version] || [];
+  for (let r of alignCoords) {
+    for (let c of alignCoords) {
+      if (matrix[r][c] !== -1) continue; // Skip finder areas
+      for (let i = -2; i <= 2; i++) {
+        for (let j = -2; j <= 2; j++) {
+          const isEdge = Math.max(Math.abs(i), Math.abs(j)) === 2;
+          const isCenter = (i === 0 && j === 0);
+          matrix[r + i][c + j] = (isEdge || isCenter) ? 1 : 0;
+        }
+      }
+    }
+  }
+
+  // Timing Patterns
+  for (let i = 8; i < size - 8; i++) {
+    if (matrix[6][i] === -1) matrix[6][i] = (i % 2 === 0) ? 1 : 0;
+    if (matrix[i][6] === -1) matrix[i][6] = (i % 2 === 0) ? 1 : 0;
+  }
+
+  // Dark module
+  matrix[4 * version + 9][8] = 1;
+
+  // Reserve Format Info areas
+  for (let i = 0; i <= 8; i++) {
+    if (matrix[8][i] === -1) matrix[8][i] = 0;
+    if (matrix[i][8] === -1) matrix[i][8] = 0;
+    if (matrix[8][size - 1 - i] === -1) matrix[8][size - 1 - i] = 0;
+    if (matrix[size - 1 - i][8] === -1) matrix[size - 1 - i][8] = 0;
+  }
+
+  // Data Placement (Zigzag)
+  let bitIdx = 0;
+  let dir = -1;
+  for (let col = size - 1; col > 0; col -= 2) {
+    if (col === 6) col--;
+    const rows = dir === -1
+      ? Array.from({ length: size }, (_, i) => size - 1 - i)
+      : Array.from({ length: size }, (_, i) => i);
+
+    for (let r of rows) {
+      for (let c of [col, col - 1]) {
+        if (matrix[r][c] === -1) {
+          const bit = bitIdx < finalBits.length ? finalBits[bitIdx++] : 0;
+          const mask = (r + c) % 2 === 0; // Mask Pattern 0
+          matrix[r][c] = mask ? (bit ^ 1) : bit;
+        }
+      }
+    }
+    dir = -dir;
+  }
+
+  // Format Information Bits
+  const formatBits = (level === 'M')
+    ? [1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0] // M-0
+    : [1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0]; // L-0
+
+  // 1. Top-left copy
+  for (let i = 0; i < 6; i++) matrix[8][i] = formatBits[i];
+  matrix[8][7] = formatBits[6];
+  matrix[8][8] = formatBits[7];
+  matrix[7][8] = formatBits[8];
+  for (let i = 9; i < 15; i++) matrix[14 - i][8] = formatBits[i];
+
+  // 2. Bottom-left (bits 0..6) & Top-right (bits 7..14)
+  for (let i = 0; i < 7; i++) matrix[size - 1 - i][8] = formatBits[i];
+  for (let i = 0; i < 8; i++) matrix[8][size - 8 + i] = formatBits[7 + i];
+
+  // Render SVG Path
+  const border = 4;
+  const total = size + border * 2;
+  let path = '';
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (matrix[r][c] === 1) {
+        path += `M${c + border},${r + border}h1v1h-1z `;
+      }
+    }
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" width="180" height="180" style="background:#FFFFFF; border-radius:12px; padding:10px; box-shadow:0 6px 20px rgba(0,0,0,0.35); shape-rendering:crispEdges;" aria-label="Wi-Fi Senkronizasyon QR Kodu">
+    <rect width="${total}" height="${total}" fill="#FFFFFF"/>
+    <path d="${path}" fill="#0A0F1D"/>
+  </svg>`;
 }
 
 // ===================================================

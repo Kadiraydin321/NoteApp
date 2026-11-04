@@ -153,14 +153,14 @@ class DesktopSyncClient @Inject constructor(
                             val url = URL("http://$candidateIp:8765/api/status")
                             val conn = (url.openConnection() as HttpURLConnection).apply {
                                 requestMethod = "GET"
-                                connectTimeout = 450
-                                readTimeout = 450
+                                connectTimeout = 600
+                                readTimeout = 600
                                 setRequestProperty("Accept", "application/json")
                             }
                             if (conn.responseCode == 200) {
                                 val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                                 val json = JSONObject(body)
-                                if (json.optString("status") == "ok") {
+                                if (json.optString("status") == "ok" || json.has("appName") || json.has("notesCount")) {
                                     val status = SyncServerStatus(
                                         appName = json.optString("appName", "Not Defterim Masaüstü"),
                                         notesCount = json.optInt("notesCount", 0),
@@ -176,7 +176,7 @@ class DesktopSyncClient @Inject constructor(
                 }
             }
 
-            val result = withTimeoutOrNull(3500) {
+            val result = withTimeoutOrNull(4500) {
                 foundDeferred.await()
             }
 
