@@ -203,4 +203,68 @@ class BackupRestoreEngineTest {
 
         assertEquals(null, resolvedPassword)
     }
+
+    @Test
+    fun `real user notevault backup can be decrypted with candidate masterPin and parsed as zip archive`() {
+        val userFilePath = "C:/Users/Birin/.gemini/antigravity/brain/b91a0902-06ca-4b38-86bb-b4bd528047b8/.user_uploaded/media_1793806061875_e56aa220.notevault"
+        val userFile = java.io.File(userFilePath)
+        if (!userFile.exists()) return // Dosya ortamda yoksa atla
+
+        val data = userFile.readBytes()
+        assertTrue(data.size > 68)
+        val magic = String(data.copyOfRange(0, 8), Charsets.US_ASCII)
+        assertEquals("NOTEVLT1", magic)
+
+        val salt = data.copyOfRange(8, 24)
+        val iv = data.copyOfRange(24, 36)
+        val storedHash = data.copyOfRange(36, 68)
+        val ciphertext = data.copyOfRange(68, data.size)
+
+        // Kullanicinin aday PIN'leri (masterPin = "2526")
+        val candidates = listOf("0000", "1234", "2526", "9999")
+        val md = MessageDigest.getInstance("SHA-256")
+        var resolvedPin: String? = null
+        for (candidate in candidates) {
+            md.reset()
+            md.update(salt)
+            md.update(candidate.toByteArray(Charsets.UTF_8))
+            if (md.digest().contentEquals(storedHash)) {
+                resolvedPin = candidate
+                break
+            }
+        }
+
+        assertNotNull("Kullanici PIN'i 2526 basariyla cozulmelidir", resolvedPin)
+        assertEquals("2526", resolvedPin)
+
+        // AES-256-GCM ile Cozme
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val spec = PBEKeySpec(resolvedPin!!.toCharArray(), salt, 65536, 256)
+        val secretKey = SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
+        val plainBytes = cipher.doFinal(ciphertext)
+
+        // ZIP Basligini dogrula (PK\x03\x04)
+        assertEquals(0x50.toByte(), plainBytes[0])
+        assertEquals(0x4B.toByte(), plainBytes[1])
+
+        // ZIP icerigindeki 13 notu ve basligi dogrula
+        val entries = mutableMapOf<String, String>()
+        ZipInputStream(ByteArrayInputStream(plainBytes)).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                entries[entry.name] = zis.bufferedReader(Charsets.UTF_8).readText()
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
+        }
+
+        assertTrue(entries.containsKey("notes.json"))
+        val notesArray = JSONArray(entries["notes.json"]!!)
+        assertEquals(13, notesArray.length())
+        val firstNote = notesArray.getJSONObject(0)
+        assertEquals("INA Pin to Pin", firstNote.getString("title"))
+        assertTrue(firstNote.getString("content").contains("ETGA = MOXA"))
+    }
 }

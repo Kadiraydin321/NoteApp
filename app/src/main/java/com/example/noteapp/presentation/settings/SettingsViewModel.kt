@@ -36,7 +36,9 @@ data class BackupUiState(
     val isOperating: Boolean = false,
     val operationTitle: String? = null,
     val message: String? = null,
-    val isSuccess: Boolean? = null
+    val isSuccess: Boolean? = null,
+    val needsPasswordForUri: Uri? = null,
+    val isPasswordWrong: Boolean = false
 )
 
 data class SyncUiState(
@@ -328,16 +330,25 @@ class SettingsViewModel @Inject constructor(
                         is RestoreResult.NeedsPassword -> {
                             _backupUiState.value = BackupUiState(
                                 isOperating = false,
-                                message = "Bu yedek dosyası Kasa Kilidi ile şifrelenmiştir. Lütfen kasa kilidini girin veya parmak izinizi doğrulayın.",
-                                isSuccess = false
+                                needsPasswordForUri = uri,
+                                isPasswordWrong = !vaultPassword.isNullOrBlank()
                             )
                         }
                         is RestoreResult.Error -> {
-                            _backupUiState.value = BackupUiState(
-                                isOperating = false,
-                                message = result.message,
-                                isSuccess = false
-                            )
+                            if (result.message.contains("Hatalı Kasa", ignoreCase = true) ||
+                                result.message.contains("şifre", ignoreCase = true)) {
+                                _backupUiState.value = BackupUiState(
+                                    isOperating = false,
+                                    needsPasswordForUri = uri,
+                                    isPasswordWrong = true
+                                )
+                            } else {
+                                _backupUiState.value = BackupUiState(
+                                    isOperating = false,
+                                    message = result.message,
+                                    isSuccess = false
+                                )
+                            }
                         }
                     }
                 } ?: run {
@@ -359,7 +370,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun dismissMessage() {
-        _backupUiState.value = _backupUiState.value.copy(message = null, isSuccess = null)
+        _backupUiState.value = _backupUiState.value.copy(message = null, isSuccess = null, needsPasswordForUri = null, isPasswordWrong = false)
     }
 
     /**

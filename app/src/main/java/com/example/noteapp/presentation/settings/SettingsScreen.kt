@@ -123,6 +123,7 @@ fun SettingsScreen(
     var exportPasswordVisible by remember { mutableStateOf(false) }
     var importPasswordInput by remember { mutableStateOf("") }
     var importPasswordVisible by remember { mutableStateOf(false) }
+    var importClearExistingNotes by remember { mutableStateOf(false) }
     var showSetPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var setPinVisible by remember { mutableStateOf(false) }
@@ -198,6 +199,13 @@ fun SettingsScreen(
         if (uri != null) {
             pendingImportUri = uri
             importPasswordInput = settings.masterPin ?: ""
+            showImportConfirmDialog = true
+        }
+    }
+
+    LaunchedEffect(backupUiState.needsPasswordForUri) {
+        backupUiState.needsPasswordForUri?.let { uri ->
+            pendingImportUri = uri
             showImportConfirmDialog = true
         }
     }
@@ -2161,19 +2169,26 @@ fun SettingsScreen(
         )
     }
 
-    // 2. İçe Aktarma Onay Penceresi (Hiyerarşik Dikey Eylemler, Buton Çakışması Yok)
+    // 2. İçe Aktarma Onay Penceresi (Şifreli Yedek & Standart Yedek)
     if (showImportConfirmDialog && pendingImportUri != null) {
         val uri = pendingImportUri!!
+        val uriStr = uri.toString().lowercase(Locale.ROOT)
+        val isVaultFile = uriStr.contains("notevault") ||
+                backupUiState.needsPasswordForUri != null ||
+                backupUiState.isPasswordWrong
+
         AlertDialog(
             onDismissRequest = {
                 showImportConfirmDialog = false
                 pendingImportUri = null
                 importPasswordInput = ""
                 importPasswordVisible = false
+                importClearExistingNotes = false
+                onDismissBackupMessage()
             },
             icon = {
                 Icon(
-                    Icons.Default.Restore,
+                    imageVector = if (isVaultFile) Icons.Default.Lock else Icons.Default.Restore,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
@@ -2181,66 +2196,74 @@ fun SettingsScreen(
             },
             title = {
                 Text(
-                    "Yedekten Geri Yükle",
+                    text = if (isVaultFile) "Şifreli Yedek Dosyası" else "Yedekten Geri Yükle",
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleLarge
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        "Seçtiğiniz yedek paketindeki tüm notlar, çizimler, etiketler ve medya dosyaları geri yüklenecektir.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    if (isBiometricAvailable) {
-                        FilledTonalButton(
-                            onClick = {
-                                promptManager?.showBiometricPrompt(
-                                    title = "Yedek Kilidini Aç",
-                                    description = "Yedek dosyasını geri yüklemek için parmak izinizi doğrulayın",
-                                    onResult = { result ->
-                                        if (result is BiometricResult.AuthenticationSuccess) {
-                                            showImportConfirmDialog = false
-                                            val pass = importPasswordInput.ifBlank { settings.masterPin }
-                                            pendingImportUri = null
-                                            importPasswordInput = ""
-                                            onImportFromUri(uri, false, pass)
-                                        }
-                                    }
+                    if (backupUiState.isPasswordWrong) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 44.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Parmak İzi ile Doğrula & Geri Yükle")
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Girdiğiniz Kasa Şifresi hatalı! Lütfen doğru PIN'i/şifreyi girin veya parmak izinizi doğrulayın.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
                         }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
+                    } else if (isVaultFile) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                         ) {
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            Text(
-                                "veya şifre ile",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp)
-                            )
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.VpnKey,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Bu yedek dosyası Kasa Kilidi ile şifrelenmiştir. Lütfen kasa kilidini girin veya parmak izinizi doğrulayın.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
                         }
+                    } else {
+                        Text(
+                            "Seçtiğiniz yedek paketindeki tüm notlar, çizimler, etiketler ve medya dosyaları geri yüklenecektir.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
 
+                    // Kasa PIN'i / Şifre Giriş Kutusu
                     OutlinedTextField(
                         value = importPasswordInput,
                         onValueChange = { importPasswordInput = it },
-                        label = { Text("Kasa Kilidi Şifresi (Varsa)") },
+                        label = { Text(if (isVaultFile) "Kasa PIN'i / Şifresi" else "Kasa Kilidi Şifresi (Varsa)") },
                         placeholder = { Text("Yedek şifresi") },
                         singleLine = true,
+                        isError = backupUiState.isPasswordWrong,
                         leadingIcon = {
                             Icon(Icons.Default.VpnKey, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         },
@@ -2257,58 +2280,85 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                    Text(
-                        "Geri yükleme yöntemini seçin:",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    // Seçenek 1: Mevcut Notları Koru & Ekle (Önerilen)
-                    Button(
-                        onClick = {
-                            showImportConfirmDialog = false
-                            val pass = importPasswordInput.ifBlank { settings.masterPin }
-                            pendingImportUri = null
-                            importPasswordInput = ""
-                            onImportFromUri(uri, false, pass)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.AddModerator, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Mevcut Notları Koru & Ekle")
+                    // Hemen altında belirgin Parmak İzi ile Doğrula & Aç butonu
+                    if (isBiometricAvailable) {
+                        FilledTonalButton(
+                            onClick = {
+                                promptManager?.showBiometricPrompt(
+                                    title = "Yedek Kilidini Aç",
+                                    description = "Yedek dosyasını içeri aktarmak için parmak izinizi doğrulayın",
+                                    onResult = { result ->
+                                        if (result is BiometricResult.AuthenticationSuccess) {
+                                            showImportConfirmDialog = false
+                                            val pass = importPasswordInput.ifBlank { settings.masterPin }
+                                            pendingImportUri = null
+                                            importPasswordInput = ""
+                                            onDismissBackupMessage()
+                                            onImportFromUri(uri, importClearExistingNotes, pass)
+                                        }
+                                    }
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 46.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(22.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Parmak İzi ile Doğrula & Aç", fontWeight = FontWeight.SemiBold)
+                        }
                     }
 
-                    // Seçenek 2: Tümünü Sil & Sıfırdan Yükle
-                    FilledTonalButton(
-                        onClick = {
-                            showImportConfirmDialog = false
-                            val pass = importPasswordInput.ifBlank { settings.masterPin }
-                            pendingImportUri = null
-                            importPasswordInput = ""
-                            onImportFromUri(uri, true, pass)
-                        },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                            contentColor = MaterialTheme.colorScheme.error
-                        ),
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    // Geri Yükleme Seçeneği (Mevcut Notları Koru vs Sıfırdan Yükle)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 48.dp),
-                        shape = RoundedCornerShape(12.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { importClearExistingNotes = !importClearExistingNotes }
+                            .padding(vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Tümünü Sil & Sıfırdan Yükle")
+                        Checkbox(
+                            checked = importClearExistingNotes,
+                            onCheckedChange = { importClearExistingNotes = it }
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                "Tümünü Sil & Sıfırdan Yükle",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                if (importClearExistingNotes) "Dikkat: Cihazdaki mevcut notlar silinecektir"
+                                else "İşaretsiz: Mevcut notlar korunur ve yedek eklenir",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (importClearExistingNotes) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             },
-            confirmButton = {},
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showImportConfirmDialog = false
+                        val pass = importPasswordInput.ifBlank { settings.masterPin }
+                        pendingImportUri = null
+                        importPasswordInput = ""
+                        onDismissBackupMessage()
+                        onImportFromUri(uri, importClearExistingNotes, pass)
+                    },
+                    modifier = Modifier.heightIn(min = 44.dp)
+                ) {
+                    Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Yedeği Geri Yükle")
+                }
+            },
             dismissButton = {
                 OutlinedButton(
                     onClick = {
@@ -2316,10 +2366,10 @@ fun SettingsScreen(
                         pendingImportUri = null
                         importPasswordInput = ""
                         importPasswordVisible = false
+                        importClearExistingNotes = false
+                        onDismissBackupMessage()
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 44.dp)
+                    modifier = Modifier.heightIn(min = 44.dp)
                 ) {
                     Text("İptal")
                 }
@@ -2352,34 +2402,41 @@ fun SettingsScreen(
         }
     }
 
-    // 4. Sonuç / Bilgilendirme İletişim Kutusu
+    // 4. Sonuç / Bilgilendirme İletişim Kutusu (Kör 'Tamam' pencerelerini engeller)
     backupUiState.message?.let { msg ->
-        AlertDialog(
-            onDismissRequest = onDismissBackupMessage,
-            icon = {
-                Icon(
-                    imageVector = if (backupUiState.isSuccess == true) Icons.Default.CheckCircle else Icons.Default.Error,
-                    contentDescription = null,
-                    tint = if (backupUiState.isSuccess == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(32.dp)
-                )
-            },
-            title = {
-                Text(
-                    if (backupUiState.isSuccess == true) "İşlem Başarılı" else "Bilgilendirme",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = { Text(msg) },
-            confirmButton = {
-                Button(
-                    onClick = onDismissBackupMessage,
-                    modifier = Modifier.heightIn(min = 44.dp)
-                ) {
-                    Text("Tamam")
+        val isPasswordOrVaultMessage = msg.contains("Kasa Kilidi", ignoreCase = true) ||
+                msg.contains("şifre", ignoreCase = true) ||
+                msg.contains("parmak izi", ignoreCase = true) ||
+                backupUiState.needsPasswordForUri != null
+
+        if (!isPasswordOrVaultMessage) {
+            AlertDialog(
+                onDismissRequest = onDismissBackupMessage,
+                icon = {
+                    Icon(
+                        imageVector = if (backupUiState.isSuccess == true) Icons.Default.CheckCircle else Icons.Default.Error,
+                        contentDescription = null,
+                        tint = if (backupUiState.isSuccess == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(32.dp)
+                    )
+                },
+                title = {
+                    Text(
+                        if (backupUiState.isSuccess == true) "İşlem Başarılı" else "Bilgilendirme",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = { Text(msg) },
+                confirmButton = {
+                    Button(
+                        onClick = onDismissBackupMessage,
+                        modifier = Modifier.heightIn(min = 44.dp)
+                    ) {
+                        Text("Tamam")
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 
     // 5. PIN Belirleme / Değiştirme Penceresi
