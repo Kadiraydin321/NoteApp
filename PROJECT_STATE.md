@@ -84,10 +84,12 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
-- [x] v1.4.0: Android canlı emülatör doğrulaması %100 yeşil (10/10 temel fonksiyon bizzat kanıtlandı).
+- [x] v1.4.0: GitHub Uzak Depo Yedeklemesi tamamlandı (`commit: cb39152`, `branch: main` -> `git@github.com:Kadiraydin321/NoteApp.git`).
+- [x] v1.4.0: Android canlı emülatör doğrulaması %100 yeşil (13/13 fonksiyon ve hotfix bizzat kanıtlandı).
 - [x] v1.4.0: Okuma modu kontrast/boyut optimizasyonu ve 3 nokta akordiyon menü mimarisi tamamlandı.
 - [x] v1.4.0: Responsive auto-sizing ve taşma koruması (Android & Masaüstü) devreye alındı.
 - [x] v1.4.0: Masaüstü QR kod eşleştirme & hava boşluklu (air-gapped) animasyonlu optik veri aktarımı tamamlandı.
+- [x] v1.4.0: Subagent Token Sentinel ve Otomatik GitHub Yedekleme kural/beceri sistemi kuruldu.
 - [x] Electron test süiti %100 yeşil (CRUD, Kripto, Backup, Wi-Fi Sync).
 - [x] Wi-Fi senkronizasyon test çerçevesi %100 yeşil (13/13 test başarılı).
 - [ ] Rust Native derlemesi için Windows MSVC C++ Build Tools linker ortamının tanımlanması (uygulama şu anda Electron ve Compose üzerinden tam kararlı çalışmaktadır).
