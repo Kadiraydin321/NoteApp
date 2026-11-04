@@ -80,6 +80,11 @@
             <span>Kilitli Kasa</span>
             <span class="nav-count" id="countVault">0</span>
           </div>
+          <div class="nav-item" data-filter="reminders" role="button" tabindex="0" aria-label="Hatırlatıcılar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+            <span>Hatırlatıcılar</span>
+            <span class="nav-count" id="countReminders">0</span>
+          </div>
           <div class="nav-item" data-filter="archive" role="button" tabindex="0" aria-label="Arşivdeki Notlar">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
             <span>Arşiv</span>
@@ -98,6 +103,14 @@
             <button class="cat-btn-add" id="btnOpenCatModal" title="Kategori Ekle" aria-label="Yeni Kategori Ekle">+</button>
           </div>
           <div id="catListContainer" style="display:flex; flex-direction:column; gap:2px;"></div>
+        </div>
+
+        <div class="tags-section" role="region" aria-label="Dinamik Etiketler">
+          <div class="cat-header">
+            <span>ETİKETLER</span>
+            <span style="font-size:11px; color:var(--text-dim); font-weight:normal;">#hashtag</span>
+          </div>
+          <div id="tagListContainer" class="tag-cloud" style="display:flex; flex-wrap:wrap; gap:6px; padding:4px 0;"></div>
         </div>
       </div>
 
@@ -125,23 +138,58 @@
     <!-- 2. ORTA PANEL: NOT LİSTESİ                     -->
     <!-- ============================================== -->
     <main class="center-panel" aria-label="Not Listesi Paneli">
-      <div class="search-box" role="search">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        <input type="text" class="search-input" id="searchInput" placeholder="Notlarda ara... (Ctrl+F)" aria-label="Notlarda ara">
-        <button class="search-clear" id="searchClear" title="Aramayı Temizle" aria-label="Aramayı Temizle">✕</button>
+      <div class="search-sort-bar">
+        <div class="search-box" role="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input type="text" class="search-input" id="searchInput" placeholder="Notlarda ara... (Ctrl+F)" aria-label="Notlarda ara">
+          <button class="search-clear" id="searchClear" title="Aramayı Temizle" aria-label="Aramayı Temizle">✕</button>
+        </div>
+        <div class="sort-menu-container" style="position:relative;">
+          <button class="icon-tool-btn" id="btnSortMenu" title="Notları Sırala" aria-label="Notları Sırala" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg>
+          </button>
+          <div class="sort-dropdown" id="sortDropdownMenu" role="menu" aria-label="Sıralama Seçenekleri" style="display:none;">
+            <div class="sort-item active" data-sort="updated-desc" role="menuitem" tabindex="0">Güncelleme: En Yeni</div>
+            <div class="sort-item" data-sort="updated-asc" role="menuitem" tabindex="0">Güncelleme: En Eski</div>
+            <div class="sort-item" data-sort="created-desc" role="menuitem" tabindex="0">Oluşturma: En Yeni</div>
+            <div class="sort-item" data-sort="created-asc" role="menuitem" tabindex="0">Oluşturma: En Eski</div>
+            <div class="sort-item" data-sort="title-asc" role="menuitem" tabindex="0">Başlık: A → Z</div>
+            <div class="sort-item" data-sort="title-desc" role="menuitem" tabindex="0">Başlık: Z → A</div>
+          </div>
+        </div>
       </div>
 
       <!-- Mobil Tarzı Hızlı Filtre Çipleri -->
       <div class="filter-chips-scroll" id="filterChipsBar" role="toolbar" aria-label="Hızlı Not Filtreleri">
         <button class="chip active" data-chip="all" aria-label="Tüm Notları Göster">📝 Tümü</button>
         <button class="chip" data-chip="pinned" aria-label="Sabitlenen Notları Göster">📌 Sabitler</button>
+        <button class="chip" data-chip="reminders" aria-label="Hatırlatıcıları Göster">⏰ Hatırlatıcılar</button>
         <button class="chip" data-chip="vault" aria-label="Kilitli Kasa Notlarını Göster">🔒 Kasa</button>
         <button class="chip" data-chip="archive" aria-label="Arşivlenmiş Notları Göster">📦 Arşiv</button>
         <button class="chip" data-chip="trash" aria-label="Çöp Kutusunu Göster">🗑️ Çöp</button>
       </div>
 
+      <!-- Toplu Eylemler Çubuğu (Batch Action Bar) -->
+      <div class="batch-action-bar" id="batchActionBar" style="display:none;" role="toolbar" aria-label="Toplu Not İşlemleri">
+        <div class="batch-info">
+          <span class="batch-count-badge" id="batchCountBadge">0 Seçildi</span>
+        </div>
+        <div class="batch-actions-btns">
+          <button class="batch-btn" id="btnBatchSelectAll" title="Tümünü Seç / Bırak">Tümü</button>
+          <button class="batch-btn" id="btnBatchPin" title="Toplu Sabitle / Kaldır">📌 Sabitle</button>
+          <button class="batch-btn" id="btnBatchVault" title="Kasaya Taşı">🔒 Kasa</button>
+          <button class="batch-btn" id="btnBatchArchive" title="Arşivle">📦 Arşiv</button>
+          <button class="batch-btn btn-danger" id="btnBatchTrash" title="Çöpe Taşı">🗑️ Çöp</button>
+          <button class="batch-btn btn-danger" id="btnBatchDeletePermanent" title="Kalıcı Sil" style="display:none;">Sil</button>
+          <button class="batch-btn batch-btn-close" id="btnBatchCancel" title="Seçimi Kapat">✕</button>
+        </div>
+      </div>
+
       <div class="list-header">
-        <span id="notesCountLabel" aria-live="polite">0 Not</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span id="notesCountLabel" aria-live="polite">0 Not</span>
+          <button class="batch-toggle-btn" id="btnToggleBatchMode" title="Çoklu Not Seçimi" aria-label="Çoklu Seçim Modunu Aç">✓ Çoklu Seç</button>
+        </div>
         <div class="view-modes" role="group" aria-label="Görünüm Düzeni">
           <button class="view-mode-btn active" id="btnViewList" title="Liste Görünümü" aria-label="Liste Görünümüne Geç">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
@@ -177,6 +225,9 @@
               </button>
               <div class="color-palette-popover" id="colorPalettePopover" role="menu" aria-label="Renk Seçenekleri"></div>
             </div>
+            <button class="editor-icon-btn" id="btnEditorReminder" title="Hatırlatıcı Ayarla" aria-label="Hatırlatıcı Ayarla">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+            </button>
           </div>
 
           <div class="editor-top-right">
@@ -201,6 +252,49 @@
             <button class="editor-icon-btn" id="btnDelete" title="Çöpe At / Sil" aria-label="Notu Çöpe At" style="color:var(--danger);">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             </button>
+
+            <!-- 3 Nokta Ana Eylemler Menüsü -->
+            <div style="position:relative; display:inline-block;">
+              <button class="editor-icon-btn" id="btnEditorMoreActions" title="Diğer Eylemler & Araçlar" aria-label="Diğer Not Eylemleri" aria-haspopup="true" aria-expanded="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+              </button>
+              <div class="dropdown-popover" id="editorMoreMenu" role="menu" aria-label="Not Eylemleri Menüsü" style="display:none; position:absolute; right:0; top:calc(100% + 6px); z-index:100; min-width:210px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.4); padding:6px 0;">
+                <button class="dropdown-item" id="btnMenuShare" role="menuitem" tabindex="0">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+                  <span>Paylaş & Dışa Aktar</span>
+                </button>
+                <button class="dropdown-item" id="btnMenuAdvanced" role="menuitem" tabindex="0">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+                  <span>Gelişmiş Araçlar</span>
+                </button>
+                <div class="dropdown-divider" style="height:1px; background:var(--border-subtle); margin:4px 0;"></div>
+                <button class="dropdown-item" id="btnMenuReminder" role="menuitem" tabindex="0">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+                  <span>Hatırlatıcı Ayarla</span>
+                </button>
+                <button class="dropdown-item" id="btnMenuDuplicate" role="menuitem" tabindex="0">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                  <span>Notu Çoğalt</span>
+                </button>
+                <button class="dropdown-item" id="btnMenuSaveTemplate" role="menuitem" tabindex="0">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                  <span>Şablon Olarak Kaydet</span>
+                </button>
+                <button class="dropdown-item" id="btnMenuHistory" role="menuitem" tabindex="0">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                  <span>Versiyon Geçmişi</span>
+                </button>
+                <button class="dropdown-item" id="btnMenuStats" role="menuitem" tabindex="0">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                  <span>İstatistikler & Süre</span>
+                </button>
+                <div class="dropdown-divider" style="height:1px; background:var(--border-subtle); margin:4px 0;"></div>
+                <button class="dropdown-item" id="btnMenuExportVault" role="menuitem" tabindex="0">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                  <span>.notevault Kasası İndir</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -213,12 +307,19 @@
           <div class="md-sep" aria-hidden="true"></div>
           <button class="md-tool-btn" data-prefix="# " data-suffix="" title="Büyük Başlık (H1)" aria-label="H1 Başlık">H1</button>
           <button class="md-tool-btn" data-prefix="## " data-suffix="" title="Alt Başlık (H2)" aria-label="H2 Alt Başlık">H2</button>
+          <button class="md-tool-btn" data-prefix="### " data-suffix="" title="Küçük Başlık (H3)" aria-label="H3 Başlık">H3</button>
+          <div class="md-sep" aria-hidden="true"></div>
           <button class="md-tool-btn" data-prefix="- [ ] " data-suffix="" title="Yapılacaklar Kutusu" aria-label="Kontrol Listesi Ekle">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM17.99 9l-1.41-1.42-6.59 6.59-2.58-2.57-1.42 1.41 4 4z"/></svg>
           </button>
           <button class="md-tool-btn" data-prefix="- " data-suffix="" title="Madde İmi" aria-label="Madde İmi Ekle">•</button>
-          <button class="md-tool-btn" data-prefix="`" data-suffix="`" title="Satır İçi Kod" aria-label="Kod Bloğu Ekle">&lt;&gt;</button>
+          <button class="md-tool-btn" data-prefix="1. " data-suffix="" title="Numaralı Liste" aria-label="Numaralı Liste Ekle">1.</button>
+          <button class="md-tool-btn" data-prefix="`" data-suffix="`" title="Satır İçi Kod" aria-label="Satır İçi Kod Ekle">&lt;&gt;</button>
+          <button class="md-tool-btn" data-prefix="```&#10;" data-suffix="&#10;```" title="Kod Bloğu" aria-label="Kod Bloğu Ekle">{ }</button>
           <button class="md-tool-btn" data-prefix="> " data-suffix="" title="Alıntı Ekle" aria-label="Alıntı Metni Ekle">”</button>
+          <div class="md-sep" aria-hidden="true"></div>
+          <button class="md-tool-btn" id="btnToolWikilink" data-prefix="[[" data-suffix="]]" title="Wiki Bağlantısı [[Not]]" aria-label="Wiki Bağlantısı Ekle">[[🔗]]</button>
+          <button class="md-tool-btn" id="btnToolHashtag" data-prefix="#" data-suffix="" title="Etiket (#tag)" aria-label="Hashtag Ekle">#</button>
 
           <div class="md-view-pills" role="group" aria-label="Düzenleyici Görünüm Modu">
             <button class="md-pill-btn" id="btnModeEdit" aria-label="Sadece Yazma Modu">Yaz</button>
@@ -246,18 +347,25 @@
         </div>
 
         <div class="editor-status-bar" role="status" aria-live="polite">
-          <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:12px;">
             <span id="charCountLabel">0 karakter • 0 kelime</span>
+            <span id="readingTimeLabel" style="color:var(--text-dim); font-size:12px;">⏱️ ~0 dk okuma</span>
             <span class="auto-save-status" id="autoSaveIndicator">✓ Otomatik Kaydedildi</span>
           </div>
-          <div id="attachmentsCount"></div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span id="editorReminderBadge" class="editor-badge" style="display:none; font-size:11px; background:rgba(245,158,11,0.15); color:var(--primary); padding:2px 8px; border-radius:10px;">⏰ Hatırlatıcı Aktif</span>
+            <div id="attachmentsCount"></div>
+          </div>
         </div>
       </div>
     </section>
   </div>
 
-  <!-- Modallar -->
-  <!-- 1. Kasa Parolası Modalı -->
+  <!-- ============================================== -->
+  <!-- 4. MODERN MODAL & POP-UP PENCERELERİ           -->
+  <!-- ============================================== -->
+
+  <!-- 1. Kasa Giriş / Şifre Belirleme Modalı -->
   <div class="modal-overlay" id="modalVault" role="dialog" aria-modal="true" aria-labelledby="vaultModalTitle">
     <div class="modal-dialog">
       <div class="modal-title">
@@ -266,6 +374,17 @@
       </div>
       <div class="modal-desc" id="vaultModalDesc">Kilitli notları görüntülemek ve düzenlemek için kasa şifrenizi girin.</div>
       <input type="password" class="modal-input" id="vaultPasswordInput" placeholder="Kasa Parolası" aria-label="Kasa Parolası">
+      
+      <!-- Yeni Şifre Kurulum / Değiştirme için Ek Alanlar -->
+      <div id="vaultSetupFields" style="display:none; flex-direction:column; gap:8px;">
+        <input type="password" class="modal-input" id="vaultPasswordConfirmInput" placeholder="Parolayı Tekrar Girin" aria-label="Parola Tekrarı">
+        <input type="text" class="modal-input" id="vaultHintInput" placeholder="Parola İpucu (İsteğe bağlı)" aria-label="Parola İpucu">
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <button type="button" class="btn-link" id="btnToggleVaultSetupMode" style="background:none; border:none; color:var(--primary); font-size:12px; cursor:pointer; text-decoration:underline;">Şifre Belirle / Değiştir</button>
+      </div>
+
       <div class="modal-actions">
         <button class="btn-secondary" id="btnCancelVault">İptal</button>
         <button class="btn-primary" id="btnConfirmVault">Kilidi Aç</button>
@@ -273,13 +392,18 @@
     </div>
   </div>
 
-  <!-- 2. Kategori Ekleme Modalı -->
+  <!-- 2. Kategori Ekleme & Yönetme Modalı -->
   <div class="modal-overlay" id="modalCategory" role="dialog" aria-modal="true" aria-labelledby="catModalTitle">
     <div class="modal-dialog">
-      <div class="modal-title" id="catModalTitle">Yeni Kategori Ekle</div>
-      <input type="text" class="modal-input" id="newCatNameInput" placeholder="Kategori Adı (örn: Finans, Proje)" aria-label="Kategori Adı">
-      <div style="font-size:12px; color:var(--text-dim); margin-bottom: 6px;">Kategori Rengi:</div>
+      <div class="modal-title" id="catModalTitle">Kategorileri Yönet & Ekle</div>
+      <div class="modal-desc">Notlarınızı organize etmek için yeni kategori tanımlayın veya mevcutları yönetin:</div>
+      <input type="text" class="modal-input" id="newCatNameInput" placeholder="Kategori Adı (örn: İş, Proje, Finans)" aria-label="Kategori Adı">
+      <div style="font-size:12px; color:var(--text-dim); margin-bottom: 2px;">Kategori Rengi:</div>
       <div id="catColorOptions" style="display:flex; gap:8px;"></div>
+      
+      <div style="font-size:12px; color:var(--text-dim); margin-top: 10px; margin-bottom:4px;">Mevcut Kategoriler:</div>
+      <div id="catManagementList" style="max-height:140px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; padding:4px; border:1px solid var(--border-subtle); border-radius:8px;"></div>
+
       <div class="modal-actions">
         <button class="btn-secondary" id="btnCancelCat">İptal</button>
         <button class="btn-primary" id="btnSaveCat">Kaydet</button>
@@ -287,7 +411,178 @@
     </div>
   </div>
 
-  <!-- 3. Wi-Fi Senkronizasyon Modalı -->
+  <!-- 3. Paylaş & Dışa Aktar Modalı -->
+  <div class="modal-overlay" id="modalShareExport" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+    <div class="modal-dialog">
+      <div class="modal-title" id="shareModalTitle">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+        <span>Paylaş & Dışa Aktar</span>
+      </div>
+      <div class="modal-desc">Aktif notu tercih ettiğiniz formatta dışa aktarın veya panoya kopyalayın:</div>
+      
+      <div class="export-options-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:8px 0;">
+        <button class="export-card-btn" id="btnExportTxt" style="display:flex; align-items:center; gap:10px; padding:12px; background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:10px; cursor:pointer; text-align:left; color:var(--text-main);">
+          <span style="font-size:22px;">📄</span>
+          <div>
+            <div style="font-weight:600; font-size:13px;">Düz Metin (.txt)</div>
+            <div style="font-size:11px; color:var(--text-dim);">Ham not içeriği</div>
+          </div>
+        </button>
+
+        <button class="export-card-btn" id="btnExportMd" style="display:flex; align-items:center; gap:10px; padding:12px; background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:10px; cursor:pointer; text-align:left; color:var(--text-main);">
+          <span style="font-size:22px;">📝</span>
+          <div>
+            <div style="font-weight:600; font-size:13px;">Markdown (.md)</div>
+            <div style="font-size:11px; color:var(--text-dim);">Biçimlendirilmiş kaynak</div>
+          </div>
+        </button>
+
+        <button class="export-card-btn" id="btnExportPdf" style="display:flex; align-items:center; gap:10px; padding:12px; background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:10px; cursor:pointer; text-align:left; color:var(--text-main);">
+          <span style="font-size:22px;">📑</span>
+          <div>
+            <div style="font-weight:600; font-size:13px;">PDF Belgesi (.pdf)</div>
+            <div style="font-size:11px; color:var(--text-dim);">Yazdırılabilir format</div>
+          </div>
+        </button>
+
+        <button class="export-card-btn" id="btnExportPng" style="display:flex; align-items:center; gap:10px; padding:12px; background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:10px; cursor:pointer; text-align:left; color:var(--text-main);">
+          <span style="font-size:22px;">🖼️</span>
+          <div>
+            <div style="font-weight:600; font-size:13px;">Not Kartı (.png)</div>
+            <div style="font-size:11px; color:var(--text-dim);">Görsel kart çıktısı</div>
+          </div>
+        </button>
+
+        <button class="export-card-btn" id="btnExportNoteVault" style="display:flex; align-items:center; gap:10px; padding:12px; background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:10px; cursor:pointer; text-align:left; color:var(--text-main);">
+          <span style="font-size:22px;">🔐</span>
+          <div>
+            <div style="font-weight:600; font-size:13px;">Kasa Paketi (.notevault)</div>
+            <div style="font-size:11px; color:var(--text-dim);">AES-256 şifreli yedek</div>
+          </div>
+        </button>
+
+        <button class="export-card-btn" id="btnCopyShareText" style="display:flex; align-items:center; gap:10px; padding:12px; background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:10px; cursor:pointer; text-align:left; color:var(--text-main);">
+          <span style="font-size:22px;">📋</span>
+          <div>
+            <div style="font-weight:600; font-size:13px;">Panoya Kopyala</div>
+            <div style="font-size:11px; color:var(--text-dim);">Hızlı metin paylaşımı</div>
+          </div>
+        </button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-primary" id="btnCloseShareExport">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Gelişmiş Not Araçları Modalı (Versiyon Geçmişi, İstatistikler, Şablonlar) -->
+  <div class="modal-overlay" id="modalAdvancedTools" role="dialog" aria-modal="true" aria-labelledby="advancedModalTitle">
+    <div class="modal-dialog" style="width:520px; max-width:94vw;">
+      <div class="modal-title" id="advancedModalTitle">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+        <span>Gelişmiş Not Araçları</span>
+      </div>
+
+      <!-- Araç Sekmeleri -->
+      <div class="tab-header" role="tablist" style="display:flex; gap:6px; border-bottom:1px solid var(--border-subtle); padding-bottom:8px; margin-bottom:12px;">
+        <button class="tab-btn active" id="tabBtnHistory" role="tab" aria-selected="true" style="padding:6px 12px; background:var(--primary); color:white; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Versiyon Geçmişi</button>
+        <button class="tab-btn" id="tabBtnStats" role="tab" aria-selected="false" style="padding:6px 12px; background:var(--bg-subtle); color:var(--text-muted); border:1px solid var(--border-subtle); border-radius:6px; font-weight:600; cursor:pointer;">İstatistikler</button>
+        <button class="tab-btn" id="tabBtnActions" role="tab" aria-selected="false" style="padding:6px 12px; background:var(--bg-subtle); color:var(--text-muted); border:1px solid var(--border-subtle); border-radius:6px; font-weight:600; cursor:pointer;">Hızlı Eylemler</button>
+      </div>
+
+      <!-- Sekme 1: Versiyon Geçmişi Paneli -->
+      <div class="tab-pane active" id="tabPaneHistory" role="tabpanel">
+        <div class="modal-desc">Not üzerinde otomatik veya manuel kaydedilmiş geçmiş revizyonlar:</div>
+        <div id="historyRevisionsContainer" style="max-height:180px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin:8px 0; padding:4px;">
+          <div style="font-size:12px; color:var(--text-dim); text-align:center; padding:16px;">Kayıtlı revizyon bulunamadı.</div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="btn-secondary" id="btnRestoreSelectedRevision" disabled style="opacity:0.6;">Seçili Versiyonu Geri Yükle</button>
+        </div>
+      </div>
+
+      <!-- Sekme 2: Not İstatistikleri Paneli -->
+      <div class="tab-pane" id="tabPaneStats" role="tabpanel" style="display:none;">
+        <div class="stats-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0;">
+          <div class="stat-card" style="padding:10px; background:var(--bg-subtle); border-radius:8px; border:1px solid var(--border-subtle);">
+            <div style="font-size:11px; color:var(--text-dim);">Toplam Karakter</div>
+            <div style="font-size:18px; font-weight:700; color:var(--primary);" id="statCharCount">0</div>
+          </div>
+          <div class="stat-card" style="padding:10px; background:var(--bg-subtle); border-radius:8px; border:1px solid var(--border-subtle);">
+            <div style="font-size:11px; color:var(--text-dim);">Boşluksuz Karakter</div>
+            <div style="font-size:18px; font-weight:700; color:var(--primary);" id="statCharNoSpace">0</div>
+          </div>
+          <div class="stat-card" style="padding:10px; background:var(--bg-subtle); border-radius:8px; border:1px solid var(--border-subtle);">
+            <div style="font-size:11px; color:var(--text-dim);">Kelime Sayısı</div>
+            <div style="font-size:18px; font-weight:700; color:var(--primary);" id="statWordCount">0</div>
+          </div>
+          <div class="stat-card" style="padding:10px; background:var(--bg-subtle); border-radius:8px; border:1px solid var(--border-subtle);">
+            <div style="font-size:11px; color:var(--text-dim);">Tahmini Okuma Süresi</div>
+            <div style="font-size:18px; font-weight:700; color:var(--primary);" id="statReadingTime">~0 dk</div>
+          </div>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); padding:6px 0;">
+          <div><b>Oluşturulma:</b> <span id="statCreatedAt">-</span></div>
+          <div><b>Son Güncelleme:</b> <span id="statUpdatedAt">-</span></div>
+        </div>
+      </div>
+
+      <!-- Sekme 3: Hızlı Eylemler Paneli -->
+      <div class="tab-pane" id="tabPaneActions" role="tabpanel" style="display:none;">
+        <div style="display:flex; flex-direction:column; gap:8px; margin:8px 0;">
+          <button class="tool-btn" id="btnActionDuplicateNote" style="justify-content:flex-start;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            <span>Bu Notu Çoğalt (Kopya Oluştur)</span>
+          </button>
+          <button class="tool-btn" id="btnActionSaveAsTemplate" style="justify-content:flex-start;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+            <span>Şablon Olarak Kaydet</span>
+          </button>
+          <button class="tool-btn" id="btnActionExportVaultFile" style="justify-content:flex-start;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+            <span>Şifreli .notevault Dosyası Olarak İndir</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-primary" id="btnCloseAdvancedTools">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Not Hatırlatıcısı Modalı -->
+  <div class="modal-overlay" id="modalReminder" role="dialog" aria-modal="true" aria-labelledby="reminderModalTitle">
+    <div class="modal-dialog">
+      <div class="modal-title" id="reminderModalTitle">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+        <span>Not Hatırlatıcısı Ayarla</span>
+      </div>
+      <div class="modal-desc">Bu not için bir alarm veya bildirim zamanı belirleyin:</div>
+      
+      <input type="datetime-local" class="modal-input" id="reminderDateTimeInput" aria-label="Hatırlatıcı Tarih ve Saati">
+
+      <div style="font-size:12px; color:var(--text-dim); margin-top:4px;">Hızlı Ön Ayarlar:</div>
+      <div class="reminder-presets" style="display:flex; flex-wrap:wrap; gap:6px; margin:4px 0;">
+        <button type="button" class="chip" id="btnPresetTodayEvening">Bugün Akşam (18:00)</button>
+        <button type="button" class="chip" id="btnPresetTomorrowMorning">Yarın Sabah (09:00)</button>
+        <button type="button" class="chip" id="btnPresetNextWeek">Gelecek Hafta (Pzt 09:00)</button>
+      </div>
+
+      <input type="text" class="modal-input" id="reminderNoteInput" placeholder="Hatırlatıcı Açıklaması (İsteğe bağlı)" aria-label="Hatırlatıcı Açıklaması">
+
+      <div class="modal-actions" style="justify-content:space-between;">
+        <button class="btn-secondary" id="btnRemoveReminder" style="color:var(--danger); border-color:rgba(239,68,68,0.4);" title="Hatırlatıcıyı Temizle">Kaldır</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-secondary" id="btnCancelReminder">İptal</button>
+          <button class="btn-primary" id="btnSaveReminder">Kaydet</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Wi-Fi Senkronizasyon Modalı -->
   <div class="modal-overlay" id="modalSync" role="dialog" aria-modal="true" aria-labelledby="syncModalTitle">
     <div class="modal-dialog sync-dialog">
       <div class="modal-title" id="syncModalTitle">

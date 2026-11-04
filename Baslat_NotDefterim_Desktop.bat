@@ -1,5 +1,5 @@
 @echo off
-title Not Defterim - Masaustu Yonetim Merkezi
+title Not Defterim - Rust Native Masaustu Yonetim Merkezi
 color 0B
 cd /d "%~dp0"
 
@@ -7,27 +7,25 @@ cd /d "%~dp0"
 cls
 color 0B
 echo ===============================================================================
-echo                 NOT DEFTERIM - MASAUSTU YONETIM MERKEZI
+echo             NOT DEFTERIM - MODERN RUST NATIVE YONETIM MERKEZI
 echo ===============================================================================
 echo.
-echo   [1] Not Defterim (Compose Multiplatform Kotlin)
-echo   [2] Not Defterim (JavaScript / Electron Surumu)
-echo   [3] Windows Kurulum Paketi Uret (.msi)
-echo   [4] Tum Birim Testlerini Calistir (Kotlin + JS)
-echo   [5] Wi-Fi Senkronizasyon Test Paketini Calistir (Gelismis LAN Dogrulayici)
-echo   [6] Hizli Teshis ve Sistem Durumu (Node.js ve Ag Portu Kontrolu)
+echo   [1] Not Defterim Masaustu Baslat (Rust / Native GUI)
+echo   [2] Rust Masaustu Surumunu Hizli Derle (cargo build --release)
+echo   [3] Rust Masaustu Birim Testlerini Calistir (cargo test)
+echo   [4] Wi-Fi Senkronizasyon Test Paketini Calistir (Gelismis LAN Dogrulayici)
+echo   [5] Hizli Teshis ve Sistem Durumu (Rust, Cargo ve Ag Portu Kontrolu)
 echo   [0] Cikis
 echo.
 echo ===============================================================================
-set /p secim="Seciminiz [1/2/3/4/5/6/0]: "
+set /p secim="Seciminiz [1/2/3/4/5/0]: "
 if defined secim set "secim=%secim: =%"
 
-if "%secim%"=="1" goto baslat_compose
-if "%secim%"=="2" goto baslat_electron
-if "%secim%"=="3" goto paketle
-if "%secim%"=="4" goto testler
-if "%secim%"=="5" goto wifi_sync_test
-if "%secim%"=="6" goto hizli_teshis
+if "%secim%"=="1" goto baslat_rust
+if "%secim%"=="2" goto derle_rust
+if "%secim%"=="3" goto testler_rust
+if "%secim%"=="4" goto wifi_sync_test
+if "%secim%"=="5" goto hizli_teshis
 if "%secim%"=="0" goto cikis
 
 color 0C
@@ -36,173 +34,120 @@ echo [UYARI] Gecersiz secim: "%secim%"! Lutfen menudeki seceneklerden birini gir
 timeout /t 2 >nul 2>&1 || ping -n 3 127.0.0.1 >nul
 goto menu
 
-:baslat_compose
+:baslat_rust
 cls
 color 0B
 echo ===============================================================================
-echo   [1/6] Not Defterim (Compose Desktop Kotlin) Baslatiliyor...
+echo   [1/5] Not Defterim (Rust / Native GUI) Baslatiliyor...
 echo ===============================================================================
 echo.
-if not exist "%~dp0gradlew.bat" (
+
+:: 1. Oncelik: Derlenmis Release ikili dosyasi
+if exist "%~dp0desktop-native\target\release\notdefterim.exe" (
+    color 0A
+    echo [BILGI] Derlenmis Release surumu baslatiliyor: notdefterim.exe...
+    start "" "%~dp0desktop-native\target\release\notdefterim.exe" %*
+    goto baslat_rust_sonuc
+)
+
+:: 2. Oncelik: Derlenmis Debug ikili dosyasi
+if exist "%~dp0desktop-native\target\debug\notdefterim.exe" (
+    color 0A
+    echo [BILGI] Derlenmis Debug surumu baslatiliyor: notdefterim.exe...
+    start "" "%~dp0desktop-native\target\debug\notdefterim.exe" %*
+    goto baslat_rust_sonuc
+)
+
+:: 3. Oncelik: Cargo Run ile kaynak koddan derleyip calistirma
+where cargo >nul 2>&1
+if %errorlevel% neq 0 (
     color 0C
-    echo [HATA] 'gradlew.bat' dosyasi ana dizinde bulunamadi!
-    echo Lutfen proje kok dizininde oldugunuzdan emin olun.
+    echo [HATA] Rust paket yoneticisi 'cargo' bulunamadi veya PATH ortam degiskeninde yok!
+    echo Lutfen https://rustup.rs adresinden Rust arac setini kurun.
     pause
     goto menu
 )
-where java >nul 2>&1
-if %errorlevel% neq 0 (
-    color 0C
-    echo [HATA] Java JDK bulunamadi veya PATH ortam degiskenine eklenmemis!
-    echo Lutfen JDK 17+ kurulu oldugundan emin olun.
-    pause
-    goto menu
-)
-echo [BILGI] Gradle gorevi yurutuluyor: ':desktop:run'...
-echo.
-call "%~dp0gradlew.bat" :desktop:run
+
+color 0E
+echo [BILGI] Derlenmis hazir ikili bulunamadi. Cargo ile calistiriliyor [cargo run]...
+cd /d "%~dp0desktop-native"
+cargo run
 if %errorlevel% neq 0 (
     color 0C
     echo.
-    echo [HATA] Compose Desktop baslatilirken bir hata olustu! Hata kodu: %errorlevel%
-    pause
-)
-goto menu
-
-:baslat_electron
-cls
-color 0B
-echo ===============================================================================
-echo   [2/6] Not Defterim (JavaScript / Electron Surumu) Baslatiliyor...
-echo ===============================================================================
-echo.
-cd /d "%~dp0desktop-electron"
-
-where node >nul 2>&1
-if %errorlevel% neq 0 (
-    color 0C
-    echo [HATA] Node.js sistemde bulunamadi veya PATH ortam degiskenine eklenmemis!
-    echo Lutfen https://nodejs.org adresinden Node.js LTS surumunu kurun.
-    pause
-    cd /d "%~dp0"
-    goto menu
-)
-
-:: Otomatik 'npm install' ve bagimlilik kontrol mekanizmasi
-set "INSTALL_NEEDED=0"
-if not exist "node_modules\" set "INSTALL_NEEDED=1"
-if not exist "node_modules\electron\" set "INSTALL_NEEDED=1"
-
-if "%INSTALL_NEEDED%"=="1" (
-    color 0E
-    echo [BILGI] 'desktop-electron\node_modules' veya Electron calisma zamani eksik tespit edildi.
-    echo [ISLEM] Bagimliliklar otomatik kuruluyor [npm install]... Lutfen bekleyin.
-    echo.
-    call npm install
-    if %errorlevel% neq 0 (
-        color 0C
-        echo.
-        echo [HATA] npm paket kurulumu basarisiz oldu! Hata kodu: %errorlevel%
-        pause
-        cd /d "%~dp0"
-        goto menu
-    )
-    echo.
-    echo [BASARILI] Bagimliliklar basariyla kuruldu!
-    echo.
-)
-
-color 0A
-echo [BILGI] Electron masaustu uygulamasi baslatiliyor [npm start]...
-echo.
-call npm start
-if %errorlevel% neq 0 (
-    color 0C
-    echo.
-    echo [BILGI] Uygulama sonlandi veya hata kodu dondu: %errorlevel%
+    echo [HATA] Uygulama calistirilamadi! Hata kodu: %errorlevel%
     pause
 )
 cd /d "%~dp0"
 goto menu
 
-:paketle
+:baslat_rust_sonuc
+color 0A
+echo [BASARILI] Not Defterim Masaustu uygulamasi arka planda baslatildi.
+timeout /t 2 >nul 2>&1 || ping -n 3 127.0.0.1 >nul
+goto menu
+
+:derle_rust
 cls
 color 0B
 echo ===============================================================================
-echo   [3/6] Windows Kurulum Paketi Uret (.msi)
+echo   [2/5] Rust Masaustu Surumunu Hizli Derle (cargo build --release)
 echo ===============================================================================
 echo.
-if not exist "%~dp0gradlew.bat" (
+where cargo >nul 2>&1
+if %errorlevel% neq 0 (
     color 0C
-    echo [HATA] 'gradlew.bat' dosyasi bulunamadi!
+    echo [HATA] Rust paket yoneticisi 'cargo' sistemde bulunamadi!
     pause
     goto menu
 )
-echo [ISLEM] WiX Toolset ile Windows Kurulum Paketi (.msi) uretiliyor...
-echo Gorev: ':desktop:packageMsi'
+cd /d "%~dp0desktop-native"
+echo [ISLEM] Optimize edilmis Release surumu derleniyor [cargo build --release]...
 echo.
-call "%~dp0gradlew.bat" :desktop:packageMsi
+call cargo build --release
 if %errorlevel% neq 0 (
     color 0C
     echo.
-    echo [HATA] Paketleme islemi basarisiz oldu! Hata kodu: %errorlevel%
+    echo [HATA] Derleme islemi basarisiz oldu! Hata kodu: %errorlevel%
 ) else (
     color 0A
     echo.
-    echo [BASARILI] Kurulum paketi (.msi) basariyla olusturuldu!
-    echo Hedef Konum: desktop\build\compose\binaries\main\msi
+    echo [BASARILI] Rust masaustu surumu basariyla derlendi!
+    echo Hedef Konum: desktop-native\target\release\notdefterim.exe
 )
+cd /d "%~dp0"
 echo.
 pause
 goto menu
 
-:testler
+:testler_rust
 cls
 color 0B
 echo ===============================================================================
-echo   [4/6] Tum Birim Testlerini Calistir (Kotlin + JS)
+echo   [3/5] Rust Masaustu Birim Testlerini Calistir (cargo test)
 echo ===============================================================================
 echo.
-echo [1/2] Kotlin Compose Testleri Baslatiliyor...
-if exist "%~dp0gradlew.bat" (
-    call "%~dp0gradlew.bat" :desktop:test
-    if %errorlevel% neq 0 (
-        color 0E
-        echo.
-        echo [UYARI] Kotlin testleri sirasinda uyari veya hata olustu.
-    ) else (
-        echo.
-        echo [BASARILI] Kotlin birim testleri basariyla tamamlandi.
-    )
-) else (
-    echo [ATLANDI] 'gradlew.bat' bulunamadi.
+where cargo >nul 2>&1
+if %errorlevel% neq 0 (
+    color 0C
+    echo [HATA] Rust paket yoneticisi 'cargo' sistemde bulunamadi!
+    pause
+    goto menu
 )
-
+cd /d "%~dp0desktop-native"
+echo [ISLEM] Rust birim ve entegrasyon testleri yurutuluyor [cargo test]...
 echo.
-echo [2/2] Electron JavaScript Testleri Baslatiliyor...
-cd /d "%~dp0desktop-electron"
-if exist "package.json" (
-    if not exist "node_modules\" (
-        echo [BILGI] Testler oncesi eksik bagimliliklar yukleniyor...
-        call npm install
-    )
-    call npm test
-    if %errorlevel% neq 0 (
-        color 0E
-        echo.
-        echo [UYARI] JavaScript testleri sirasinda uyari veya hata olustu.
-    ) else (
-        echo.
-        echo [BASARILI] JavaScript birim testleri basariyla tamamlandi.
-    )
+call cargo test
+if %errorlevel% neq 0 (
+    color 0E
+    echo.
+    echo [UYARI] Testler sirasinda bazi basarisizliklar veya uyarilar olustu.
 ) else (
-    echo [ATLANDI] 'desktop-electron\package.json' bulunamadi.
+    color 0A
+    echo.
+    echo [BASARILI] Tum Rust birim testleri basariyla tamamlandi!
 )
 cd /d "%~dp0"
-
-echo.
-echo ===============================================================================
-echo Tum birim test dongusu tamamlandi.
 echo.
 pause
 goto menu
@@ -283,18 +228,8 @@ if exist "%~dp0..\tools_sync_tester\sync_tester.py" (
 
 :: Test paketi henuz hazir degilse rehberlik
 color 0E
-echo [BILGI] 'tools\sync_tester' veya 'tools_sync_tester' test paketi henuz tamamlanmadi.
-echo.
-echo Mevcut alternatif Electron testlerini calistirmak ister misiniz?
-echo   [1] Electron Birim/Entegrasyon Testlerini Calistir (npm test)
-echo   [2] Ana Menuye Don
-echo.
-set /p sync_alt="Seciminiz [1/2]: "
-if "%sync_alt%"=="1" (
-    cd /d "%~dp0desktop-electron"
-    call npm test
-    cd /d "%~dp0"
-)
+echo [BILGI] 'tools\sync_tester' test paketi henuz hazir degil veya bulunamadi.
+echo Lutfen tools\sync_tester dizininin mevcut oldugundan emin olun.
 goto wifi_sync_bitis
 
 :wifi_sync_sonuc
@@ -317,39 +252,29 @@ goto menu
 cls
 color 0B
 echo ===============================================================================
-echo   [6/6] Hizli Teshis ve Sistem Durumu (Node.js ve Ag Portu Kontrolu)
+echo   [5/5] Hizli Teshis ve Sistem Durumu (Rust, Cargo ve Ag Portu Kontrolu)
 echo ===============================================================================
 echo.
 
-:: 1. Node.js ve npm Durumu
-echo [1/4] Node.js ve npm Calisma Zamani Denetimi:
-where node >nul 2>&1
+:: 1. Rust ve Cargo Calisma Zamani Denetimi
+echo [1/4] Rust ve Cargo Calisma Zamani Denetimi:
+where rustc >nul 2>&1
 if %errorlevel% equ 0 (
-    for /f "tokens=*" %%v in ('node -v 2^>nul') do echo   - Node.js Surumu : %%v [KURULU - TAMAM]
+    for /f "tokens=*" %%v in ('rustc --version 2^>nul') do echo   - rustc Surumu   : %%v [KURULU - TAMAM]
 ) else (
-    echo   - Node.js        : [BULUNAMADI - UYARI] - Electron surumu icin gereklidir
+    echo   - rustc          : [BULUNAMADI - UYARI] - Rust derleyicisi gereklidir
 )
 
-where npm >nul 2>&1
+where cargo >nul 2>&1
 if %errorlevel% equ 0 (
-    for /f "tokens=*" %%v in ('npm -v 2^>nul') do echo   - npm Surumu     : %%v [KURULU - TAMAM]
+    for /f "tokens=*" %%v in ('cargo --version 2^>nul') do echo   - cargo Surumu   : %%v [KURULU - TAMAM]
 ) else (
-    echo   - npm            : [BULUNAMADI - UYARI]
+    echo   - cargo          : [BULUNAMADI - UYARI] - Cargo paket yoneticisi gereklidir
 )
 
-:: 2. Java JDK Durumu
+:: 2. Wi-Fi Senkronizasyon Portu (8765) Kontrolu
 echo.
-echo [2/4] Java JDK Calisma Zamani Denetimi:
-where java >nul 2>&1
-if %errorlevel% equ 0 (
-    echo   - Java [JDK]     : [KURULU - TAMAM] - Compose Desktop icin hazir
-) else (
-    echo   - Java [JDK]     : [BULUNAMADI - UYARI] - Compose Kotlin icin gereklidir
-)
-
-:: 3. Wi-Fi Senkronizasyon Portu (8765) Kontrolu
-echo.
-echo [3/4] Wi-Fi Senkronizasyon Portu [8765] Ag Denetimi:
+echo [2/4] Wi-Fi Senkronizasyon Portu [8765] Ag Denetimi:
 netstat -ano | findstr /c:":8765" >nul 2>&1
 if %errorlevel% equ 0 (
     color 0E
@@ -361,33 +286,45 @@ if %errorlevel% equ 0 (
     echo   - Port 8765 Durumu: SERBEST - Kullanima hazir, cakisma yok [TAMAM]
 )
 
-:: 4. Yerel Ag (LAN) IPv4 Adresleri
+:: 3. Yerel Ag (LAN) IPv4 Adresleri
 echo.
 color 0B
-echo [4/4] Yerel IP Adresleri - Wi-Fi Senkronizasyon Cihaz Eslesmesi Icin:
+echo [3/4] Yerel IP Adresleri - Wi-Fi Senkronizasyon Cihaz Eslesmesi Icin:
 for /f "tokens=2 delims=:" %%i in ('ipconfig ^| findstr /i "IPv4"') do (
     echo   - Yerel IP :%%i
 )
 
-:: 5. Dosya ve Bilesen Kontrolleri
+:: 4. Dosya ve Bilesen Kontrolleri
 echo.
-echo [BILGI] Proje Bilesen Durumlari:
-if exist "%~dp0desktop-electron\node_modules\" (
-    echo   - desktop-electron\node_modules : [MEVCUT]
+echo [4/4] Proje Bilesen Durumlari:
+if exist "%~dp0desktop-native\Cargo.toml" (
+    echo   - desktop-native\Cargo.toml         : [MEVCUT - RUST PROJESI HAZIR]
 ) else (
-    echo   - desktop-electron\node_modules : [EKSIK] - Secenek [2] ile otomatik yuklenir
+    echo   - desktop-native\Cargo.toml         : [EKSIK]
+)
+if exist "%~dp0desktop-native\ui\index.html" (
+    echo   - desktop-native\ui [Arayuz]        : [MEVCUT]
+) else (
+    echo   - desktop-native\ui [Arayuz]        : [EKSIK]
+)
+if exist "%~dp0desktop-native\target\release\notdefterim.exe" (
+    echo   - desktop-native\target [Release]   : [DERLENMIS - HAZIR]
+) else (
+    echo   - desktop-native\target [Release]   : [HENUZ DERLENMEDI - Secenek 2 ile derlenebilir]
 )
 if exist "%~dp0gradlew.bat" (
-    echo   - Gradle Wrapper [gradlew.bat]   : [MEVCUT]
+    echo   - Android Gradle [gradlew.bat]      : [MEVCUT]
 ) else (
-    echo   - Gradle Wrapper [gradlew.bat]   : [EKSIK]
+    echo   - Android Gradle [gradlew.bat]      : [EKSIK]
 )
 if exist "%~dp0tools\sync_tester\" (
-    echo   - tools\sync_tester             : [MEVCUT]
-) else if exist "%~dp0..\tools_sync_tester\" (
-    echo   - tools_sync_tester             : [UST DIZINDE MEVCUT]
+    echo   - tools\sync_tester                 : [MEVCUT]
 ) else (
-    echo   - tools\sync_tester             : [HENUZ OLUSTURULMADI]
+    if exist "%~dp0..\tools_sync_tester\" (
+        echo   - tools_sync_tester                 : [UST DIZINDE MEVCUT]
+    ) else (
+        echo   - tools\sync_tester                 : [HENUZ OLUSTURULMADI]
+    )
 )
 
 echo.

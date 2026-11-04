@@ -80,6 +80,26 @@ class QrSyncManager @Inject constructor() {
             }
         }
 
+        // 4. NOTDEFTERIM_SYNC formatı: NOTDEFTERIM_SYNC:192.168.1.15:8765:1234
+        if (trimmed.startsWith("NOTDEFTERIM_SYNC:", ignoreCase = true)) {
+            val clean = trimmed.substring(trimmed.indexOf(":") + 1).trim()
+            val parts = clean.split(":")
+            if (parts.size >= 3) {
+                val ip = parts[0].trim()
+                val port = parts[1].trim().toIntOrNull() ?: 8765
+                val pin = parts[2].trim()
+                if (ip.isNotEmpty() && pin.isNotEmpty()) {
+                    return SyncQrPayload(ip = ip, port = port, pin = pin)
+                }
+            } else if (parts.size == 2) {
+                val ip = parts[0].trim()
+                val pin = parts[1].trim()
+                if (ip.isNotEmpty() && pin.isNotEmpty()) {
+                    return SyncQrPayload(ip = ip, port = 8765, pin = pin)
+                }
+            }
+        }
+
         return null
     }
 }

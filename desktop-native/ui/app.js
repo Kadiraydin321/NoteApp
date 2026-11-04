@@ -19,32 +19,153 @@ const NOTE_PRESETS = [
   { id: -3610935, name: "Açık Nane", color: "#C8E6C9", text: "#1A1C1E" }
 ];
 
-// Uygulama Durumu
+// Uygulama Durumu (Reaktif İstemci State)
 let state = {
   activeNotes: [],
   archivedNotes: [],
   trashNotes: [],
   categories: [],
-  currentFilter: 'all', // 'all', 'pinned', 'vault', 'archive', 'trash', 'cat_ID'
+  currentFilter: 'all', // 'all', 'pinned', 'reminders', 'vault', 'archive', 'trash', 'cat_ID', 'tag_TAG'
+  selectedNav: 'all',
+  selectedCategoryId: null,
+  selectedTag: null,
   searchQuery: '',
+  sortOrder: 'updated-desc', // 'updated-desc', 'updated-asc', 'created-desc', 'created-asc', 'title-asc', 'title-desc'
   selectedNoteId: null,
+  selectedNoteIds: new Set(),
+  batchModeActive: false,
   layoutMode: 'list', // 'list' veya 'grid'
   markdownMode: 'split', // 'edit', 'split', 'preview'
   antiSsEnabled: true,
   isVaultUnlocked: false,
+  vaultHasPassword: true,
   undoStack: [],
   redoStack: [],
+  noteVersions: new Map(), // noteId -> Array<{ timestamp, title, content }>
   autoSaveTimer: null,
   isDirty: false
 };
 
-// IPC İletişim Köprüsü (Custom Protocol üzerinden hızlı HTTP Fetch)
-async function callIpc(cmd, payload = {}) {
+// ===================================================
+// WRY NATIVE IPC KÖPRÜSÜ & FETCH FALLBACK
+// ===================================================
+
+const pendingRequests = new Map();
+let requestCounter = 0;
+const eventListeners = new Map();
+
+// Rust Backend Action -> API Komutu Eşleme Tablosu
+const ACTION_MAP = {
+  "db:getNotes": "getNotes",
+  "db:createNote": "createNote",
+  "db:saveNote": "saveNote",
+  "db:moveToTrash": "moveToTrash",
+  "db:restoreFromTrash": "restoreFromTrash",
+  "db:deletePermanently": "deletePermanently",
+  "db:emptyTrash": "emptyTrash",
+  "db:getCategories": "getCategories",
+  "db:addCategory": "addCategory",
+  "db:saveCategory": "addCategory",
+  "db:deleteCategory": "deleteCategory",
+  "vault:getStatus": "vaultStatus",
+  "vault:setup": "vaultSetup",
+  "vault:unlock": "vaultUnlock",
+  "vault:lock": "vaultLock",
+  "sync:getState": "syncGetState",
+  "sync:start": "syncStart",
+  "sync:stop": "syncStop",
+  "sync:refreshPin": "syncRefreshPin",
+  "backup:export": "backupExport",
+  "backup:import": "backupImport",
+  "window:setAntiScreenshot": "setAntiScreenshot"
+};
+
+// Rust -> Frontend Yanıt Çözücü (evaluate_script ile tetiklenir)
+window.__IPC_RESOLVE__ = function(response) {
+  try {
+    const res = typeof response === "string" ? JSON.parse(response) : response;
+    const { requestId, success, data, error } = res || {};
+    if (requestId && pendingRequests.has(requestId)) {
+      const { resolve, reject, timeoutId } = pendingRequests.get(requestId);
+      if (timeoutId) clearTimeout(timeoutId);
+      pendingRequests.delete(requestId);
+      if (success !== false && !error) {
+        resolve(data !== undefined ? (data.result !== undefined ? data.result : data) : data);
+      } else {
+        const errMsg = error?.message || (typeof error === "string" ? error : "IPC İşlem Hatası");
+        reject(new Error(errMsg));
+      }
+    }
+  } catch (err) {
+    console.error("[__IPC_RESOLVE__ Hatası]:", err);
+  }
+};
+
+// Rust -> Frontend Asenkron Push Olayları (sync:statusChanged, vault:locked vb.)
+window.__IPC_EMIT__ = function(eventPayload) {
+  try {
+    const payload = typeof eventPayload === "string" ? JSON.parse(eventPayload) : eventPayload;
+    const { event, data } = payload || {};
+    if (event && eventListeners.has(event)) {
+      eventListeners.get(event).forEach(fn => {
+        try { fn(data); } catch (e) { console.error(`[__IPC_EMIT__ Dinleyici Hatası (${event})]:`, e); }
+      });
+    }
+  } catch (err) {
+    console.error("[__IPC_EMIT__ Hatası]:", err);
+  }
+};
+
+function onNativeEvent(event, callback) {
+  if (!eventListeners.has(event)) {
+    eventListeners.set(event, new Set());
+  }
+  eventListeners.get(event).add(callback);
+  return () => eventListeners.get(event)?.delete(callback);
+}
+
+// Birleşik IPC Çağrı Fonksiyonu
+async function callIpc(actionOrCmd, payload = {}) {
+  const reqId = `req_${Date.now()}_${++requestCounter}`;
+  const mappedCmd = ACTION_MAP[actionOrCmd] || actionOrCmd.replace(/^[a-z]+:/i, "");
+  const envelope = {
+    action: actionOrCmd,
+    cmd: mappedCmd,
+    payload,
+    requestId: reqId
+  };
+
+  // 1. Wry Native IPC (window.ipc.postMessage)
+  if (window.ipc && typeof window.ipc.postMessage === "function") {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        pendingRequests.delete(reqId);
+        // Zaman aşımında fetch fallback'e geç
+        fallbackFetch(mappedCmd, payload, actionOrCmd).then(resolve).catch(reject);
+      }, 1500);
+
+      pendingRequests.set(reqId, { resolve, reject, timeoutId });
+
+      try {
+        window.ipc.postMessage(JSON.stringify(envelope));
+      } catch (e) {
+        clearTimeout(timeoutId);
+        pendingRequests.delete(reqId);
+        fallbackFetch(mappedCmd, payload, actionOrCmd).then(resolve).catch(reject);
+      }
+    });
+  }
+
+  // 2. HTTP Fallback (/api)
+  return fallbackFetch(mappedCmd, payload, actionOrCmd);
+}
+
+async function fallbackFetch(cmd, payload = {}, action = "") {
   try {
     const res = await fetch("/api", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cmd, payload })
+      body: JSON.stringify({ cmd, action, payload })
     });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -53,7 +174,7 @@ async function callIpc(cmd, payload = {}) {
     if (data.error) {
       throw new Error(data.error);
     }
-    return data.result;
+    return data.result !== undefined ? data.result : data;
   } catch (err) {
     console.error(`[IPC Hatası] Komut '${cmd}':`, err);
     throw err;
@@ -67,11 +188,26 @@ async function callIpc(cmd, payload = {}) {
 document.addEventListener("DOMContentLoaded", () => {
   initUI();
   loadAllData();
+
+  // Rust Backend Push Event Dinleyicileri
+  onNativeEvent("sync:statusChanged", (data) => {
+    updateSyncStateUI();
+  });
+
+  onNativeEvent("db:changed", () => {
+    loadAllData();
+  });
+
+  onNativeEvent("vault:locked", () => {
+    state.isVaultUnlocked = false;
+    showToast("Kasa kilitlendi", "info");
+    loadAllData();
+  });
 });
 
 async function loadAllData() {
   try {
-    const data = await callIpc("getNotes");
+    const data = await callIpc("db:getNotes");
     if (data) {
       state.activeNotes = data.active || [];
       state.archivedNotes = data.archived || [];
@@ -81,6 +217,7 @@ async function loadAllData() {
 
       updateSidebarCounts();
       renderCategoriesList();
+      extractTagsAndRender();
       renderNotesList();
 
       if (state.selectedNoteId) {
@@ -253,6 +390,90 @@ function initUI() {
     }
   });
 
+  // 10.1 Sıralama Menüsü Açılır/Kapanır
+  const btnSort = document.getElementById("btnSortMenu");
+  const sortMenu = document.getElementById("sortDropdownMenu");
+  if (btnSort && sortMenu) {
+    btnSort.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isOpen = sortMenu.style.display === "block";
+      sortMenu.style.display = isOpen ? "none" : "block";
+      btnSort.setAttribute("aria-expanded", !isOpen);
+    });
+    document.addEventListener("click", () => {
+      sortMenu.style.display = "none";
+      btnSort.setAttribute("aria-expanded", "false");
+    });
+    document.querySelectorAll(".sort-item").forEach(item => {
+      item.addEventListener("click", () => {
+        document.querySelectorAll(".sort-item").forEach(i => i.classList.remove("active"));
+        item.classList.add("active");
+        state.sortOrder = item.dataset.sort;
+        renderNotesList();
+        sortMenu.style.display = "none";
+        btnSort.setAttribute("aria-expanded", "false");
+      });
+    });
+  }
+
+  // 10.2 Çoklu Not Seçimi (Batch Action Mode)
+  initBatchMode();
+
+  // 10.3 3 Nokta Not Eylemleri Menüsü
+  const btnMore = document.getElementById("btnEditorMoreActions");
+  const moreMenu = document.getElementById("editorMoreMenu");
+  if (btnMore && moreMenu) {
+    btnMore.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isOpen = moreMenu.style.display === "block";
+      moreMenu.style.display = isOpen ? "none" : "block";
+      btnMore.setAttribute("aria-expanded", !isOpen);
+    });
+    document.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      btnMore.setAttribute("aria-expanded", "false");
+    });
+
+    // Menü Butonları Dinleyicileri
+    document.getElementById("btnMenuShare")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      openShareModal();
+    });
+    document.getElementById("btnMenuAdvanced")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      openAdvancedToolsModal();
+    });
+    document.getElementById("btnMenuReminder")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      openReminderModal();
+    });
+    document.getElementById("btnMenuDuplicate")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      duplicateCurrentNote();
+    });
+    document.getElementById("btnMenuSaveTemplate")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      saveAsTemplate();
+    });
+    document.getElementById("btnMenuHistory")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      openVersionHistoryModal();
+    });
+    document.getElementById("btnMenuStats")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      openStatsModal();
+    });
+    document.getElementById("btnMenuExportVault")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      exportCurrentNoteToVaultFile();
+    });
+  }
+
+  // Hatırlatıcı Butonu (Editör Çubuğu)
+  document.getElementById("btnEditorReminder")?.addEventListener("click", () => {
+    openReminderModal();
+  });
+
   // 11. Modallar
   initModals();
 
@@ -276,6 +497,138 @@ function initUI() {
     document.getElementById("antiSsLabel").textContent = state.antiSsEnabled ? "Anti-SS: Açık" : "Anti-SS: Kapalı";
     showToast(state.antiSsEnabled ? "Gizlilik Kalkanı aktif (Anti-SS açık)" : "Gizlilik Kalkanı devre dışı", "info");
   });
+}
+
+// ===================================================
+// TOPLU NOT İŞLEMLERİ (BATCH ACTION MODE)
+// ===================================================
+
+function initBatchMode() {
+  const btnToggle = document.getElementById("btnToggleBatchMode");
+  const bar = document.getElementById("batchActionBar");
+  const btnCancel = document.getElementById("btnBatchCancel");
+  const btnSelectAll = document.getElementById("btnBatchSelectAll");
+  const btnPin = document.getElementById("btnBatchPin");
+  const btnVault = document.getElementById("btnBatchVault");
+  const btnArchive = document.getElementById("btnBatchArchive");
+  const btnTrash = document.getElementById("btnBatchTrash");
+  const btnDeletePerm = document.getElementById("btnBatchDeletePermanent");
+
+  if (!btnToggle || !bar) return;
+
+  btnToggle.addEventListener("click", () => {
+    state.batchModeActive = !state.batchModeActive;
+    if (!state.batchModeActive) {
+      state.selectedNoteIds.clear();
+    }
+    btnToggle.classList.toggle("active", state.batchModeActive);
+    bar.style.display = state.batchModeActive ? "flex" : "none";
+    updateBatchActionBarUI();
+    renderNotesList();
+  });
+
+  btnCancel?.addEventListener("click", () => {
+    state.batchModeActive = false;
+    state.selectedNoteIds.clear();
+    btnToggle.classList.remove("active");
+    bar.style.display = "none";
+    renderNotesList();
+  });
+
+  btnSelectAll?.addEventListener("click", () => {
+    const visibleNotes = getVisibleNotesList();
+    if (state.selectedNoteIds.size === visibleNotes.length) {
+      state.selectedNoteIds.clear();
+    } else {
+      visibleNotes.forEach(n => state.selectedNoteIds.add(n.id));
+    }
+    updateBatchActionBarUI();
+    renderNotesList();
+  });
+
+  btnPin?.addEventListener("click", async () => {
+    if (state.selectedNoteIds.size === 0) return;
+    for (const id of state.selectedNoteIds) {
+      const note = findNoteById(id);
+      if (note) {
+        note.isPinned = !note.isPinned;
+        await callIpc("db:saveNote", { note });
+      }
+    }
+    showToast(`${state.selectedNoteIds.size} not güncellendi`, "success");
+    loadAllData();
+  });
+
+  btnVault?.addEventListener("click", async () => {
+    if (state.selectedNoteIds.size === 0) return;
+    for (const id of state.selectedNoteIds) {
+      const note = findNoteById(id);
+      if (note) {
+        note.isLocked = true;
+        await callIpc("db:saveNote", { note });
+      }
+    }
+    showToast(`${state.selectedNoteIds.size} not kilitli kasaya taşındı`, "info");
+    loadAllData();
+  });
+
+  btnArchive?.addEventListener("click", async () => {
+    if (state.selectedNoteIds.size === 0) return;
+    for (const id of state.selectedNoteIds) {
+      const note = findNoteById(id);
+      if (note) {
+        note.isArchived = !note.isArchived;
+        await callIpc("db:saveNote", { note });
+      }
+    }
+    showToast(`${state.selectedNoteIds.size} not arşivlendi`, "info");
+    loadAllData();
+  });
+
+  btnTrash?.addEventListener("click", async () => {
+    if (state.selectedNoteIds.size === 0) return;
+    for (const id of state.selectedNoteIds) {
+      await callIpc("db:moveToTrash", { id });
+    }
+    showToast(`${state.selectedNoteIds.size} not çöp kutusuna taşındı`, "warning");
+    state.selectedNoteIds.clear();
+    loadAllData();
+  });
+
+  btnDeletePerm?.addEventListener("click", async () => {
+    if (state.selectedNoteIds.size === 0) return;
+    for (const id of state.selectedNoteIds) {
+      await callIpc("db:deletePermanently", { id });
+    }
+    showToast(`${state.selectedNoteIds.size} not kalıcı olarak silindi`, "danger");
+    state.selectedNoteIds.clear();
+    loadAllData();
+  });
+}
+
+function getVisibleNotesList() {
+  if (state.currentFilter === 'all') return state.activeNotes;
+  if (state.currentFilter === 'pinned') return state.activeNotes.filter(n => n.isPinned);
+  if (state.currentFilter === 'reminders') return state.activeNotes.filter(n => n.reminderDate && n.reminderDate > 0);
+  if (state.currentFilter === 'vault') return state.activeNotes.filter(n => n.isLocked);
+  if (state.currentFilter === 'archive') return state.archivedNotes;
+  if (state.currentFilter === 'trash') return state.trashNotes;
+  return state.activeNotes;
+}
+
+function updateBatchActionBarUI() {
+  const badge = document.getElementById("batchCountBadge");
+  const btnDeletePerm = document.getElementById("btnBatchDeletePermanent");
+  const btnTrash = document.getElementById("btnBatchTrash");
+
+  if (badge) badge.textContent = `${state.selectedNoteIds.size} Seçildi`;
+  if (state.currentFilter === 'trash') {
+    if (btnDeletePerm) btnDeletePerm.style.display = "inline-flex";
+    if (btnTrash) btnTrash.style.display = "none";
+  } else {
+    if (btnDeletePerm) btnDeletePerm.style.display = "none";
+    if (btnTrash) btnTrash.style.display = "inline-flex";
+  }
 }
 
 function setMarkdownMode(mode, activeBtn, otherBtns, paneEdit, panePrev) {
@@ -350,35 +703,88 @@ function onEditorChange() {
   const note = findNoteById(state.selectedNoteId);
 
   if (note) {
-    // Undo stack push
-    if (!state.undoStack.length || state.undoStack[state.undoStack.length - 1].content !== content) {
+    // Undo stack kaydı
+    if (!state.undoStack.length || state.undoStack[state.undoStack.length - 1].content !== content || state.undoStack[state.undoStack.length - 1].title !== title) {
       state.undoStack.push({ title: note.title, content: note.content });
       if (state.undoStack.length > 50) state.undoStack.shift();
       state.redoStack = [];
+      updateUndoRedoButtons();
     }
 
     note.title = title;
     note.content = content;
     note.updatedAt = Date.now();
+    state.isDirty = true;
     triggerAutoSave();
+  }
+}
+
+function updateUndoRedoButtons() {
+  const btnUndo = document.getElementById("btnUndo");
+  const btnRedo = document.getElementById("btnRedo");
+  if (btnUndo) {
+    btnUndo.style.opacity = state.undoStack.length > 0 ? "1" : "0.4";
+    btnUndo.style.pointerEvents = state.undoStack.length > 0 ? "auto" : "none";
+  }
+  if (btnRedo) {
+    btnRedo.style.opacity = state.redoStack.length > 0 ? "1" : "0.4";
+    btnRedo.style.pointerEvents = state.redoStack.length > 0 ? "auto" : "none";
   }
 }
 
 function triggerAutoSave() {
   const indicator = document.getElementById("autoSaveIndicator");
-  indicator.textContent = "Kaydediliyor...";
-  indicator.style.color = "var(--warning)";
+  if (indicator) {
+    indicator.textContent = "Kaydediliyor...";
+    indicator.style.color = "var(--warning)";
+  }
 
   clearTimeout(state.autoSaveTimer);
   state.autoSaveTimer = setTimeout(async () => {
     const note = findNoteById(state.selectedNoteId);
     if (note) {
-      await callIpc("saveNote", { note });
-      indicator.textContent = "✓ Otomatik Kaydedildi";
-      indicator.style.color = "var(--success)";
-      renderNotesList();
+      try {
+        await callIpc("db:saveNote", { note });
+        state.isDirty = false;
+        if (indicator) {
+          indicator.textContent = "✓ Otomatik Kaydedildi";
+          indicator.style.color = "var(--success)";
+        }
+
+        // Versiyon geçmişine anlık görüntü kaydet
+        recordNoteVersion(note);
+
+        // Sidebar etiketleri ve not kartı güncelle
+        extractTagsAndRender();
+        renderNotesList();
+      } catch (err) {
+        console.error("Otomatik kaydetme hatası:", err);
+        if (indicator) {
+          indicator.textContent = "Kaydetme Hatası!";
+          indicator.style.color = "var(--danger)";
+        }
+      }
     }
-  }, 350);
+  }, 500); // 500ms Debouncer
+}
+
+function recordNoteVersion(note) {
+  if (!note || !note.id) return;
+  if (!state.noteVersions.has(note.id)) {
+    state.noteVersions.set(note.id, []);
+  }
+  const versions = state.noteVersions.get(note.id);
+  const last = versions[versions.length - 1];
+
+  // En az 30 saniye geçmişse veya ilk versiyonsa kaydet
+  if (!last || (Date.now() - last.timestamp > 30000 && (last.content !== note.content || last.title !== note.title))) {
+    versions.push({
+      timestamp: Date.now(),
+      title: note.title,
+      content: note.content
+    });
+    if (versions.length > 20) versions.shift();
+  }
 }
 
 function undo() {
@@ -393,6 +799,7 @@ function undo() {
 
     document.getElementById("editorTitle").value = prev.title;
     document.getElementById("editorContent").value = prev.content;
+    updateUndoRedoButtons();
     updateLiveMarkdownPreview();
     updateCharWordsCount();
     triggerAutoSave();
@@ -411,6 +818,7 @@ function redo() {
 
     document.getElementById("editorTitle").value = next.title;
     document.getElementById("editorContent").value = next.content;
+    updateUndoRedoButtons();
     updateLiveMarkdownPreview();
     updateCharWordsCount();
     triggerAutoSave();
@@ -496,7 +904,7 @@ function updateLiveMarkdownPreview() {
   const preview = document.getElementById("markdownPreview");
   preview.innerHTML = sanitizeMarkdownHtml(renderMarkdownToHtml(content));
 
-  // Önizlemedeki Checkbox tıklamalarını yakala
+  // 1. Önizlemedeki Checkbox tıklamalarını yakala
   preview.querySelectorAll(".task-item").forEach(item => {
     item.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -504,6 +912,62 @@ function updateLiveMarkdownPreview() {
       toggleMarkdownCheckboxAtLine(lineIndex);
     });
   });
+
+  // 2. Çift Yönlü Wikilink Tıklamalarını Yakala
+  preview.querySelectorAll(".wikilink").forEach(link => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const targetTitle = link.dataset.target;
+      if (targetTitle) {
+        navigateToWikilink(targetTitle);
+      }
+    });
+  });
+}
+
+function navigateToWikilink(targetTitle) {
+  const normalized = targetTitle.trim().toLowerCase();
+  const allNotes = [...state.activeNotes, ...state.archivedNotes];
+  const found = allNotes.find(n => (n.title || "").trim().toLowerCase() === normalized);
+
+  if (found) {
+    loadNoteIntoEditor(found, false);
+    showToast(`'${found.title || "Adsız"}' notuna geçildi`, "info");
+  } else {
+    // Not yoksa otomatik yeni not oluştur
+    createNewNoteWithTitle(targetTitle.trim());
+  }
+}
+
+async function createNewNoteWithTitle(initialTitle) {
+  const newNote = {
+    id: 0,
+    title: initialTitle,
+    content: `# ${initialTitle}\n\n`,
+    timestamp: Date.now(),
+    color: 0,
+    categoryId: state.selectedCategoryId || null,
+    isPinned: false,
+    isArchived: false,
+    isDeleted: false,
+    deletedAt: null,
+    isLocked: false
+  };
+
+  try {
+    const created = await callIpc("db:createNote", { note: newNote });
+    if (created && created.id) {
+      newNote.id = created.id;
+      state.activeNotes.unshift(newNote);
+      renderNotesList();
+      loadNoteIntoEditor(newNote, false);
+      showToast(`'${initialTitle}' başlıklı yeni not oluşturuldu`, "success");
+    }
+  } catch (err) {
+    console.error("Wikilink not oluşturma hatası:", err);
+    showToast("Not oluşturulamadı", "danger");
+  }
 }
 
 function toggleMarkdownCheckboxAtLine(targetLineIndex) {
@@ -528,15 +992,36 @@ function renderMarkdownToHtml(md) {
 
   const lines = md.split("\n");
   let html = [];
+  let inCodeBlock = false;
+  let codeBlockBuffer = [];
 
-  lines.forEach((line, idx) => {
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
     const trimmed = line.trim();
+
+    // Çok satırlı kod blokları (```)
+    if (trimmed.startsWith("```")) {
+      if (inCodeBlock) {
+        html.push(`<pre class="code-block"><code>${escapeHtml(codeBlockBuffer.join("\n"))}</code></pre>`);
+        codeBlockBuffer = [];
+        inCodeBlock = false;
+      } else {
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBlockBuffer.push(line);
+      continue;
+    }
+
     if (trimmed.startsWith("# ")) {
-      html.push(`<h1>${escapeHtml(trimmed.substring(2))}</h1>`);
+      html.push(`<h1>${formatInline(escapeHtml(trimmed.substring(2)))}</h1>`);
     } else if (trimmed.startsWith("## ")) {
-      html.push(`<h2>${escapeHtml(trimmed.substring(3))}</h2>`);
+      html.push(`<h2>${formatInline(escapeHtml(trimmed.substring(3)))}</h2>`);
     } else if (trimmed.startsWith("### ")) {
-      html.push(`<h3>${escapeHtml(trimmed.substring(4))}</h3>`);
+      html.push(`<h3>${formatInline(escapeHtml(trimmed.substring(4)))}</h3>`);
     } else if (trimmed.startsWith("> ")) {
       html.push(`<blockquote>${formatInline(escapeHtml(trimmed.substring(2)))}</blockquote>`);
     } else if (trimmed.startsWith("- [ ] ") || trimmed.startsWith("- [x] ") || trimmed.startsWith("- [X] ")) {
@@ -550,24 +1035,38 @@ function renderMarkdownToHtml(md) {
       `);
     } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
       html.push(`<li>${formatInline(escapeHtml(trimmed.substring(2)))}</li>`);
-    } else if (trimmed.startsWith("```")) {
-      html.push(`<pre><code>${escapeHtml(trimmed.replace(/```/g, ""))}</code></pre>`);
+    } else if (/^\d+\.\s+/.test(trimmed)) {
+      const text = trimmed.replace(/^\d+\.\s+/, "");
+      html.push(`<li style="list-style-type:decimal;">${formatInline(escapeHtml(text))}</li>`);
+    } else if (trimmed === "---" || trimmed === "***") {
+      html.push("<hr>");
     } else if (trimmed === "") {
       html.push("<br>");
     } else {
       html.push(`<p>${formatInline(escapeHtml(line))}</p>`);
     }
-  });
+  }
+
+  if (inCodeBlock && codeBlockBuffer.length > 0) {
+    html.push(`<pre class="code-block"><code>${escapeHtml(codeBlockBuffer.join("\n"))}</code></pre>`);
+  }
 
   return html.join("");
 }
 
 function formatInline(text) {
   return text
+    // Wikilinks: [[Hedef Not|Görünen İsim]] veya [[Hedef Not]]
+    .replace(/\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]/g, (match, target, alias) => {
+      const label = alias || target;
+      return `<a href="#" class="wikilink" data-target="${escapeHtml(target.trim())}" title="Not: ${escapeHtml(target.trim())}">🔗 ${escapeHtml(label.trim())}</a>`;
+    })
+    // Kalın & İtalik & Üstü Çizili
+    .replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>")
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
     .replace(/~~(.*?)~~/g, "<del>$1</del>")
-    .replace(/`(.*?)`/g, "<code>$1</code>");
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
 }
 
 function escapeHtml(str) {
@@ -676,13 +1175,101 @@ function applyTheme(theme) {
 
 function setFilter(filter) {
   state.currentFilter = filter;
+  state.selectedNav = filter;
+
+  if (!filter.startsWith('cat_')) {
+    state.selectedCategoryId = null;
+    document.querySelectorAll(".cat-item").forEach(i => i.classList.remove("active"));
+  }
+  if (!filter.startsWith('tag_')) {
+    state.selectedTag = null;
+  }
+
   document.querySelectorAll(".nav-item").forEach(i => {
     i.classList.toggle("active", i.dataset.filter === filter);
   });
   document.querySelectorAll("#filterChipsBar .chip").forEach(c => {
     c.classList.toggle("active", c.dataset.chip === filter);
   });
+
   renderNotesList();
+}
+
+// ===================================================
+// NOT SIRALAMA & DİNAMİK ETİKETLER
+// ===================================================
+
+function sortNotes(list) {
+  const sort = state.sortOrder || "updated-desc";
+  return [...list].sort((a, b) => {
+    const timeAUpdated = a.updatedAt || a.timestamp || 0;
+    const timeBUpdated = b.updatedAt || b.timestamp || 0;
+    const timeACreated = a.createdAt || a.timestamp || 0;
+    const timeBCreated = b.createdAt || b.timestamp || 0;
+    const titleA = (a.title || "").toLowerCase();
+    const titleB = (b.title || "").toLowerCase();
+
+    switch (sort) {
+      case "updated-asc":
+        return timeAUpdated - timeBUpdated;
+      case "created-desc":
+        return timeBCreated - timeACreated;
+      case "created-asc":
+        return timeACreated - timeBCreated;
+      case "title-asc":
+        return titleA.localeCompare(titleB, "tr");
+      case "title-desc":
+        return titleB.localeCompare(titleA, "tr");
+      case "updated-desc":
+      default:
+        return timeBUpdated - timeAUpdated;
+    }
+  });
+}
+
+function extractTagsAndRender() {
+  const tagContainer = document.getElementById("tagListContainer");
+  if (!tagContainer) return;
+  tagContainer.innerHTML = "";
+
+  const tagCounts = new Map();
+  const allNotes = [...state.activeNotes, ...state.archivedNotes];
+
+  allNotes.forEach(note => {
+    const text = `${note.title || ""} ${note.content || ""}`;
+    const matches = text.match(/#([a-zA-ZçğıöşüÇĞİÖŞÜ0-9_-]+)/g);
+    if (matches) {
+      const uniqueInNote = new Set(matches.map(m => m.toLowerCase()));
+      uniqueInNote.forEach(tag => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      });
+    }
+  });
+
+  if (tagCounts.size === 0) {
+    tagContainer.innerHTML = `<span style="font-size:11px; color:var(--text-faint); padding:2px 4px;">Etiket yok (#etiket yazın)</span>`;
+    return;
+  }
+
+  tagCounts.forEach((count, tag) => {
+    const btn = document.createElement("button");
+    const isActive = state.selectedTag === tag;
+    btn.className = `tag-chip ${isActive ? 'active' : ''}`;
+    btn.textContent = `${tag} (${count})`;
+    btn.title = `${tag} etiketine göre filtrele`;
+    btn.addEventListener("click", () => {
+      if (state.selectedTag === tag) {
+        state.selectedTag = null;
+        state.currentFilter = 'all';
+      } else {
+        state.selectedTag = tag;
+        state.currentFilter = `tag_${tag}`;
+      }
+      renderNotesList();
+      extractTagsAndRender();
+    });
+    tagContainer.appendChild(btn);
+  });
 }
 
 // ===================================================
@@ -694,21 +1281,37 @@ function renderNotesList() {
   container.innerHTML = "";
 
   let list = [];
-  if (state.currentFilter === 'all') list = state.activeNotes;
-  else if (state.currentFilter === 'pinned') list = state.activeNotes.filter(n => n.isPinned);
-  else if (state.currentFilter === 'vault') list = state.activeNotes.filter(n => n.isLocked);
-  else if (state.currentFilter === 'archive') list = state.archivedNotes;
-  else if (state.currentFilter === 'trash') list = state.trashNotes;
-  else if (state.currentFilter.startsWith('cat_')) {
+  if (state.currentFilter === 'all') {
+    list = state.activeNotes;
+  } else if (state.currentFilter === 'pinned') {
+    list = state.activeNotes.filter(n => n.isPinned);
+  } else if (state.currentFilter === 'reminders') {
+    list = state.activeNotes.filter(n => n.reminderDate && n.reminderDate > 0);
+  } else if (state.currentFilter === 'vault') {
+    list = state.activeNotes.filter(n => n.isLocked);
+  } else if (state.currentFilter === 'archive') {
+    list = state.archivedNotes;
+  } else if (state.currentFilter === 'trash') {
+    list = state.trashNotes;
+  } else if (state.currentFilter.startsWith('cat_')) {
     const catId = parseInt(state.currentFilter.replace('cat_', ''));
     list = state.activeNotes.filter(n => n.categoryId === catId);
+  } else if (state.currentFilter.startsWith('tag_')) {
+    const tag = state.selectedTag || state.currentFilter.replace('tag_', '');
+    list = state.activeNotes.filter(n => {
+      const text = `${n.title || ""} ${n.content || ""}`.toLowerCase();
+      return text.includes(tag.toLowerCase());
+    });
   }
 
   // Arama filtresi
   if (state.searchQuery.trim()) {
     const q = state.searchQuery.toLowerCase();
-    list = list.filter(n => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q));
+    list = list.filter(n => (n.title || "").toLowerCase().includes(q) || (n.content || "").toLowerCase().includes(q));
   }
+
+  // Sıralama uygula
+  list = sortNotes(list);
 
   document.getElementById("notesCountLabel").textContent = `${list.length} Not`;
 
@@ -754,7 +1357,9 @@ function renderNotesList() {
 
   list.forEach(note => {
     const card = document.createElement("div");
-    card.className = `note-card ${note.id === state.selectedNoteId ? 'active' : ''}`;
+    const isSelected = note.id === state.selectedNoteId;
+    const isChecked = state.selectedNoteIds.has(note.id);
+    card.className = `note-card ${isSelected ? 'active' : ''} ${isChecked ? 'batch-selected' : ''}`;
 
     // Not Arka Plan Rengi ve Pastel Yazı Uyumu (Mobil Kart Tarzı)
     if (note.color !== 0) {
@@ -775,10 +1380,17 @@ function renderNotesList() {
     const displayTitle = highlightQuery(note.title || "Başlıksız Not", state.searchQuery);
     const displaySnippet = highlightQuery(note.content ? note.content.substring(0, 100) : "(İçerik yok)", state.searchQuery);
 
+    const hasReminder = note.reminderDate && note.reminderDate > 0;
+    const reminderFormatted = hasReminder ? new Date(note.reminderDate).toLocaleDateString("tr-TR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+
     card.innerHTML = `
       <div class="card-title-row">
-        ${note.isPinned ? '<span class="card-pin-icon"><svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg></span>' : ''}
-        ${note.isLocked ? '<span class="card-lock-icon"><svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg></span>' : ''}
+        ${state.batchModeActive ? `
+          <input type="checkbox" class="batch-checkbox" data-note-id="${note.id}" ${isChecked ? 'checked' : ''} style="margin-right:8px; width:16px; height:16px; cursor:pointer;" aria-label="Notu seç">
+        ` : ''}
+        ${note.isPinned ? '<span class="card-pin-icon" title="Sabitlenmiş Not"><svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg></span>' : ''}
+        ${note.isLocked ? '<span class="card-lock-icon" title="Kilitli Kasa Notu"><svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg></span>' : ''}
+        ${hasReminder ? `<span class="card-reminder-icon" title="Hatırlatıcı: ${reminderFormatted}" style="color:var(--primary); display:inline-flex; align-items:center; margin-right:4px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg></span>` : ''}
         <div class="card-title">${displayTitle}</div>
         ${cat ? `<span class="card-cat-badge" style="background:${cat.color ? '#' + (cat.color >>> 0).toString(16).slice(-6) + '33' : 'rgba(255,255,255,0.1)'}; color:#CBD5E1;">${escapeHtml(cat.name)}</span>` : ''}
       </div>
@@ -797,6 +1409,16 @@ function renderNotesList() {
     `;
 
     card.addEventListener("click", () => {
+      if (state.batchModeActive) {
+        if (state.selectedNoteIds.has(note.id)) {
+          state.selectedNoteIds.delete(note.id);
+        } else {
+          state.selectedNoteIds.add(note.id);
+        }
+        updateBatchActionBarUI();
+        renderNotesList();
+        return;
+      }
       loadNoteIntoEditor(note, false);
     });
 
@@ -837,11 +1459,19 @@ function highlightQuery(text, query) {
 // ===================================================
 
 function updateSidebarCounts() {
-  document.getElementById("countAll").textContent = state.activeNotes.length;
-  document.getElementById("countPinned").textContent = state.activeNotes.filter(n => n.isPinned).length;
-  document.getElementById("countVault").textContent = state.activeNotes.filter(n => n.isLocked).length;
-  document.getElementById("countArchive").textContent = state.archivedNotes.length;
-  document.getElementById("countTrash").textContent = state.trashNotes.length;
+  const elAll = document.getElementById("countAll");
+  const elPinned = document.getElementById("countPinned");
+  const elVault = document.getElementById("countVault");
+  const elReminders = document.getElementById("countReminders");
+  const elArchive = document.getElementById("countArchive");
+  const elTrash = document.getElementById("countTrash");
+
+  if (elAll) elAll.textContent = state.activeNotes.length;
+  if (elPinned) elPinned.textContent = state.activeNotes.filter(n => n.isPinned).length;
+  if (elVault) elVault.textContent = state.activeNotes.filter(n => n.isLocked).length;
+  if (elReminders) elReminders.textContent = state.activeNotes.filter(n => n.reminderDate && n.reminderDate > 0).length;
+  if (elArchive) elArchive.textContent = state.archivedNotes.length;
+  if (elTrash) elTrash.textContent = state.trashNotes.length;
 }
 
 function renderCategoriesList() {
@@ -909,14 +1539,14 @@ function toggleArchiveCurrentNote() {
     note.isArchived = !note.isArchived;
     document.getElementById("btnArchive").classList.toggle("active", note.isArchived);
     showToast(note.isArchived ? "Not arşivlendi" : "Not arşivden çıkarıldı", "info");
-    callIpc("saveNote", { note }).then(loadAllData);
+    callIpc("db:saveNote", { note }).then(loadAllData);
   }
 }
 
 function deleteCurrentNote() {
   const note = findNoteById(state.selectedNoteId);
   if (note) {
-    callIpc("moveToTrash", { id: note.id }).then(() => {
+    callIpc("db:moveToTrash", { id: note.id }).then(() => {
       showToast("Not çöp kutusuna taşındı", "warning");
       state.selectedNoteId = null;
       document.getElementById("emptyEditorState").style.display = "flex";
@@ -931,76 +1561,819 @@ function deleteCurrentNote() {
 // ===================================================
 
 function initModals() {
-  // 1. Kategori Modalı
+  // 1. Kasa Modalı (#modalVault)
+  const modalVault = document.getElementById("modalVault");
+  const vaultTitle = document.getElementById("vaultModalTitle");
+  const vaultDesc = document.getElementById("vaultModalDesc");
+  const vaultInput = document.getElementById("vaultPasswordInput");
+  const btnConfirmVault = document.getElementById("btnConfirmVault");
+  const btnCancelVault = document.getElementById("btnCancelVault");
+
+  async function checkAndOpenVaultModal() {
+    try {
+      const status = await callIpc("vault:getStatus");
+      state.vaultHasPassword = status?.hasPassword ?? status?.has_password ?? false;
+      state.isVaultUnlocked = status?.isUnlocked ?? status?.is_unlocked ?? false;
+
+      if (state.isVaultUnlocked) {
+        showToast("Kasa zaten açık. Kilitlemek için Editördeki Kasa ikonuna tıklayın.", "info");
+        state.currentFilter = 'vault';
+        renderNotesList();
+        return;
+      }
+
+      if (!state.vaultHasPassword) {
+        vaultTitle.textContent = "Kasa Parolası Oluştur";
+        vaultDesc.textContent = "Kilitli notlarınızı şifrelemek için güçlü bir ana parola belirleyin.";
+        btnConfirmVault.textContent = "Parolayı Kaydet";
+      } else {
+        vaultTitle.textContent = "Kasa Kilidini Aç";
+        vaultDesc.textContent = "Kilitli notları görüntülemek ve düzenlemek için kasa şifrenizi girin.";
+        btnConfirmVault.textContent = "Kilidi Aç";
+      }
+
+      vaultInput.value = "";
+      modalVault.classList.add("open");
+      vaultInput.focus();
+    } catch (err) {
+      console.error("Kasa durum kontrolü hatası:", err);
+      modalVault.classList.add("open");
+    }
+  }
+
+  btnCancelVault?.addEventListener("click", () => {
+    modalVault.classList.remove("open");
+    vaultInput.value = "";
+  });
+
+  async function submitVaultPassword() {
+    const password = vaultInput.value.trim();
+    if (!password) {
+      showToast("Lütfen parola girin", "warning");
+      return;
+    }
+
+    try {
+      if (!state.vaultHasPassword) {
+        const ok = await callIpc("vault:setup", { password });
+        if (ok) {
+          state.vaultHasPassword = true;
+          state.isVaultUnlocked = true;
+          modalVault.classList.remove("open");
+          showToast("Kasa parolası başarıyla oluşturuldu!", "success");
+          loadAllData();
+        } else {
+          showToast("Kasa parolası kaydedilemedi", "danger");
+        }
+      } else {
+        const ok = await callIpc("vault:unlock", { password });
+        if (ok) {
+          state.isVaultUnlocked = true;
+          modalVault.classList.remove("open");
+          showToast("Kasa kilidi açıldı!", "success");
+          loadAllData();
+        } else {
+          showToast("Hatalı kasa parolası!", "danger");
+        }
+      }
+    } catch (err) {
+      showToast("Kasa işlemi hatası: " + (err.message || err), "danger");
+    }
+  }
+
+  btnConfirmVault?.addEventListener("click", submitVaultPassword);
+  vaultInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitVaultPassword();
+  });
+
+  // Sidebar Kilitli Kasa öğesine tıklanınca kilitliyse modal aç
+  document.querySelectorAll("[data-filter='vault'], [data-chip='vault']").forEach(el => {
+    el.addEventListener("click", () => {
+      if (!state.isVaultUnlocked) {
+        checkAndOpenVaultModal();
+      }
+    });
+  });
+
+  // 2. Kategori Modalı (#modalCategory)
   const modalCat = document.getElementById("modalCategory");
-  document.getElementById("btnOpenCatModal").addEventListener("click", () => {
+  const catColorContainer = document.getElementById("catColorOptions");
+  let selectedCatColor = -12877066; // Varsayılan Mavi
+
+  if (catColorContainer) {
+    catColorContainer.innerHTML = "";
+    NOTE_PRESETS.slice(0, 8).forEach(preset => {
+      const circle = document.createElement("div");
+      circle.className = `palette-circle ${preset.id === selectedCatColor ? 'selected' : ''}`;
+      circle.style.backgroundColor = preset.color;
+      circle.style.cursor = "pointer";
+      circle.style.width = "24px";
+      circle.style.height = "24px";
+      circle.title = preset.name;
+      circle.addEventListener("click", () => {
+        catColorContainer.querySelectorAll(".palette-circle").forEach(c => c.classList.remove("selected"));
+        circle.classList.add("selected");
+        selectedCatColor = preset.id;
+      });
+      catColorContainer.appendChild(circle);
+    });
+  }
+
+  document.getElementById("btnOpenCatModal")?.addEventListener("click", () => {
     modalCat.classList.add("open");
+    document.getElementById("newCatNameInput").value = "";
     document.getElementById("newCatNameInput").focus();
   });
-  document.getElementById("btnCancelCat").addEventListener("click", () => {
+
+  document.getElementById("btnCancelCat")?.addEventListener("click", () => {
     modalCat.classList.remove("open");
   });
-  document.getElementById("btnSaveCat").addEventListener("click", async () => {
+
+  document.getElementById("btnSaveCat")?.addEventListener("click", async () => {
     const name = document.getElementById("newCatNameInput").value.trim();
     if (name) {
-      await callIpc("addCategory", { name, color: -12877066 }); // Varsayılan mavi
-      document.getElementById("newCatNameInput").value = "";
-      modalCat.classList.remove("open");
-      showToast(`'${name}' kategorisi eklendi`, "success");
-      loadAllData();
+      try {
+        await callIpc("db:addCategory", { name, color: selectedCatColor });
+        document.getElementById("newCatNameInput").value = "";
+        modalCat.classList.remove("open");
+        showToast(`'${name}' kategorisi eklendi`, "success");
+        loadAllData();
+      } catch (err) {
+        showToast("Kategori eklenemedi: " + err, "danger");
+      }
+    } else {
+      showToast("Lütfen bir kategori adı girin", "warning");
     }
   });
 
-  // 2. Wi-Fi Senkronizasyon Modalı
+  // 3. Wi-Fi Senkronizasyon Modalı (#modalSync)
   const modalSync = document.getElementById("modalSync");
-  document.getElementById("btnOpenSync").addEventListener("click", async () => {
+  document.getElementById("btnOpenSync")?.addEventListener("click", async () => {
     modalSync.classList.add("open");
-    await callIpc("syncStart");
+    await callIpc("sync:start");
     updateSyncStateUI();
   });
-  document.getElementById("btnCloseSync").addEventListener("click", () => {
+
+  document.getElementById("btnCloseSync")?.addEventListener("click", () => {
     modalSync.classList.remove("open");
   });
-  
-  const btnCopySyncPin = document.getElementById("btnCopySyncPin");
-  if (btnCopySyncPin) {
-    btnCopySyncPin.addEventListener("click", () => {
-      const pin = document.getElementById("syncPinCode").textContent.trim();
-      if (pin && pin !== "----") {
-        navigator.clipboard.writeText(pin).then(() => {
-          showToast("PIN panoya kopyalandı: " + pin, "success");
-        }).catch(() => {
-          showToast("PIN kopyalanamadı", "warning");
-        });
-      }
-    });
-  }
-  document.getElementById("btnRefreshPin").addEventListener("click", async () => {
-    await callIpc("syncRefreshPin");
+
+  document.getElementById("btnCopySyncPin")?.addEventListener("click", () => {
+    const pin = document.getElementById("syncPinCode").textContent.trim();
+    if (pin && pin !== "----") {
+      navigator.clipboard.writeText(pin).then(() => {
+        showToast("PIN panoya kopyalandı: " + pin, "success");
+      }).catch(() => {
+        showToast("PIN kopyalanamadı", "warning");
+      });
+    }
+  });
+
+  document.getElementById("btnRefreshPin")?.addEventListener("click", async () => {
+    await callIpc("sync:refreshPin");
     updateSyncStateUI();
     showToast("Yeni PIN kodu üretildi", "info");
   });
-  document.getElementById("btnToggleServer").addEventListener("click", async () => {
-    const stateObj = await callIpc("syncGetState");
-    if (stateObj && stateObj.is_running) {
-      await callIpc("syncStop");
+
+  document.getElementById("btnToggleServer")?.addEventListener("click", async () => {
+    const stateObj = await callIpc("sync:getState");
+    if (stateObj && (stateObj.is_running || stateObj.isRunning)) {
+      await callIpc("sync:stop");
       showToast("Wi-Fi sunucusu durduruldu", "info");
     } else {
-      await callIpc("syncStart");
+      await callIpc("sync:start");
       showToast("Wi-Fi sunucusu başlatıldı", "success");
     }
     updateSyncStateUI();
   });
 
-  // 3. Yedek Al Butonu
-  document.getElementById("btnExportBackup").addEventListener("click", async () => {
+  // 4. Yedekleme & Kurtarma Butonu
+  document.getElementById("btnExportBackup")?.addEventListener("click", async () => {
     try {
-      const res = await callIpc("backupExport");
-      showToast(res || "Tüm notlar başarıyla yedeklendi (.zip)", "success");
+      const res = await callIpc("backup:export");
+      const msg = typeof res === "string" ? res : (res?.filePath ? `Yedek alındı: ${res.filePath}` : "Tüm notlar başarıyla yedeklendi (.zip)");
+      showToast(msg, "success");
     } catch (e) {
       showToast("Yedekleme hatası: " + e, "danger");
     }
   });
+}
+
+// ===================================================
+// DİNAMİK POP-UP & MODAL YÖNETİCİSİ (Paylaşım, İstatistik, Tarihçe)
+// ===================================================
+
+function openShareModal() {
+  const note = findNoteById(state.selectedNoteId);
+  if (!note) {
+    showToast("Paylaşılacak bir not seçilmedi", "warning");
+    return;
+  }
+
+  const existing = document.getElementById("dynamicModalContainer");
+  if (existing) existing.remove();
+
+  const container = document.createElement("div");
+  container.id = "dynamicModalContainer";
+  container.className = "modal-overlay open";
+  container.setAttribute("role", "dialog");
+  container.setAttribute("aria-modal", "true");
+
+  container.innerHTML = `
+    <div class="modal-dialog" style="max-width:540px;">
+      <div class="modal-title">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+        <span>Notu Paylaş & Dışa Aktar</span>
+      </div>
+      <div class="modal-desc">
+        '<b>${escapeHtml(note.title || "Başlıksız Not")}</b>' notunuzu istediğiniz formatta dışa aktarın veya sosyal medya not kartı olarak kaydedin:
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin: 16px 0;">
+        <button class="btn-secondary" id="btnShareCopyText" style="padding:12px; display:flex; flex-direction:column; align-items:center; gap:6px;">
+          <span style="font-size:20px;">📋</span>
+          <span style="font-weight:600;">Düz Metin Kopyala</span>
+          <span style="font-size:11px; opacity:0.7;">Panoya aktarır</span>
+        </button>
+
+        <button class="btn-secondary" id="btnShareDownloadMd" style="padding:12px; display:flex; flex-direction:column; align-items:center; gap:6px;">
+          <span style="font-size:20px;">📝</span>
+          <span style="font-weight:600;">Markdown İndir</span>
+          <span style="font-size:11px; opacity:0.7;">.md formatında dosya</span>
+        </button>
+
+        <button class="btn-secondary" id="btnSharePrintPdf" style="padding:12px; display:flex; flex-direction:column; align-items:center; gap:6px;">
+          <span style="font-size:20px;">🖨️</span>
+          <span style="font-weight:600;">PDF / Belge Yazdır</span>
+          <span style="font-size:11px; opacity:0.7;">Sistem yazıcısı / PDF</span>
+        </button>
+
+        <button class="btn-secondary" id="btnShareCardPng" style="padding:12px; display:flex; flex-direction:column; align-items:center; gap:6px; border-color:var(--primary);">
+          <span style="font-size:20px;">🖼️</span>
+          <span style="font-weight:600; color:var(--primary);">Not Kartı PNG Üret</span>
+          <span style="font-size:11px; opacity:0.7;">Şık görsel kart indir</span>
+        </button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-primary" id="btnCloseShareModal" style="width:100%;">Kapat</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+
+  container.querySelector("#btnCloseShareModal").addEventListener("click", () => container.remove());
+  container.addEventListener("click", (e) => { if (e.target === container) container.remove(); });
+
+  // 1. Düz Metin
+  container.querySelector("#btnShareCopyText").addEventListener("click", () => {
+    const fullText = `${note.title || "Başlıksız Not"}\n\n${note.content || ""}`;
+    navigator.clipboard.writeText(fullText).then(() => {
+      showToast("Düz metin panoya kopyalandı", "success");
+      container.remove();
+    });
+  });
+
+  // 2. Markdown İndir
+  container.querySelector("#btnShareDownloadMd").addEventListener("click", () => {
+    const fullText = `# ${note.title || "Başlıksız Not"}\n\n${note.content || ""}`;
+    const blob = new Blob([fullText], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(note.title || "not").replace(/[\\/:*?"<>|]/g, "_")}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Markdown dosyası indirildi", "success");
+    container.remove();
+  });
+
+  // 3. Print / PDF
+  container.querySelector("#btnSharePrintPdf").addEventListener("click", () => {
+    container.remove();
+    window.print();
+  });
+
+  // 4. Not Kartı PNG Üretici
+  container.querySelector("#btnShareCardPng").addEventListener("click", () => {
+    generateNoteCardPng(note);
+    container.remove();
+  });
+}
+
+// HTML Canvas ile Not Kartı PNG Üretici
+function generateNoteCardPng(note) {
+  const canvas = document.createElement("canvas");
+  const width = 1000;
+  const height = 600;
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  // Arka Plan Rengi ve Gradyan
+  const preset = NOTE_PRESETS.find(p => p.id === note.color) || NOTE_PRESETS[0];
+  const grad = ctx.createLinearGradient(0, 0, width, height);
+  grad.addColorStop(0, preset.color || "#131D2E");
+  grad.addColorStop(1, "#0A0E17");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Kart Çerçevesi
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(30, 30, width - 60, height - 60);
+
+  // Üst Bar & Logo
+  ctx.fillStyle = "#F59E0B";
+  ctx.font = "bold 20px 'Segoe UI', sans-serif";
+  ctx.fillText("📝 NOT DEFTERİM", 60, 80);
+
+  // Tarih
+  const dateStr = new Date(note.updatedAt || note.timestamp).toLocaleDateString("tr-TR", {
+    day: "numeric", month: "long", year: "numeric"
+  });
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.font = "16px 'Segoe UI', sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(dateStr, width - 60, 80);
+  ctx.textAlign = "left";
+
+  // Çizgi
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+  ctx.beginPath();
+  ctx.moveTo(60, 105);
+  ctx.lineTo(width - 60, 105);
+  ctx.stroke();
+
+  // Başlık
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "bold 32px 'Segoe UI', sans-serif";
+  const title = (note.title || "Başlıksız Not").substring(0, 50);
+  ctx.fillText(title, 60, 160);
+
+  // İçerik (Satır sarma)
+  ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+  ctx.font = "20px 'Segoe UI', sans-serif";
+  const rawContent = (note.content || "").replace(/[#*`~>-]/g, "").trim();
+  const words = rawContent.split(/\s+/);
+  let line = "";
+  let y = 220;
+  const maxWidth = width - 120;
+
+  for (let i = 0; i < words.length && y < 510; i++) {
+    const testLine = line + words[i] + " ";
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && i > 0) {
+      ctx.fillText(line, 60, y);
+      line = words[i] + " ";
+      y += 34;
+    } else {
+      line = testLine;
+    }
+  }
+  if (y < 510) {
+    ctx.fillText(line, 60, y);
+  }
+
+  // Alt Filigran
+  ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+  ctx.font = "14px 'Segoe UI', sans-serif";
+  ctx.fillText("Not Defterim Masaüstü Uygulaması ile oluşturuldu", 60, height - 50);
+
+  // İndir
+  const link = document.createElement("a");
+  link.download = `NotKarti_${(note.title || "not").replace(/[\\/:*?"<>|]/g, "_")}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+  showToast("Not kartı görseli oluşturuldu ve indirildi!", "success");
+}
+
+// Gelişmiş Araçlar Modalı
+function openAdvancedToolsModal() {
+  const note = findNoteById(state.selectedNoteId);
+  if (!note) return;
+
+  const existing = document.getElementById("dynamicModalContainer");
+  if (existing) existing.remove();
+
+  const container = document.createElement("div");
+  container.id = "dynamicModalContainer";
+  container.className = "modal-overlay open";
+
+  container.innerHTML = `
+    <div class="modal-dialog" style="max-width:560px;">
+      <div class="modal-title">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+        <span>Gelişmiş Not Araçları</span>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px; margin:16px 0;">
+        <button class="btn-secondary" id="btnAdvHistory" style="display:flex; align-items:center; gap:12px; padding:12px; text-align:left;">
+          <span style="font-size:22px;">⏱️</span>
+          <div style="flex:1;">
+            <div style="font-weight:600;">Versiyon Geçmişi</div>
+            <div style="font-size:12px; opacity:0.7;">Bu oturumdaki önceki sürümleri görüntüle ve geri yükle</div>
+          </div>
+        </button>
+
+        <button class="btn-secondary" id="btnAdvDuplicate" style="display:flex; align-items:center; gap:12px; padding:12px; text-align:left;">
+          <span style="font-size:22px;">📑</span>
+          <div style="flex:1;">
+            <div style="font-weight:600;">Notu Çoğalt</div>
+            <div style="font-size:12px; opacity:0.7;">Tüm içerik ve ayarlarla birlikte birebir kopyasını oluştur</div>
+          </div>
+        </button>
+
+        <button class="btn-secondary" id="btnAdvTemplate" style="display:flex; align-items:center; gap:12px; padding:12px; text-align:left;">
+          <span style="font-size:22px;">📋</span>
+          <div style="flex:1;">
+            <div style="font-weight:600;">Hazır Şablon Uygula</div>
+            <div style="font-size:12px; opacity:0.7;">Toplantı notu, sprint planı veya yapılacaklar şablonu yükle</div>
+          </div>
+        </button>
+
+        <button class="btn-secondary" id="btnAdvStats" style="display:flex; align-items:center; gap:12px; padding:12px; text-align:left;">
+          <span style="font-size:22px;">📊</span>
+          <div style="flex:1;">
+            <div style="font-weight:600;">Ayrıntılı İstatistikler</div>
+            <div style="font-size:12px; opacity:0.7;">Okuma süresi, kelime, harf ve başlık analizleri</div>
+          </div>
+        </button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-primary" id="btnCloseAdvModal" style="width:100%;">Kapat</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+  container.querySelector("#btnCloseAdvModal").addEventListener("click", () => container.remove());
+  container.addEventListener("click", (e) => { if (e.target === container) container.remove(); });
+
+  container.querySelector("#btnAdvHistory").addEventListener("click", () => {
+    container.remove();
+    openVersionHistoryModal();
+  });
+  container.querySelector("#btnAdvDuplicate").addEventListener("click", () => {
+    container.remove();
+    duplicateCurrentNote();
+  });
+  container.querySelector("#btnAdvTemplate").addEventListener("click", () => {
+    container.remove();
+    openTemplatePickerModal();
+  });
+  container.querySelector("#btnAdvStats").addEventListener("click", () => {
+    container.remove();
+    openStatsModal();
+  });
+}
+
+// Versiyon Geçmişi Modalı
+function openVersionHistoryModal() {
+  const note = findNoteById(state.selectedNoteId);
+  if (!note) return;
+
+  const versions = state.noteVersions.get(note.id) || [];
+
+  const existing = document.getElementById("dynamicModalContainer");
+  if (existing) existing.remove();
+
+  const container = document.createElement("div");
+  container.id = "dynamicModalContainer";
+  container.className = "modal-overlay open";
+
+  let listHtml = "";
+  if (versions.length === 0) {
+    listHtml = `<div style="text-align:center; padding:30px 10px; color:var(--text-faint);">Bu not için henüz geçmiş versiyon kaydedilmedi. Düzenleme yaptıkça versiyonlar otomatik birikir.</div>`;
+  } else {
+    listHtml = versions.map((v, i) => {
+      const timeStr = new Date(v.timestamp).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const dateStr = new Date(v.timestamp).toLocaleDateString("tr-TR");
+      return `
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--bg-main); border-radius:8px; margin-bottom:8px; border:1px solid var(--border-subtle);">
+          <div>
+            <div style="font-weight:600; font-size:14px;">Versiyon #${i + 1} - ${escapeHtml(v.title || "Başlıksız")}</div>
+            <div style="font-size:12px; color:var(--text-faint);">${dateStr} ${timeStr} • ${v.content.length} karakter</div>
+          </div>
+          <button class="btn-secondary btn-restore-version" data-index="${i}" style="font-size:12px; padding:6px 12px;">Geri Yükle</button>
+        </div>
+      `;
+    }).reverse().join("");
+  }
+
+  container.innerHTML = `
+    <div class="modal-dialog" style="max-width:560px; max-height:80vh; display:flex; flex-direction:column;">
+      <div class="modal-title">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+        <span>Versiyon Geçmişi</span>
+      </div>
+      <div class="modal-desc">
+        Notunuzun önceki kaydedilmiş sürümleri:
+      </div>
+      <div style="flex:1; overflow-y:auto; margin:12px 0; max-height:360px;">
+        ${listHtml}
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" id="btnCloseHistModal" style="width:100%;">Kapat</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+  container.querySelector("#btnCloseHistModal").addEventListener("click", () => container.remove());
+  container.addEventListener("click", (e) => { if (e.target === container) container.remove(); });
+
+  container.querySelectorAll(".btn-restore-version").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.index);
+      const targetVersion = versions[idx];
+      if (targetVersion) {
+        note.title = targetVersion.title;
+        note.content = targetVersion.content;
+        document.getElementById("editorTitle").value = targetVersion.title;
+        document.getElementById("editorContent").value = targetVersion.content;
+        updateLiveMarkdownPreview();
+        updateCharWordsCount();
+        triggerAutoSave();
+        showToast(`Versiyon #${idx + 1} geri yüklendi!`, "success");
+        container.remove();
+      }
+    });
+  });
+}
+
+// İstatistikler Modalı
+function openStatsModal() {
+  const note = findNoteById(state.selectedNoteId);
+  if (!note) return;
+
+  const content = note.content || "";
+  const chars = content.length;
+  const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const lines = content ? content.split("\n").length : 0;
+  const readTimeMin = Math.ceil(words / 200); // 200 kelime/dk
+  const tasksTotal = (content.match(/- \[[ xX]\]/g) || []).length;
+  const tasksDone = (content.match(/- \[[xX]\]/g) || []).length;
+
+  const existing = document.getElementById("dynamicModalContainer");
+  if (existing) existing.remove();
+
+  const container = document.createElement("div");
+  container.id = "dynamicModalContainer";
+  container.className = "modal-overlay open";
+
+  container.innerHTML = `
+    <div class="modal-dialog" style="max-width:480px;">
+      <div class="modal-title">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+        <span>Not İstatistikleri</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin:16px 0;">
+        <div style="background:var(--bg-main); padding:12px; border-radius:8px; border:1px solid var(--border-subtle); text-align:center;">
+          <div style="font-size:24px; font-weight:700; color:var(--primary);">${words}</div>
+          <div style="font-size:12px; color:var(--text-faint);">Kelime Sayısı</div>
+        </div>
+        <div style="background:var(--bg-main); padding:12px; border-radius:8px; border:1px solid var(--border-subtle); text-align:center;">
+          <div style="font-size:24px; font-weight:700; color:var(--primary);">${chars}</div>
+          <div style="font-size:12px; color:var(--text-faint);">Karakter Sayısı</div>
+        </div>
+        <div style="background:var(--bg-main); padding:12px; border-radius:8px; border:1px solid var(--border-subtle); text-align:center;">
+          <div style="font-size:24px; font-weight:700; color:var(--primary);">${lines}</div>
+          <div style="font-size:12px; color:var(--text-faint);">Satır Sayısı</div>
+        </div>
+        <div style="background:var(--bg-main); padding:12px; border-radius:8px; border:1px solid var(--border-subtle); text-align:center;">
+          <div style="font-size:24px; font-weight:700; color:var(--primary);">~${readTimeMin} dk</div>
+          <div style="font-size:12px; color:var(--text-faint);">Tahmini Okuma</div>
+        </div>
+      </div>
+
+      ${tasksTotal > 0 ? `
+        <div style="background:var(--bg-main); padding:12px; border-radius:8px; border:1px solid var(--border-subtle); margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">
+            <span>Kontrol Listesi</span>
+            <b>${tasksDone} / ${tasksTotal} (${Math.round((tasksDone / tasksTotal) * 100)}%)</b>
+          </div>
+          <div style="width:100%; height:6px; background:var(--border-subtle); border-radius:3px; overflow:hidden;">
+            <div style="width:${(tasksDone / tasksTotal) * 100}%; height:100%; background:var(--success);"></div>
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="modal-actions">
+        <button class="btn-primary" id="btnCloseStatsModal" style="width:100%;">Kapat</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+  container.querySelector("#btnCloseStatsModal").addEventListener("click", () => container.remove());
+  container.addEventListener("click", (e) => { if (e.target === container) container.remove(); });
+}
+
+// Hatırlatıcı Modalı
+function openReminderModal() {
+  const note = findNoteById(state.selectedNoteId);
+  if (!note) return;
+
+  const existing = document.getElementById("dynamicModalContainer");
+  if (existing) existing.remove();
+
+  const container = document.createElement("div");
+  container.id = "dynamicModalContainer";
+  container.className = "modal-overlay open";
+
+  const currentDateVal = note.reminderDate ? new Date(note.reminderDate).toISOString().slice(0, 16) : "";
+
+  container.innerHTML = `
+    <div class="modal-dialog" style="max-width:440px;">
+      <div class="modal-title">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+        <span>Hatırlatıcı Ayarla</span>
+      </div>
+      <div class="modal-desc">
+        Notunuz için tarih ve saat seçin. Zamanı geldiğinde haberdar olun:
+      </div>
+
+      <div style="margin: 16px 0;">
+        <label style="display:block; font-size:12px; color:var(--text-faint); margin-bottom:6px;">Tarih ve Saat:</label>
+        <input type="datetime-local" class="modal-input" id="reminderDateInput" value="${currentDateVal}" style="width:100%;">
+      </div>
+
+      <div class="modal-actions" style="display:flex; gap:8px;">
+        ${note.reminderDate ? `<button class="btn-secondary" id="btnRemoveReminder" style="color:var(--danger);">Hatırlatıcıyı Kaldır</button>` : ''}
+        <button class="btn-secondary" id="btnCancelReminder">İptal</button>
+        <button class="btn-primary" id="btnSaveReminder">Kaydet</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+  container.querySelector("#btnCancelReminder").addEventListener("click", () => container.remove());
+  container.addEventListener("click", (e) => { if (e.target === container) container.remove(); });
+
+  container.querySelector("#btnSaveReminder").addEventListener("click", async () => {
+    const val = container.querySelector("#reminderDateInput").value;
+    if (val) {
+      note.reminderDate = new Date(val).getTime();
+      await callIpc("db:saveNote", { note });
+      showToast("Hatırlatıcı kaydedildi", "success");
+      updateSidebarCounts();
+      renderNotesList();
+      container.remove();
+    } else {
+      showToast("Lütfen geçerli bir tarih seçin", "warning");
+    }
+  });
+
+  const btnRemove = container.querySelector("#btnRemoveReminder");
+  if (btnRemove) {
+    btnRemove.addEventListener("click", async () => {
+      note.reminderDate = null;
+      await callIpc("db:saveNote", { note });
+      showToast("Hatırlatıcı kaldırıldı", "info");
+      updateSidebarCounts();
+      renderNotesList();
+      container.remove();
+    });
+  }
+}
+
+// Şablon Seçici Modalı
+function openTemplatePickerModal() {
+  const note = findNoteById(state.selectedNoteId);
+  if (!note) return;
+
+  const templates = [
+    {
+      name: "Toplantı Notu",
+      content: `## 📌 Toplantı Gündemi\n- **Tarih:** ${new Date().toLocaleDateString("tr-TR")}\n- **Katılımcılar:** \n\n### 💬 Görüşülen Konular\n1. \n2. \n\n### ✅ Alınan Kararlar & Aksiyonlar\n- [ ] Görev 1\n- [ ] Görev 2\n`
+    },
+    {
+      name: "Günlük Planlayıcı",
+      content: `## 🌅 Günlük Hedefler (${new Date().toLocaleDateString("tr-TR")})\n\n### 🎯 Öncelikli Görevler\n- [ ] 1. Öncelik:\n- [ ] 2. Öncelik:\n- [ ] 3. Öncelik:\n\n### 📝 Günlük Notlar & Fikirler\n- \n\n### 🌙 Gün Sonu Değerlendirmesi\n- `
+    },
+    {
+      name: "Proje İskeleti",
+      content: `## 🚀 Proje: [Proje Adı]\n\n### 🎯 Amaç & Kapsam\n\n### 🛠️ Teknolojiler & Mimari\n- \n\n### 📋 Yol Haritası (Milestones)\n- [ ] v1.0 MVP\n- [ ] v1.1 Entegrasyonlar\n`
+    }
+  ];
+
+  const existing = document.getElementById("dynamicModalContainer");
+  if (existing) existing.remove();
+
+  const container = document.createElement("div");
+  container.id = "dynamicModalContainer";
+  container.className = "modal-overlay open";
+
+  container.innerHTML = `
+    <div class="modal-dialog" style="max-width:480px;">
+      <div class="modal-title">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        <span>Hazır Şablon Uygula</span>
+      </div>
+      <div class="modal-desc">
+        Mevcut notunuza hazır bir şablon içeriği ekleyin:
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin:16px 0;">
+        ${templates.map((t, idx) => `
+          <button class="btn-secondary btn-apply-tmpl" data-index="${idx}" style="text-align:left; padding:10px 14px;">
+            <b>${t.name}</b>
+          </button>
+        `).join("")}
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" id="btnCloseTmplModal" style="width:100%;">Kapat</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+  container.querySelector("#btnCloseTmplModal").addEventListener("click", () => container.remove());
+  container.addEventListener("click", (e) => { if (e.target === container) container.remove(); });
+
+  container.querySelectorAll(".btn-apply-tmpl").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const t = templates[parseInt(btn.dataset.index)];
+      note.content = (note.content ? note.content + "\n\n" : "") + t.content;
+      document.getElementById("editorContent").value = note.content;
+      updateLiveMarkdownPreview();
+      updateCharWordsCount();
+      triggerAutoSave();
+      showToast(`'${t.name}' şablonu uygulandı`, "success");
+      container.remove();
+    });
+  });
+}
+
+// Notu Çoğalt
+async function duplicateCurrentNote() {
+  const note = findNoteById(state.selectedNoteId);
+  if (!note) return;
+
+  const duplicated = {
+    ...note,
+    id: 0,
+    title: `Kopya - ${note.title || "Başlıksız Not"}`,
+    timestamp: Date.now(),
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  try {
+    const created = await callIpc("db:createNote", { note: duplicated });
+    if (created && created.id) {
+      duplicated.id = created.id;
+      state.activeNotes.unshift(duplicated);
+      renderNotesList();
+      loadNoteIntoEditor(duplicated, false);
+      showToast("Not başarıyla çoğaltıldı!", "success");
+    }
+  } catch (err) {
+    showToast("Not çoğaltılamadı: " + err, "danger");
+  }
+}
+
+// Şablon Olarak Sakla
+function saveAsTemplate() {
+  const note = findNoteById(state.selectedNoteId);
+  if (!note) return;
+
+  const key = `notdefterim_template_${Date.now()}`;
+  localStorage.setItem(key, JSON.stringify({ title: note.title, content: note.content }));
+  showToast("Mevcut not şablon olarak tarayıcı belleğine kaydedildi!", "success");
+}
+
+// .notevault Dosyası Olarak Dışa Aktar
+function exportCurrentNoteToVaultFile() {
+  const note = findNoteById(state.selectedNoteId);
+  if (!note) return;
+
+  const exportData = {
+    version: "1.4.4",
+    exportedAt: Date.now(),
+    type: "notdefterim_vault_note",
+    note: {
+      title: note.title,
+      content: note.content,
+      color: note.color,
+      categoryId: note.categoryId,
+      isPinned: note.isPinned,
+      isLocked: note.isLocked
+    }
+  };
+
+  const jsonStr = JSON.stringify(exportData, null, 2);
+  const blob = new Blob([jsonStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(note.title || "kasa_notu").replace(/[\\/:*?"<>|]/g, "_")}.notevault`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(".notevault dosyası başarıyla dışa aktarıldı!", "success");
 }
 
 async function updateSyncStateUI() {
@@ -1028,8 +2401,8 @@ async function updateSyncStateUI() {
 
     document.getElementById("btnToggleServer").textContent = syncState.is_running ? "Sunucuyu Durdur" : "Sunucuyu Başlat";
 
-    // QR Kod Oluştur
-    const qrText = `NOTDEFTERIM_SYNC:${syncState.local_ip}:${syncState.port}:${syncState.pairing_pin}`;
+    // QR Kod Oluştur (JSON eşleştirme formatı)
+    const qrText = JSON.stringify({ type: "noteapp_sync", ip: syncState.local_ip, port: syncState.port, pin: syncState.pairing_pin });
     const qrContainer = document.getElementById("qrCodeContainer");
     qrContainer.innerHTML = renderSimpleQr(qrText);
   }
@@ -1088,3 +2461,17 @@ function showToast(message, type = "info", duration = 3000) {
     }, 250);
   }, duration);
 }
+
+// ===================================================
+// ASENKRON OLAY DİNLEYİCİSİ (Rust -> Frontend Push)
+// ===================================================
+window.__IPC_EMIT__ = function(eventObj) {
+  if (!eventObj) return;
+  if (eventObj.event === "sync:statusChanged") {
+    updateSyncStateUI();
+    if (eventObj.data && eventObj.data.lastMessage) {
+      showToast(eventObj.data.lastMessage, "info");
+    }
+  }
+};
+

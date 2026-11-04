@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "NoteApp"
 include(":app")
-include(":desktop")
+
