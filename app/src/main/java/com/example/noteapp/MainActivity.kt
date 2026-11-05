@@ -866,6 +866,7 @@ class MainActivity : FragmentActivity() {
                             onSelectDiscoveredSyncServer = viewModel::selectDiscoveredSyncServer,
                             onStartAndroidSyncServer = viewModel::startAndroidSyncServer,
                             onStopAndroidSyncServer = viewModel::stopAndroidSyncServer,
+                            onDisconnectSync = viewModel::disconnectSyncDesktop,
                             onRespondToIncomingSync = { id, approved, clear ->
                                 viewModel.respondToIncomingSync(id, approved, clear)
                             },

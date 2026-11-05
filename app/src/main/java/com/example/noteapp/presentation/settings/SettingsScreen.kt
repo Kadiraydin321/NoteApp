@@ -8,7 +8,11 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.togetherWith
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
@@ -104,6 +108,7 @@ fun SettingsScreen(
     onSelectDiscoveredSyncServer: (DiscoveredSyncServer) -> Unit = {},
     onStartAndroidSyncServer: () -> Unit = {},
     onStopAndroidSyncServer: () -> Unit = {},
+    onDisconnectSync: () -> Unit = {},
     onRespondToIncomingSync: (String, Boolean, Boolean) -> Unit = { _, _, _ -> },
     onSendNotesToDesktop: (String, String, Boolean, String?) -> Unit = { _, _, _, _ -> },
     onPullNotesFromDesktop: (String, String, Boolean, String?) -> Unit = { _, _, _, _ -> },
@@ -227,7 +232,22 @@ fun SettingsScreen(
         }
     }
 
+    var page by rememberSaveable {
+        mutableStateOf<String?>(if (initialFocusSection == "widget") PAGE_APPEARANCE else null)
+    }
+    BackHandler(enabled = page != null) { page = null }
+
+    // Wi-Fi sayfası açılınca ağdaki masaüstü cihazlarını otomatik ara
+    LaunchedEffect(page) {
+        if (page == PAGE_WIFI && syncUiState.isConnected != true &&
+            !syncUiState.isDiscovering && !syncUiState.isOperating
+        ) {
+            onDiscoverSyncServers()
+        }
+    }
+
     val scrollState = rememberScrollState()
+    LaunchedEffect(page) { scrollState.scrollTo(0) }
     val widgetSectionOffsetY = remember { mutableIntStateOf(0) }
 
     LaunchedEffect(initialFocusSection, widgetSectionOffsetY.intValue) {
@@ -248,13 +268,13 @@ fun SettingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Ayarlar",
+                        settingsPageTitle(page),
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleLarge
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = { if (page != null) page = null else onBackClick() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 },
@@ -264,19 +284,49 @@ fun SettingsScreen(
             )
         }
     ) { padding ->
+        AnimatedContent(
+            targetState = page,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "settingsPage",
+            modifier = Modifier.padding(padding)
+        ) { current ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .verticalScroll(scrollState)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (current == null) {
+                val updateAvailable = updateUiState.status is UpdateStatus.UpdateAvailable ||
+                    updateUiState.availableUpdateInfo != null
+                val lastBackupSubtitle = settings.lastBackupTimestamp?.let {
+                    "Son yedek: " + SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(it))
+                } ?: "ZIP yedek, geri yükleme, QR ile aktarım"
+                SettingsCategoryRow(Icons.Default.Palette, MaterialTheme.colorScheme.primary, "Görünüm",
+                    "Tema, renk paleti, düzen, widget · ${settings.colorPalette.title}") { page = PAGE_APPEARANCE }
+                SettingsCategoryRow(Icons.Default.Security, MaterialTheme.colorScheme.tertiary, "Güvenlik & Gizlilik",
+                    if (settings.masterPin != null) "Kilit aktif · biyometrik, PIN, otomatik kilit" else "Biyometrik kilit, Master PIN") { page = PAGE_SECURITY }
+                SettingsCategoryRow(Icons.Default.NotificationsActive, MaterialTheme.colorScheme.secondary, "Bildirimler & Yazma Hedefi",
+                    if (notificationPermissionGranted) "Bildirim izni açık · günlük hedef ${settings.dailyWordGoal} kelime" else "Bildirim izni gerekli",
+                    badge = if (notificationPermissionGranted) null else "İzin") { page = PAGE_NOTIFICATIONS }
+                SettingsCategoryRow(Icons.Default.CloudSync, MaterialTheme.colorScheme.primary, "Yedekleme & Aktarım",
+                    lastBackupSubtitle) { page = PAGE_BACKUP }
+                SettingsCategoryRow(Icons.Default.Devices, MaterialTheme.colorScheme.primary, "Masaüstü Wi-Fi Eşitleme",
+                    if (syncUiState.isConnected == true) "Bağlı: ${syncUiState.serverStatus?.appName ?: "Masaüstü"}" else "QR ile bağlan, notları gönder / çek") { page = PAGE_WIFI }
+                SettingsCategoryRow(Icons.Default.Storage, MaterialTheme.colorScheme.secondary, "Veritabanı & Depolama",
+                    "Veritabanı ${if (maintenanceUiState.dbSizeKb > 0) "${maintenanceUiState.dbSizeKb} KB" else "bakımı"} · önbellek ${maintenanceUiState.cacheSizeKb} KB") { page = PAGE_DB }
+                SettingsCategoryRow(Icons.Default.BarChart, MaterialTheme.colorScheme.secondary, "İstatistikler",
+                    "Yazma serisi, kelime sayısı, etiketler", onClick = onNavigateToStatistics)
+                SettingsCategoryRow(Icons.Default.Info, MaterialTheme.colorScheme.primary, "Hakkında & Güncellemeler",
+                    if (updateAvailable) "Yeni sürüm mevcut" else "Sürüm bilgisi ve güncelleme denetimi",
+                    badge = if (updateAvailable) "Güncelleme var" else null) { page = PAGE_ABOUT }
+            }
 
             // =========================================================================
             // GRUP 1: GÖRÜNÜM & ARAYÜZ (APPEARANCE)
             // =========================================================================
-            SettingsGroupCard(
+            if (current == PAGE_APPEARANCE) SettingsGroupCard(
                 icon = Icons.Default.Palette,
                 iconTint = MaterialTheme.colorScheme.primary,
                 title = "Görünüm",
@@ -818,7 +868,7 @@ fun SettingsScreen(
             // =========================================================================
             // GRUP 2: GÜVENLİK & GİZLİLİK (SECURITY & PRIVACY)
             // =========================================================================
-            SettingsGroupCard(
+            if (current == PAGE_SECURITY) SettingsGroupCard(
                 icon = Icons.Default.Security,
                 iconTint = MaterialTheme.colorScheme.tertiary,
                 title = "Güvenlik & Gizlilik",
@@ -1060,7 +1110,7 @@ fun SettingsScreen(
             // =========================================================================
             // GRUP 3: YEDEKLEME & DIŞA AKTARMA (BACKUP, SYNC & STORAGE)
             // =========================================================================
-            SettingsGroupCard(
+            if (current == PAGE_BACKUP) SettingsGroupCard(
                 icon = Icons.Default.CloudSync,
                 iconTint = MaterialTheme.colorScheme.primary,
                 title = "Yedekleme & Dışa Aktarma",
@@ -1094,7 +1144,7 @@ fun SettingsScreen(
                 ) {
                     Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("📦 Notları Yedekle & Dışa Aktar", fontWeight = FontWeight.SemiBold)
+                    Text("Notları Yedekle & Dışa Aktar", fontWeight = FontWeight.SemiBold)
                 }
 
                 // Temiz Tek Buton: Yedekten Geri Yükle
@@ -1108,7 +1158,7 @@ fun SettingsScreen(
                 ) {
                     Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("📥 Yedekten Geri Yükle", fontWeight = FontWeight.SemiBold)
+                    Text("Yedekten Geri Yükle", fontWeight = FontWeight.SemiBold)
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
@@ -1168,12 +1218,17 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(22.dp))
                             Spacer(Modifier.width(10.dp))
-                            Text("Kamera ile Not Al", fontWeight = FontWeight.Bold)
+                            Text("Kamera ile Al", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
 
-                // Masaüstü Wi-Fi Senkronizasyonu Sub-Card
+                // Masaüstü Wi-Fi Senkronizasyonu (ayrı sayfa)
+            }
+            if (current == PAGE_WIFI) SettingsGroupCard(
+                icon = Icons.Default.Devices,
+                title = "Masaüstü Wi-Fi Eşitleme"
+            ) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -1200,7 +1255,7 @@ fun SettingsScreen(
                         }
 
                         Text(
-                            "Bilgisayarınızdaki 'Not Defterim Masaüstü' uygulaması ile kamera veya yerel ağ üzerinden IP/Port girmeden tek tıkla eşitleyin.",
+                            "Bilgisayarınızdaki 'Not Defterim Masaüstü' uygulamasındaki QR kodu okutarak eşleşin; aynı ağdaki masaüstü otomatik bulunur.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1222,12 +1277,10 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(24.dp))
                             Spacer(Modifier.width(10.dp))
-                            Column(horizontalAlignment = Alignment.Start) {
-                                Text("Masaüstü QR Kodunu Tara 📷", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                                Text("Kamera ile Tek Tıkla Eşitle", style = MaterialTheme.typography.labelSmall)
-                            }
+                            Text("Masaüstüne Bağlan", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                         }
 
+                        val hostBlock: @Composable ColumnScope.() -> Unit = {
                         OutlinedButton(
                             onClick = {
                                 if (syncUiState.isHosting) onStopAndroidSyncServer() else onStartAndroidSyncServer()
@@ -1296,54 +1349,70 @@ fun SettingsScreen(
                                 )
                             }
                         }
+                        }
 
-                        // Keşif yalnızca cihaz adresini bulur; eşleşme için QR/PIN kimlik doğrulaması gerekir.
-                        FilledTonalButton(
-                            onClick = onDiscoverSyncServers,
-                            enabled = !syncUiState.isDiscovering && !syncUiState.isOperating,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 46.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            if (syncUiState.isDiscovering) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Yakındaki masaüstü aranıyor…")
-                            } else {
-                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Yakındaki masaüstü bilgisayarları bul", fontWeight = FontWeight.SemiBold)
+                        // Otomatik keşif: yalnızca adres bulunur; eşleşme için QR kimlik doğrulaması gerekir.
+                        if (syncUiState.isConnected != true) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Ağdaki masaüstü bilgisayarlar",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (syncUiState.isDiscovering) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    TextButton(
+                                        onClick = onDiscoverSyncServers,
+                                        enabled = !syncUiState.isOperating
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Yeniden Ara")
+                                    }
+                                }
+                            }
+                            if (syncUiState.discoveredServers.isEmpty()) {
+                                Text(
+                                    if (syncUiState.isDiscovering) "Aranıyor…"
+                                    else syncUiState.discoveryMessage ?: "Masaüstü bulunamadı. Masaüstü uygulamasının açık ve aynı Wi-Fi ağında olduğundan emin olun.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
-
-                        syncUiState.discoveryMessage?.let { discoveryMessage ->
-                            Text(
-                                discoveryMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (syncUiState.discoveredServers.isEmpty() && !syncUiState.isDiscovering) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    MaterialTheme.colorScheme.primary
-                                }
-                            )
-                        }
-                        syncUiState.discoveredServers.forEach { server ->
-                            OutlinedButton(
-                                onClick = { onSelectDiscoveredSyncServer(server) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
+                        if (syncUiState.isConnected != true) syncUiState.discoveredServers.forEach { server ->
+                            Surface(
+                                onClick = {
+                                    onSelectDiscoveredSyncServer(server)
+                                    activeScannerMode = ScannerMode.WIFI_SYNC_PAIRING
+                                    showScannerDialog = true
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalAlignment = Alignment.Start
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(server.name, fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        "${server.host}:${server.port} · Eşleşmek için masaüstü QR kodunu okutun",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    Icon(Icons.Default.Computer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(server.name, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                        Text(
+                                            "${server.host}:${server.port} · Dokun ve QR ile eşleş",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1
+                                        )
+                                    }
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -1362,7 +1431,7 @@ fun SettingsScreen(
                                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                                         Spacer(Modifier.width(8.dp))
                                         Text(
-                                            "✓ Bağlandı: ${syncUiState.serverStatus?.appName ?: "Masaüstü"} (${syncUiState.serverStatus?.notesCount ?: 0} not)",
+                                            "Bağlandı: ${syncUiState.serverStatus?.appName ?: "Masaüstü"} · ${syncHostInput.ifBlank { "yerel ağ" }} · ${syncUiState.serverStatus?.notesCount ?: 0} not",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
@@ -1388,7 +1457,7 @@ fun SettingsScreen(
                                         ) {
                                             Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(Modifier.width(4.dp))
-                                            Text("Gönder 📤")
+                                            Text("Gönder")
                                         }
 
                                         FilledTonalButton(
@@ -1399,8 +1468,15 @@ fun SettingsScreen(
                                         ) {
                                             Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(Modifier.width(4.dp))
-                                            Text("Çek 📥")
+                                            Text("Çek")
                                         }
+                                    }
+                                    TextButton(
+                                        onClick = onDisconnectSync,
+                                        enabled = !syncUiState.isOperating,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Bağlantıyı Kes", color = MaterialTheme.colorScheme.error)
                                     }
                                     if (syncUiState.uploadProgress.totalBytes > 0L) {
                                         LinearProgressIndicator(
@@ -1452,14 +1528,15 @@ fun SettingsScreen(
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                "Gelişmiş / Manuel Bağlantı (İsteğe Bağlı)",
+                                "Gelişmiş: Elle bağlan",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
                         AnimatedVisibility(visible = showManualConnection) {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                hostBlock()
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1514,9 +1591,11 @@ fun SettingsScreen(
                     }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-
-                // Veritabanı & Depolama Bakımı Sub-Card
+            }
+            if (current == PAGE_DB) SettingsGroupCard(
+                icon = Icons.Default.Storage,
+                title = "Veritabanı & Depolama"
+            ) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -1571,7 +1650,7 @@ fun SettingsScreen(
             // =========================================================================
             // GRUP 4: BİLDİRİMLER & HEDEFLER (NOTIFICATIONS & HABITS)
             // =========================================================================
-            SettingsGroupCard(
+            if (current == PAGE_NOTIFICATIONS) SettingsGroupCard(
                 icon = Icons.Default.NotificationsActive,
                 iconTint = MaterialTheme.colorScheme.secondary,
                 title = "Bildirimler & Alışkanlıklar",
@@ -1676,7 +1755,7 @@ fun SettingsScreen(
                         )
                     }
                     Text(
-                        "Düzenli yazma alışkanlığı kazanmak için her gün ulaşmak istediğiniz hedefi belirleyin:",
+                        "Her gün ulaşmak istediğiniz kelime hedefini seçin (önerilen: 300).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1691,8 +1770,10 @@ fun SettingsScreen(
                                 onClick = { onDailyWordGoalChange(goal) },
                                 label = {
                                     Text(
-                                        if (goal == 300) "300 (Önerilen)" else "$goal Kelime",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        "$goal",
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        style = MaterialTheme.typography.labelLarge,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
                                 },
@@ -1709,7 +1790,7 @@ fun SettingsScreen(
             // =========================================================================
             // GRUP 5: HAKKINDA & GÜNCELLEMELER (ABOUT & UPDATES)
             // =========================================================================
-            SettingsGroupCard(
+            if (current == PAGE_ABOUT) SettingsGroupCard(
                 icon = Icons.Default.Info,
                 iconTint = MaterialTheme.colorScheme.primary,
                 title = "Hakkında & Güncellemeler",
@@ -1984,6 +2065,7 @@ fun SettingsScreen(
                     }
                 }
             }
+        }
         }
     }
 
@@ -3083,74 +3165,94 @@ private fun SettingsGroupCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-        ),
+    // Başlık üst çubukta gösterilir; sayfa yalnızca içeriği çizer.
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        content = content
+    )
+}
+
+private const val PAGE_APPEARANCE = "appearance"
+private const val PAGE_SECURITY = "security"
+private const val PAGE_NOTIFICATIONS = "notifications"
+private const val PAGE_BACKUP = "backup"
+private const val PAGE_WIFI = "wifi"
+private const val PAGE_DB = "db"
+private const val PAGE_ABOUT = "about"
+
+private fun settingsPageTitle(page: String?): String = when (page) {
+    PAGE_APPEARANCE -> "Görünüm"
+    PAGE_SECURITY -> "Güvenlik & Gizlilik"
+    PAGE_NOTIFICATIONS -> "Bildirimler & Yazma Hedefi"
+    PAGE_BACKUP -> "Yedekleme & Aktarım"
+    PAGE_WIFI -> "Masaüstü Wi-Fi Eşitleme"
+    PAGE_DB -> "Veritabanı & Depolama"
+    PAGE_ABOUT -> "Hakkında & Güncellemeler"
+    else -> "Ayarlar"
+}
+
+@Composable
+private fun SettingsCategoryRow(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    subtitle: String,
+    badge: String? = null,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
-        modifier = modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Başlık Satırı
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(iconTint.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(iconTint.copy(alpha = 0.14f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = iconTint,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (subtitle != null) {
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                if (badgeText != null) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = iconTint.copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text = badgeText,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = iconTint,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
+                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
             }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-            // İçerik
-            content()
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+            if (badge != null) {
+                Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.error) {
+                    Text(
+                        badge,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onError,
+                        maxLines = 1,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
