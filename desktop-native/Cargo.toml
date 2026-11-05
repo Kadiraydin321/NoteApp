@@ -16,9 +16,11 @@ pbkdf2 = "0.13"
 rand = "0.10"
 base64 = "0.23"
 tiny_http = "0.12"
+mdns-sd = { version = "0.21.7", default-features = false }
 zip = { version = "9.0", default-features = false, features = ["deflate"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 hmac = "0.13.0"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [
@@ -33,3 +35,6 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[dev-dependencies]
+rcgen = "0.14.10"

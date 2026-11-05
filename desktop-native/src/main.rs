@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod android_client;
 mod backup;
 mod crypto;
 mod db;
@@ -281,6 +282,97 @@ fn execute_ipc_action(
         "sync:refreshPin" | "syncRefreshPin" => {
             let new_pin = sync.refresh_pin();
             IpcResponse::ok(request_id, serde_json::json!({ "pin": new_pin }))
+        }
+        "sync:createPairingToken" | "createPairingToken" => match sync.create_pairing_token() {
+            Ok(pairing) => IpcResponse::ok(request_id, serde_json::to_value(pairing).unwrap_or_default()),
+            Err(_) => IpcResponse::err(request_id, "PAIRING_UNAVAILABLE", "QR eşleştirme kodu oluşturulamadı."),
+        },
+
+        "androidSync:preview" => {
+            let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
+            let qr = payload.get("qr").and_then(|v| v.as_str()).unwrap_or_default();
+            if let Err(e) = android_client::parse_qr(qr, now_ms) {
+                return IpcResponse::err(request_id, "INVALID_QR", e);
+            }
+            if payload.get("direction").and_then(|v| v.as_str()) == Some("send") {
+                let count = db.get_all_notes().map(|n| n.len()).unwrap_or(0);
+                match BackupManager::create_backup_zip_buffer(db) {
+                    Ok(zip) if zip.len() <= android_client::MAX_ZIP_BYTES => IpcResponse::ok(
+                        request_id,
+                        serde_json::json!({ "noteCount": count, "sizeBytes": zip.len() }),
+                    ),
+                    Ok(_) => IpcResponse::err(request_id, "ARCHIVE_TOO_LARGE", "ZIP paketi 50 MiB sınırını aşıyor."),
+                    Err(e) => IpcResponse::err(request_id, "ARCHIVE_FAILED", e),
+                }
+            } else {
+                IpcResponse::ok(request_id, serde_json::json!({ "noteCount": null, "sizeBytes": null }))
+            }
+        }
+        "androidSync:transfer" => {
+            use std::sync::atomic::{AtomicBool, Ordering};
+            static BUSY: AtomicBool = AtomicBool::new(false);
+            let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
+            let qr = payload.get("qr").and_then(|v| v.as_str()).unwrap_or_default();
+            let pairing = match android_client::parse_qr(qr, now_ms) {
+                Ok(p) => p,
+                Err(e) => return IpcResponse::err(request_id, "INVALID_QR", e),
+            };
+            let send = match payload.get("direction").and_then(|v| v.as_str()) {
+                Some("send") => true,
+                Some("receive") => false,
+                _ => return IpcResponse::err(request_id, "INVALID_PAYLOAD", "direction gerekli"),
+            };
+            if payload.get("confirmed").and_then(|v| v.as_bool()) != Some(true) {
+                return IpcResponse::err(request_id, "NOT_CONFIRMED", "Aktarım açık onay olmadan başlatılamaz.");
+            }
+            if BUSY.swap(true, Ordering::SeqCst) {
+                return IpcResponse::err(request_id, "BUSY", "Başka bir aktarım sürüyor.");
+            }
+            let emit = |proxy: &EventLoopProxy<UserEvent>, data: serde_json::Value| {
+                let json = serde_json::json!({ "event": "androidSync:event", "data": data });
+                let _ = proxy.send_event(UserEvent::EvaluateScript(format!(
+                    "if (window.__IPC_EMIT__) {{ window.__IPC_EMIT__({}); }}",
+                    json
+                )));
+            };
+            // Network work runs inline on this IPC worker thread; progress is pushed as events.
+            let progress_proxy = proxy.clone();
+            let mut last_pct = -1i64;
+            let progress = |done: u64, total: u64| {
+                let pct = if total > 0 { (done * 100 / total) as i64 } else { 0 };
+                if pct != last_pct {
+                    last_pct = pct;
+                    emit(&progress_proxy, serde_json::json!({ "type": "progress", "done": done, "total": total }));
+                }
+            };
+            let outcome: Result<(String, u64), String> = if send {
+                BackupManager::create_backup_zip_buffer(db)
+                    .and_then(|zip| android_client::upload(&pairing, &zip, progress))
+                    .map(|n| ("Notlar Android cihaza gönderildi.".to_string(), n))
+            } else {
+                android_client::download(&pairing, progress).and_then(|rec| {
+                    if !rec.zip.starts_with(b"PK\x03\x04") {
+                        return Err("Android geçerli bir ZIP yedeği göndermedi.".to_string());
+                    }
+                    // Restore replaces local notes, so keep a local safety copy first.
+                    let safety = Database::get_app_dir().join("pre_android_sync_backup.zip");
+                    let current = BackupManager::create_backup_zip_buffer(db)?;
+                    std::fs::write(&safety, current).map_err(|e| format!("Yerel güvenlik yedeği yazılamadı: {e}"))?;
+                    let (notes, _) = BackupManager::restore_backup_zip_buffer(db, &rec.zip)?;
+                    Ok(("Android notları bu bilgisayara aktarıldı.".to_string(), notes as u64))
+                })
+            };
+            BUSY.store(false, Ordering::SeqCst);
+            match outcome {
+                Ok((message, notes)) => {
+                    emit(proxy, serde_json::json!({ "type": "done", "ok": true, "message": message, "notes": notes, "reload": !send }));
+                    IpcResponse::ok(request_id, serde_json::json!({ "ok": true }))
+                }
+                Err(e) => {
+                    emit(proxy, serde_json::json!({ "type": "done", "ok": false, "message": e }));
+                    IpcResponse::err(request_id, "TRANSFER_FAILED", e)
+                }
+            }
         }
 
         // --- backup:* (Yedekleme & Geri YÃ¼kleme) ---

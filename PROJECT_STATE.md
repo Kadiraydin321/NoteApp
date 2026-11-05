@@ -1,7 +1,7 @@
 # 📌 Proje Durumu & Hafıza Kartı (PROJECT_STATE)
 
 **Son Güncelleme:** 2026-11-05 15:00
-**Aktif Sürüm / Durum:** v1.4.4 (versionCode 35) / Kararlı & Rust Native Masaüstü Mimarili
+**Aktif Sürüm / Durum:** v1.4.5 (versionCode 36) / Kararlı & Rust Native Masaüstü Mimarili
 **Teknoloji Yığını:** Rust Wry / Tauri (`desktop-native`), Kotlin Jetpack Compose Room SQLite (`app` Android), CameraX & ML Kit Barcode, Vanilla JS, CSS3 Glassmorphism
 
 ---
@@ -49,6 +49,12 @@
 ---
 
 ## 3. 📝 Son Değişiklikler ve Sürüm Günlüğü (Changelog)
+
+### [2026-11-05] - v1.4.5 (versionCode 36): Android Animasyonlu QR ile Parolalı Not Aktarımı
+- Android'e gönderici eklendi (`OpticalQrSenderDialog`): notlar gzip + AES-256-GCM (PBKDF2-SHA256, 120k) ile şifrelenip dönen QR karelerinde gösterilir (kare sayacı, ilerleme, boyut/hız ayarı).
+- Alıcı (`OpticalQrScannerDialog`) artık otomatik içe aktarmaz: parola ister, not sayısı/boyut onayı gösterir. Eski düz v1 akış uyarı + onayla kabul edilir. CRC32 yalnızca bütünlük kontrolüdür.
+- Girişler: ana ekran çekmecesi ("Araçlar & Verimlilik") ve Ayarlar > Yedekleme/Senkronizasyon kartı.
+- Masaüstü gönderici hâlâ v1 (şifresiz) üretir; v2 zarf formatı için `OpticalTransferManager.kt` içindeki `OpticalFormat` esas alınmalı.
 
 ### [2026-11-04 22:30] - v1.4.4: Masaüstü %100 Yerel Rust Native (Wry / WebView2) Mimari Dönüşümü ve Android Tam Eşdeğerliği
 - **Mimari Dönüşüm & Temizlik:**

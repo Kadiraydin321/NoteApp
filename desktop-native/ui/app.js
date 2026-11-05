@@ -34,8 +34,8 @@ let state = {
   selectedNoteId: null,
   selectedNoteIds: new Set(),
   batchModeActive: false,
-  layoutMode: 'list', // 'list' veya 'grid'
-  markdownMode: 'split', // 'edit', 'split', 'preview'
+  layoutMode: 'grid', // 'list' veya 'grid'
+  markdownMode: 'edit', // 'edit', 'split', 'preview'
   antiSsEnabled: true,
   isVaultUnlocked: false,
   vaultHasPassword: true,
@@ -43,6 +43,7 @@ let state = {
   redoStack: [],
   noteVersions: new Map(), // noteId -> Array<{ timestamp, title, content }>
   autoSaveTimer: null,
+  autoSavePending: false,
   isDirty: false
 };
 
@@ -192,10 +193,6 @@ document.addEventListener("DOMContentLoaded", () => {
   loadAllData();
 
   // Rust Backend Push Event Dinleyicileri
-  onNativeEvent("sync:statusChanged", (data) => {
-    updateSyncStateUI();
-  });
-
   onNativeEvent("db:changed", () => {
     loadAllData();
   });
@@ -250,9 +247,11 @@ async function loadAllData() {
 
       if (state.selectedNoteId) {
         const found = findNoteById(state.selectedNoteId);
-        if (found) loadNoteIntoEditor(found, false);
-      } else if (state.activeNotes.length > 0 && state.currentFilter === 'all') {
-        loadNoteIntoEditor(state.activeNotes[0], false);
+        if (found) {
+          loadNoteIntoEditor(found, false);
+        } else {
+          closeEditor({ skipSave: true });
+        }
       }
     }
   } catch (err) {
@@ -319,10 +318,38 @@ function initUI() {
   // 1. Yeni Not Butonları
   document.getElementById("btnNewNote").addEventListener("click", createNewNote);
   document.getElementById("btnNewNoteEmpty").addEventListener("click", createNewNote);
+  document.getElementById("btnNewNoteBoard").addEventListener("click", createNewNote);
+
+  // Kenar çubuğu daralt/genişlet (Keep tarzı), tercih hatırlanır
+  const applySidebarState = (collapsed) => {
+    document.body.classList.toggle("sidebar-collapsed", collapsed);
+    document.getElementById("btnToggleSidebar")?.setAttribute("aria-expanded", String(!collapsed));
+  };
+  applySidebarState(localStorage.getItem("notdefterim_sidebar") === "collapsed");
+  document.getElementById("btnToggleSidebar")?.addEventListener("click", () => {
+    const collapsed = !document.body.classList.contains("sidebar-collapsed");
+    applySidebarState(collapsed);
+    localStorage.setItem("notdefterim_sidebar", collapsed ? "collapsed" : "open");
+  });
+  document.getElementById("sidebarScrim")?.addEventListener("click", () => applySidebarState(true));
+
+  // Editör penceresi: kapat düğmesi, arka plan ve Esc
+  document.getElementById("btnCloseEditor")?.addEventListener("click", () => closeEditor());
+  document.getElementById("editorBackdrop")?.addEventListener("click", () => closeEditor());
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !document.body.classList.contains("editor-open")) return;
+    if (document.body.classList.contains("sticky-mode")) return;
+    if (document.querySelector(".modal-overlay.open")) return;
+    if (document.getElementById("editorMoreMenu")?.style.display === "block") return;
+    if (document.getElementById("colorPalettePopover")?.classList.contains("open")) return;
+    if (document.querySelector(".command-palette-overlay, .palette-overlay")) return;
+    closeEditor();
+  });
 
   // 2. Sidebar Filtreleri & Mobil Çipler
   document.querySelectorAll(".nav-item").forEach(item => {
     item.addEventListener("click", () => {
+      if (!item.dataset.filter) return;
       setFilter(item.dataset.filter);
     });
   });
@@ -355,6 +382,9 @@ function initUI() {
   // 4. Görünüm Değiştirici (List vs Grid)
   const btnList = document.getElementById("btnViewList");
   const btnGrid = document.getElementById("btnViewGrid");
+  btnGrid.classList.add("active");
+  btnList.classList.remove("active");
+  document.getElementById("notesContainer").className = "notes-container layout-grid";
   btnList.addEventListener("click", () => {
     state.layoutMode = 'list';
     btnList.classList.add("active");
@@ -414,6 +444,8 @@ function initUI() {
   btnPrev.addEventListener("click", () => {
     setMarkdownMode('preview', btnPrev, [btnEdit, btnSplit], paneEdit, panePrev);
   });
+  // Varsayılan: yalnızca yazma modu (diyalog daha ferah olur)
+  setMarkdownMode('edit', btnEdit, [btnSplit, btnPrev], paneEdit, panePrev);
 
   // 7. Markdown Araç Çubuğu Butonları
   document.querySelectorAll(".md-tool-btn").forEach(btn => {
@@ -756,8 +788,13 @@ function applyNoteColor(colorInt) {
   const wrapper = document.getElementById("editorContentState");
   if (colorInt !== 0) {
     wrapper.style.backgroundColor = preset.color;
+    wrapper.style.setProperty("--editor-ink", preset.text);
+    wrapper.classList.toggle("tone-light", preset.text === "#1A1C1E");
+    wrapper.classList.add("has-color");
   } else {
-    wrapper.style.backgroundColor = "var(--bg-main)";
+    wrapper.style.backgroundColor = "";
+    wrapper.style.removeProperty("--editor-ink");
+    wrapper.classList.remove("tone-light", "has-color");
   }
 }
 
@@ -808,7 +845,9 @@ function triggerAutoSave() {
   }
 
   clearTimeout(state.autoSaveTimer);
+  state.autoSavePending = true;
   state.autoSaveTimer = setTimeout(async () => {
+    state.autoSavePending = false;
     const note = findNoteById(state.selectedNoteId);
     if (note) {
       try {
@@ -1324,6 +1363,7 @@ function loadNoteIntoEditor(note, focusTitle = false) {
 
   document.getElementById("emptyEditorState").style.display = "none";
   document.getElementById("editorContentState").style.display = "flex";
+  document.body.classList.add("editor-open");
 
   const titleInput = document.getElementById("editorTitle");
   const contentInput = document.getElementById("editorContent");
@@ -1352,6 +1392,30 @@ function loadNoteIntoEditor(note, focusTitle = false) {
   if (focusTitle) {
     titleInput.focus();
   }
+}
+
+// Editör diyaloğunu kapatır; bekleyen değişiklik varsa önce kaydeder.
+async function closeEditor(options = {}) {
+  clearTimeout(state.autoSaveTimer);
+  const note = findNoteById(state.selectedNoteId);
+  const needsSave = !options.skipSave && note && (state.autoSavePending || state.isDirty);
+  state.autoSavePending = false;
+  state.selectedNoteId = null;
+  document.body.classList.remove("editor-open");
+  document.getElementById("colorPalettePopover")?.classList.remove("open");
+  const moreMenu = document.getElementById("editorMoreMenu");
+  if (moreMenu) moreMenu.style.display = "none";
+  if (needsSave) {
+    try {
+      await callIpc("db:saveNote", { note });
+      state.isDirty = false;
+      recordNoteVersion(note);
+    } catch (err) {
+      console.error("Kapatırken kaydetme hatası:", err);
+    }
+    extractTagsAndRender();
+  }
+  renderNotesList();
 }
 
 // ===================================================
@@ -1556,17 +1620,30 @@ function renderNotesList() {
     return;
   }
 
-  list.forEach(note => {
-    const card = document.createElement("div");
+  const ICON_PIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>';
+  const ICON_LOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>';
+  const ICON_BELL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>';
+  const ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+  const ICON_ARCHIVE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>';
+
+  const buildCard = (note) => {
+    const card = document.createElement("article");
     const isSelected = note.id === state.selectedNoteId;
     const isChecked = state.selectedNoteIds.has(note.id);
-    card.className = `note-card ${isSelected ? 'active' : ''} ${isChecked ? 'batch-selected' : ''}`;
+    card.className = "note-card";
+    if (isSelected) card.classList.add("active");
+    if (isChecked) card.classList.add("batch-selected");
+    if (note.isPinned) card.classList.add("is-pinned");
+    if (note.isLocked) card.classList.add("is-locked");
+    card.dataset.noteId = String(note.id);
+    card.dataset.color = String(note.color || 0);
+    card.tabIndex = 0;
 
-    // Not Arka Plan Rengi ve Pastel Yazı Uyumu (Mobil Kart Tarzı)
     if (note.color !== 0) {
       const preset = NOTE_PRESETS.find(p => p.id === note.color);
       if (preset) {
         card.style.backgroundColor = preset.color;
+        card.style.setProperty("--card-ink", preset.text || "inherit");
         if (preset.text === "#1A1C1E") {
           card.classList.add("card-light-tone");
         }
@@ -1574,42 +1651,61 @@ function renderNotesList() {
     }
 
     const cat = state.categories.find(c => c.id === note.categoryId);
-    const dateFormatted = new Date(note.updatedAt || note.timestamp).toLocaleString("tr-TR", {
-      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
-    });
+    const updated = new Date(note.updatedAt || note.timestamp);
+    const dateFormatted = updated.toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: updated.getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
 
-    const displayTitle = highlightQuery(note.title || "Başlıksız Not", state.searchQuery);
-    const displaySnippet = highlightQuery(note.content ? note.content.substring(0, 100) : "(İçerik yok)", state.searchQuery);
-
+    const displayTitle = highlightQuery(note.title || "", state.searchQuery);
     const hasReminder = note.reminderDate && note.reminderDate > 0;
     const reminderFormatted = hasReminder ? new Date(note.reminderDate).toLocaleDateString("tr-TR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 
+    const rawContent = note.content || "";
+    const checkLines = !note.isLocked
+      ? rawContent.split("\n").filter(line => /^\s*(?:[-*]\s+)?\[[ xX]\]/.test(line))
+      : [];
+    const checklistTotal = checkLines.length;
+    const checklistCompleted = checkLines.filter(line => /\[[xX]\]/.test(line)).length;
+
+    let bodyHtml = "";
+    if (checklistTotal > 0) {
+      const shown = checkLines.slice(0, 6).map(line => {
+        const done = /\[[xX]\]/.test(line);
+        const text = line.replace(/^\s*(?:[-*]\s+)?\[[ xX]\]\s*/, "");
+        return `<li class="card-check${done ? " done" : ""}"><span class="card-check-box" aria-hidden="true"></span><span class="card-check-text">${highlightQuery(text, state.searchQuery)}</span></li>`;
+      }).join("");
+      const more = checklistTotal > 6 ? `<li class="card-check-more">+${checklistTotal - 6} öğe daha</li>` : "";
+      bodyHtml = `<ul class="card-checklist" aria-label="Kontrol listesi">${shown}${more}</ul>`;
+    } else {
+      const plain = rawContent.replace(/^#{1,6}\s+/gm, "").trim();
+      const snippet = plain ? plain.substring(0, 320) : (displayTitle ? "" : "(İçerik yok)");
+      bodyHtml = snippet ? `<div class="card-content-preview">${highlightQuery(snippet, state.searchQuery)}</div>` : "";
+    }
+
+    const badges = [];
+    if (cat) {
+      const hex = cat.color ? "#" + (cat.color >>> 0).toString(16).slice(-6) : "#94A3B8";
+      badges.push(`<span class="card-cat-badge"><i style="background:${hex};"></i>${escapeHtml(cat.name)}</span>`);
+    }
+    if (hasReminder) badges.push(`<span class="card-meta-badge" title="Hatırlatıcı: ${reminderFormatted}">${ICON_BELL}${reminderFormatted}</span>`);
+    if (note.isLocked) badges.push(`<span class="card-meta-badge" title="Kilitli kasa">${ICON_LOCK}Kasa</span>`);
+    if (checklistTotal > 0) badges.push(`<span class="card-meta-badge${checklistCompleted === checklistTotal ? " is-done" : ""}">${checklistCompleted}/${checklistTotal}</span>`);
+
+    const archiveTitle = note.isArchived ? "Arşivden çıkar" : "Arşivle";
     card.innerHTML = `
-      <div class="card-title-row">
-        ${state.batchModeActive ? `
-          <input type="checkbox" class="batch-checkbox" data-note-id="${note.id}" ${isChecked ? 'checked' : ''} style="margin-right:8px; width:16px; height:16px; cursor:pointer;" aria-label="Notu seç">
-        ` : ''}
-        ${note.isPinned ? '<span class="card-pin-icon" title="Sabitlenmiş Not"><svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg></span>' : ''}
-        ${note.isLocked ? '<span class="card-lock-icon" title="Kilitli Kasa Notu"><svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg></span>' : ''}
-        ${hasReminder ? `<span class="card-reminder-icon" title="Hatırlatıcı: ${reminderFormatted}" style="color:var(--primary); display:inline-flex; align-items:center; margin-right:4px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg></span>` : ''}
-        <div class="card-title">${displayTitle}</div>
-        ${cat ? `<span class="card-cat-badge" style="background:${cat.color ? '#' + (cat.color >>> 0).toString(16).slice(-6) + '33' : 'rgba(255,255,255,0.1)'}; color:#CBD5E1;">${escapeHtml(cat.name)}</span>` : ''}
-      </div>
-      <div class="card-content-preview">${displaySnippet}</div>
+      ${state.batchModeActive ? `<input type="checkbox" class="batch-checkbox" data-note-id="${note.id}" ${isChecked ? "checked" : ""} aria-label="Notu seç">` : ""}
+      <button class="card-pin-toggle btn-card-pin" type="button" title="${note.isPinned ? "Sabitlemeyi kaldır" : "Sabitle"}" aria-label="${note.isPinned ? "Sabitlemeyi kaldır" : "Sabitle"}">${ICON_PIN}</button>
+      ${displayTitle ? `<h3 class="card-title">${displayTitle}</h3>` : ""}
+      ${bodyHtml}
+      ${badges.length ? `<div class="card-badges">${badges.join("")}</div>` : ""}
       <div class="card-footer">
-        <span>${dateFormatted}</span>
+        <span class="card-date">${dateFormatted}</span>
         <div class="card-actions">
-          <button class="card-action-btn btn-card-pin" title="${note.isPinned ? 'Sabitlemeyi Kaldır' : 'Sabitle'}">
-            <svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
-          </button>
-          <button class="card-action-btn btn-card-del" title="${note.isDeleted ? 'Kalıcı Sil' : 'Çöpe At'}">
-            <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-          </button>
+          ${note.isDeleted ? "" : `<button class="card-action-btn btn-card-archive" type="button" title="${archiveTitle}" aria-label="${archiveTitle}">${ICON_ARCHIVE}</button>`}
+          <button class="card-action-btn btn-card-del" type="button" title="${note.isDeleted ? "Kalıcı sil" : "Çöpe at"}" aria-label="${note.isDeleted ? "Kalıcı sil" : "Çöpe at"}">${ICON_TRASH}</button>
         </div>
       </div>
     `;
 
-    card.addEventListener("click", () => {
+    const activate = () => {
       closeNoteContextMenu();
       if (state.batchModeActive) {
         if (state.selectedNoteIds.has(note.id)) {
@@ -1622,9 +1718,15 @@ function renderNotesList() {
         return;
       }
       loadNoteIntoEditor(note, false);
+    };
+    card.addEventListener("click", activate);
+    card.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target === card) {
+        e.preventDefault();
+        activate();
+      }
     });
 
-    // Masaüstü Sağ Tık Bağlam Menüsü (Context Menu)
     card.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -1635,6 +1737,13 @@ function renderNotesList() {
       e.stopPropagation();
       note.isPinned = !note.isPinned;
       showToast(note.isPinned ? "Not sabitlendi" : "Sabitleme kaldırıldı", "info");
+      callIpc("saveNote", { note }).then(loadAllData);
+    });
+
+    card.querySelector(".btn-card-archive")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      note.isArchived = !note.isArchived;
+      showToast(note.isArchived ? "Not arşivlendi" : "Not arşivden çıkarıldı", "info");
       callIpc("saveNote", { note }).then(loadAllData);
     });
 
@@ -1653,8 +1762,34 @@ function renderNotesList() {
       }
     });
 
-    container.appendChild(card);
-  });
+    return card;
+  };
+
+  // Sabitlenenler ayrı bir bölüm olarak gösterilir (Keep tarzı)
+  const groupable = !["archive", "trash"].includes(state.currentFilter);
+  const pinned = groupable ? list.filter(n => n.isPinned) : [];
+  const others = groupable ? list.filter(n => !n.isPinned) : list;
+
+  const appendSection = (label, notes) => {
+    if (label) {
+      const heading = document.createElement("div");
+      heading.className = "board-section-label";
+      heading.textContent = label;
+      container.appendChild(heading);
+    }
+    notes.forEach((note, index) => {
+      const card = buildCard(note);
+      card.style.setProperty("--enter-delay", `${Math.min(index, 12) * 28}ms`);
+      container.appendChild(card);
+    });
+  };
+
+  if (pinned.length > 0) {
+    appendSection("Sabitlenenler", pinned);
+    if (others.length > 0) appendSection("Diğerleri", others);
+  } else {
+    appendSection("", others);
+  }
 }
 
 function highlightQuery(text, query) {
@@ -1757,9 +1892,7 @@ function deleteCurrentNote() {
   if (note) {
     callIpc("db:moveToTrash", { id: note.id }).then(() => {
       showToast("Not çöp kutusuna taşındı", "warning");
-      state.selectedNoteId = null;
-      document.getElementById("emptyEditorState").style.display = "flex";
-      document.getElementById("editorContentState").style.display = "none";
+      closeEditor({ skipSave: true });
       loadAllData();
     });
   }
@@ -1917,55 +2050,88 @@ function initModals() {
 
   // 3. Wi-Fi Senkronizasyon Modalı (#modalSync)
   const modalSync = document.getElementById("modalSync");
+  const modalSyncReview = document.getElementById("modalSyncReview");
+  // Modal açılınca masaüstü sunucusu başlatılır ve QR üretimi için durum izleme açılır.
   document.getElementById("btnOpenSync")?.addEventListener("click", async () => {
     modalSync.classList.add("open");
-    try {
-      await callIpc("sync:start");
-    } catch (e) {
-      console.warn("sync:start IPC hatası (devam ediliyor):", e);
-    }
-    startSyncPolling();
+    setSyncStatus("Android uygulamasında HTTPS sunucusunu başlatın.");
+    setDesktopQrPlaceholder("QR kodu hazırlanıyor…");
+    desktopPairingQr = null;
+    const qrContainer = document.getElementById("qrCodeContainer");
+    if (qrContainer) delete qrContainer.dataset.payload;
+    await ensureDesktopSyncServer();
+    if (modalSync.classList.contains("open")) startSyncPolling();
   });
 
-  document.getElementById("btnCloseSync")?.addEventListener("click", () => {
+  const closeSyncModal = () => {
     modalSync.classList.remove("open");
     stopSyncPolling();
+    stopSyncQrCamera();
+    pendingAndroidSyncQr = null;
+    document.getElementById("syncQrManualInput").value = "";
+    document.getElementById("syncPairingDetails").hidden = true;
+    modalSyncReview.classList.remove("open");
+    modalSyncReview.hidden = true;
+    // Modalın kendi başlattığı ve kimsenin bağlanmadığı sunucu açık bırakılmaz
+    if (syncModalStartedServer && !(syncLastState?.connected_clients > 0)) {
+      syncModalStartedServer = false;
+      desktopPairingQr = null;
+      callIpc("sync:stop").catch(() => {}).finally(updateSyncStateUI);
+    }
+  };
+
+  document.getElementById("btnCloseSync")?.addEventListener("click", closeSyncModal);
+  document.getElementById("btnToggleServer")?.addEventListener("click", toggleDesktopSyncServer);
+  document.getElementById("btnRefreshQr")?.addEventListener("click", () => {
+    desktopPairingQr = null;
+    const qrContainer = document.getElementById("qrCodeContainer");
+    if (qrContainer) delete qrContainer.dataset.payload;
+    updateSyncStateUI();
+  });
+  document.getElementById("btnCopyPin")?.addEventListener("click", () => {
+    const pin = document.getElementById("syncPinCode")?.textContent || "";
+    if (/^\d+$/.test(pin) && navigator.clipboard) {
+      navigator.clipboard.writeText(pin).then(() => showToast("PIN kopyalandı", "success")).catch(() => {});
+    }
   });
 
   modalSync?.addEventListener("click", (e) => {
-    if (e.target === modalSync) {
-      modalSync.classList.remove("open");
-      stopSyncPolling();
+    if (e.target === modalSync) closeSyncModal();
+  });
+
+  document.getElementById("btnStartSyncCamera")?.addEventListener("click", startSyncQrCamera);
+  document.getElementById("btnValidateSyncQr")?.addEventListener("click", () => {
+    try {
+      acceptAndroidSyncQr(document.getElementById("syncQrManualInput").value);
+    } catch (error) {
+      clearAndroidSyncPairing();
+      setSyncStatus(error.message);
     }
   });
 
-  document.getElementById("btnCopySyncPin")?.addEventListener("click", () => {
-    const pin = document.getElementById("syncPinCode").textContent.trim();
-    if (pin && pin !== "----") {
-      navigator.clipboard.writeText(pin).then(() => {
-        showToast("PIN panoya kopyalandı: " + pin, "success");
-      }).catch(() => {
-        showToast("PIN kopyalanamadı", "warning");
-      });
+  document.getElementById("btnReceiveFromAndroid")?.addEventListener("click", () => {
+    openSyncTransferReview("receive");
+  });
+
+  document.getElementById("btnSendToAndroid")?.addEventListener("click", () => {
+    openSyncTransferReview("send");
+  });
+
+  document.getElementById("btnCancelSyncReview")?.addEventListener("click", () => {
+    modalSyncReview.classList.remove("open");
+    modalSyncReview.hidden = true;
+  });
+
+  modalSyncReview?.addEventListener("click", (e) => {
+    if (e.target === modalSyncReview) {
+      modalSyncReview.classList.remove("open");
+      modalSyncReview.hidden = true;
     }
   });
 
-  document.getElementById("btnRefreshPin")?.addEventListener("click", async () => {
-    await callIpc("sync:refreshPin");
-    updateSyncStateUI();
-    showToast("Yeni PIN kodu üretildi", "info");
-  });
-
-  document.getElementById("btnToggleServer")?.addEventListener("click", async () => {
-    const stateObj = await callIpc("sync:getState");
-    if (stateObj && (stateObj.is_running || stateObj.isRunning)) {
-      await callIpc("sync:stop");
-      showToast("Wi-Fi sunucusu durduruldu", "info");
-    } else {
-      await callIpc("sync:start");
-      showToast("Wi-Fi sunucusu başlatıldı", "success");
-    }
-    updateSyncStateUI();
+  document.getElementById("btnCloseSyncSuccess")?.addEventListener("click", () => {
+    document.getElementById("modalSyncSuccess").classList.remove("open");
+    document.getElementById("modalSyncSuccess").hidden = true;
   });
 
   // 4. Yedekleme & Kurtarma Butonu
@@ -2618,8 +2784,304 @@ function exportCurrentNoteToVaultFile() {
   showToast(".notevault dosyası başarıyla dışa aktarıldı!", "success");
 }
 
+// Android QR pairing is validated locally; no pairing token is sent before a future
+// native transport verifies the QR-pinned TLS certificate.
+let pendingAndroidSyncQr = null;
+let syncQrCameraStream = null;
+let syncQrCameraFrame = 0;
+let syncQrScanActive = false;
+
+function isPrivateSyncIpv4(host) {
+  const parts = host.split(".");
+  if (parts.length !== 4) return false;
+  const octets = parts.map(part => Number(part));
+  if (octets.some((value, index) => !Number.isInteger(value) || value < 0 || value > 255 || String(value) !== parts[index])) {
+    return false;
+  }
+  return octets[0] === 10 ||
+    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+    (octets[0] === 192 && octets[1] === 168) ||
+    (octets[0] === 169 && octets[1] === 254);
+}
+
+function parseAndroidSyncQr(rawText) {
+  if (typeof rawText !== "string" || rawText.trim().length === 0 || rawText.length > 4096) {
+    throw new Error("QR kod içeriği boş veya beklenen boyutun dışında.");
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(rawText.trim());
+  } catch {
+    throw new Error("QR kod geçerli JSON bağlantı bilgisi içermiyor.");
+  }
+
+  if (!payload || payload.type !== "noteapp_sync" || payload.version !== 3 || payload.scheme !== "https") {
+    throw new Error("Yalnızca Not Defterim Android HTTPS v3 QR kodları kabul edilir.");
+  }
+  if (!isPrivateSyncIpv4(payload.host)) {
+    throw new Error("Android adresi özel yerel IPv4 ağına ait değil.");
+  }
+  if (!Number.isInteger(payload.port) || payload.port < 1 || payload.port > 65535) {
+    throw new Error("QR kodundaki bağlantı noktası geçersiz.");
+  }
+  if (typeof payload.tls_cert_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(payload.tls_cert_sha256)) {
+    throw new Error("QR kodundaki TLS sertifika parmak izi geçersiz.");
+  }
+  if (typeof payload.pairing_token !== "string" || !/^[A-Za-z0-9_-]{32}$/.test(payload.pairing_token)) {
+    throw new Error("QR kodundaki tek kullanımlık eşleşme kodu geçersiz.");
+  }
+  if (!Number.isSafeInteger(payload.expires_at) || payload.expires_at <= Date.now()) {
+    throw new Error("Android QR kodunun süresi dolmuş. Telefonda yeni bir QR kod oluşturun.");
+  }
+
+  return payload;
+}
+
+function setSyncStatus(message) {
+  const status = document.getElementById("syncServerMsg");
+  if (status) status.textContent = message;
+}
+
+function clearAndroidSyncPairing() {
+  pendingAndroidSyncQr = null;
+  document.getElementById("syncPairingDetails").hidden = true;
+  document.getElementById("syncDeviceAddress").textContent = "—";
+  document.getElementById("syncCertificateFingerprint").textContent = "—";
+  const review = document.getElementById("modalSyncReview");
+  review.classList.remove("open");
+  review.hidden = true;
+}
+
+function acceptAndroidSyncQr(rawText) {
+  const payload = parseAndroidSyncQr(rawText);
+  pendingAndroidSyncQr = payload;
+  document.getElementById("syncQrManualInput").value = "";
+  document.getElementById("syncDeviceAddress").textContent = `${payload.host}:${payload.port}`;
+  document.getElementById("syncCertificateFingerprint").textContent =
+    payload.tls_cert_sha256.match(/.{1,8}/g).join(" ");
+  document.getElementById("syncPairingDetails").hidden = false;
+  setSyncStatus("QR doğrulandı. Henüz hiçbir eşleşme bilgisi veya not gönderilmedi.");
+}
+
+function openSyncTransferReview(direction) {
+  if (!pendingAndroidSyncQr || pendingAndroidSyncQr.expires_at <= Date.now()) {
+    pendingAndroidSyncQr = null;
+    document.getElementById("syncPairingDetails").hidden = true;
+    setSyncStatus("QR kodunun süresi doldu. Android'de yeni bir QR kod oluşturun.");
+    showToast("Aktarım için yeni bir Android QR kodu okutun.", "warning");
+    return;
+  }
+
+  const review = document.getElementById("modalSyncReview");
+  document.getElementById("syncReviewDirection").textContent = direction === "receive"
+    ? "Android cihazdan bu bilgisayara not aktarılacak."
+    : "Bu bilgisayardaki notlar Android cihaza gönderilecek.";
+  document.getElementById("syncTransferNoteCount").textContent = "Güvenli bağlantıdan sonra doğrulanacak";
+  document.getElementById("syncTransferFileSize").textContent = "ZIP paketi aktarım öncesi ölçülecek";
+  document.getElementById("syncTransferProgressPanel").hidden = true;
+  document.getElementById("syncTransferUnavailable").hidden = false;
+  document.getElementById("btnConfirmSyncTransfer").disabled = true;
+  review.hidden = false;
+  review.classList.add("open");
+  stageNativeSyncTransfer(direction);
+}
+
+let stagedSyncDirection = null;
+let syncTransferRunning = false;
+
+// Native-only call: no timeout and no HTTP fallback, so credentials never leave the IPC channel.
+function callNativeOnly(action, payload) {
+  if (!(window.ipc && typeof window.ipc.postMessage === "function")) {
+    return Promise.reject(new Error("Yerel masaüstü köprüsü yok."));
+  }
+  const requestId = `req_${Date.now()}_${++requestCounter}`;
+  return new Promise((resolve, reject) => {
+    pendingRequests.set(requestId, { resolve, reject, timeoutId: null });
+    window.ipc.postMessage(JSON.stringify({ action, cmd: action, payload, requestId }));
+  });
+}
+
+async function stageNativeSyncTransfer(direction) {
+  stagedSyncDirection = null;
+  const qr = pendingAndroidSyncQr;
+  if (!qr || !(window.ipc && typeof window.ipc.postMessage === "function")) return;
+  try {
+    const preview = await callNativeOnly("androidSync:preview", { qr: JSON.stringify(qr), direction });
+    stagedSyncDirection = direction;
+    renderSyncTransferSummary({
+      direction: direction === "send" ? "send" : "receive",
+      noteCount: preview.noteCount,
+      sizeBytes: preview.sizeBytes
+    });
+    if (direction === "receive") {
+      document.getElementById("syncTransferNoteCount").textContent = "Android'den gelen notlar";
+      document.getElementById("syncTransferFileSize").textContent =
+        "Gelen veri bu bilgisayardaki notların yerine geçer; önce yerel güvenlik yedeği alınır.";
+    }
+    document.getElementById("syncTransferUnavailable").hidden = true;
+    document.getElementById("btnConfirmSyncTransfer").disabled = false;
+  } catch (error) {
+    setSyncStatus(error.message);
+  }
+}
+
+async function confirmNativeSyncTransfer() {
+  if (!stagedSyncDirection || !pendingAndroidSyncQr || syncTransferRunning) return;
+  const direction = stagedSyncDirection;
+  const qr = JSON.stringify(pendingAndroidSyncQr);
+  syncTransferRunning = true;
+  stagedSyncDirection = null;
+  pendingAndroidSyncQr = null;
+  document.getElementById("btnConfirmSyncTransfer").disabled = true;
+  renderSyncTransferProgress(0, 1);
+  try {
+    await callNativeOnly("androidSync:transfer", { qr, direction, confirmed: true });
+  } catch (error) {
+    // The "done" event renders the failure; this only covers a missing event.
+    console.warn("Android aktarımı başarısız:", error.message);
+  } finally {
+    syncTransferRunning = false;
+  }
+}
+
+onNativeEvent("androidSync:event", (data) => {
+  if (data.type === "progress") {
+    renderSyncTransferProgress(data.done, data.total);
+  } else if (data.type === "done") {
+    const review = document.getElementById("modalSyncReview");
+    review.classList.remove("open");
+    review.hidden = true;
+    clearAndroidSyncPairing();
+    renderSyncTransferResult(data.ok, data.ok ? `${data.message} (${data.notes} not)` : data.message);
+    if (data.ok && data.reload) loadAllData();
+  }
+});
+
+document.getElementById("btnConfirmSyncTransfer")?.addEventListener("click", confirmNativeSyncTransfer);
+
+// Presentation-only helpers: they render supplied values and never dispatch a request.
+function formatSyncBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderSyncTransferSummary({ direction, noteCount, sizeBytes }) {
+  const label = direction === "send"
+    ? "Bu bilgisayardaki notlar Android cihaza gönderilecek."
+    : "Android cihazdan bu bilgisayara not aktarılacak.";
+  document.getElementById("syncReviewDirection").textContent = label;
+  document.getElementById("syncTransferNoteCount").textContent = Number.isInteger(noteCount) && noteCount >= 0
+    ? `${noteCount} not` : "—";
+  document.getElementById("syncTransferFileSize").textContent = `ZIP · ${formatSyncBytes(sizeBytes)}`;
+  document.getElementById("syncTransferProgressPanel").hidden = true;
+  const review = document.getElementById("modalSyncReview");
+  review.hidden = false;
+  review.classList.add("open");
+}
+
+function renderSyncTransferProgress(receivedBytes, totalBytes) {
+  const valid = Number.isFinite(totalBytes) && totalBytes > 0 && Number.isFinite(receivedBytes) && receivedBytes >= 0;
+  const percent = valid ? Math.min(100, Math.floor((receivedBytes / totalBytes) * 100)) : 0;
+  document.getElementById("syncTransferProgressPanel").hidden = false;
+  document.getElementById("syncTransferStatus").textContent = valid ? "Aktarılıyor" : "Boyut doğrulanamadı";
+  document.getElementById("syncTransferProgressPercent").textContent = valid ? `${percent}%` : "—";
+  document.getElementById("syncTransferProgress").value = percent;
+  document.getElementById("syncTransferBytes").textContent = valid
+    ? `${formatSyncBytes(receivedBytes)} / ${formatSyncBytes(totalBytes)}` : "Geçerli Content-Length gerekli";
+}
+
+function renderSyncTransferResult(ok, message) {
+  const modal = document.getElementById("modalSyncSuccess");
+  document.getElementById("syncSuccessTitle").textContent = ok ? "Aktarım tamamlandı" : "Aktarım başarısız";
+  document.getElementById("syncTransferSuccessMessage").textContent = message;
+  modal.hidden = false;
+  modal.classList.add("open");
+}
+
+// Credential-free preview entry point for the UI states; confirm stays disabled.
+window.NotDefterimSyncPreview = Object.freeze({
+  summary: renderSyncTransferSummary,
+  progress: renderSyncTransferProgress,
+  result: renderSyncTransferResult
+});
+
+async function startSyncQrCamera() {
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    setSyncStatus("Bu uygulama bağlamında kamera izni kullanılamıyor. QR metnini aşağıya yapıştırın.");
+    return;
+  }
+  if (!("BarcodeDetector" in window)) {
+    setSyncStatus("Bu WebView kamera QR çözümlemeyi desteklemiyor. QR metnini aşağıya yapıştırın.");
+    return;
+  }
+
+  try {
+    const detector = new BarcodeDetector({ formats: ["qr_code"] });
+    syncQrCameraStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: "environment" } }
+    });
+    const video = document.getElementById("syncCameraVideo");
+    video.srcObject = syncQrCameraStream;
+    video.hidden = false;
+    document.getElementById("syncCameraPlaceholder").hidden = true;
+    await video.play();
+    syncQrScanActive = true;
+    setSyncStatus("Kamerayı Android QR koduna yöneltin.");
+
+    const scanFrame = async () => {
+      if (!syncQrScanActive) return;
+      try {
+        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          const codes = await detector.detect(video);
+          if (codes.length > 0) {
+            document.getElementById("syncQrManualInput").value = codes[0].rawValue;
+            stopSyncQrCamera();
+            acceptAndroidSyncQr(codes[0].rawValue);
+            return;
+          }
+        }
+        syncQrCameraFrame = requestAnimationFrame(scanFrame);
+      } catch (error) {
+        stopSyncQrCamera();
+        clearAndroidSyncPairing();
+        setSyncStatus(`Kamera QR kodunu okuyamadı: ${error.message || "bilinmeyen hata"}`);
+      }
+    };
+    syncQrCameraFrame = requestAnimationFrame(scanFrame);
+  } catch (error) {
+    stopSyncQrCamera();
+    setSyncStatus(error.name === "NotAllowedError"
+      ? "Kamera izni verilmedi. QR metnini aşağıya yapıştırabilirsiniz."
+      : `Kamera açılamadı: ${error.message || "bilinmeyen hata"}`);
+  }
+}
+
+function stopSyncQrCamera() {
+  syncQrScanActive = false;
+  if (syncQrCameraFrame) {
+    cancelAnimationFrame(syncQrCameraFrame);
+    syncQrCameraFrame = 0;
+  }
+  syncQrCameraStream?.getTracks().forEach(track => track.stop());
+  syncQrCameraStream = null;
+  const video = document.getElementById("syncCameraVideo");
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+    video.hidden = true;
+  }
+  const placeholder = document.getElementById("syncCameraPlaceholder");
+  if (placeholder) placeholder.hidden = false;
+}
+
 // Wi-Fi Senkronizasyon Durum İzleme & Polling
 let syncPollTimer = null;
+let desktopPairingQr = null;
+let desktopPairingQrPromise = null;
 
 function startSyncPolling() {
   stopSyncPolling();
@@ -2631,7 +3093,7 @@ function startSyncPolling() {
     } else {
       stopSyncPolling();
     }
-  }, 3000);
+  }, 2000);
 }
 
 function stopSyncPolling() {
@@ -2641,402 +3103,202 @@ function stopSyncPolling() {
   }
 }
 
+let syncModalStartedServer = false;
+let syncUpdateInFlight = false;
+let syncLastState = null;
+
+function isUsableLanIp(ip) {
+  return typeof ip === "string"
+    && ip.trim() !== ""
+    && ip !== "undefined"
+    && ip !== "null"
+    && ip !== "0.0.0.0"
+    && !ip.startsWith("127.");
+}
+
+function setDesktopQrPlaceholder(html) {
+  const qrContainer = document.getElementById("qrCodeContainer");
+  if (qrContainer) qrContainer.innerHTML = `<div class="qr-placeholder">${html}</div>`;
+}
+
+// Modal açıldığında masaüstü sunucusunu başlatır (QR için sunucu çalışıyor olmalı).
+async function ensureDesktopSyncServer() {
+  let current = null;
+  try {
+    current = await callIpc("sync:getState");
+  } catch (_) {}
+  if (current && current.is_running) return current;
+  try {
+    const started = await callIpc("sync:start");
+    syncModalStartedServer = true;
+    return started;
+  } catch (err) {
+    console.error("sync:start başarısız:", err);
+    setDesktopQrPlaceholder("Wi-Fi sunucusu başlatılamadı. Port 8765 başka bir uygulama tarafından kullanılıyor olabilir.");
+    return null;
+  }
+}
+
+async function toggleDesktopSyncServer() {
+  const btn = document.getElementById("btnToggleServer");
+  if (btn) btn.disabled = true;
+  try {
+    const current = await callIpc("sync:getState").catch(() => null);
+    desktopPairingQr = null;
+    if (current && current.is_running) {
+      await callIpc("sync:stop");
+      syncModalStartedServer = false;
+    } else {
+      await callIpc("sync:start");
+    }
+  } catch (err) {
+    showToast("Sunucu durumu değiştirilemedi", "danger");
+  } finally {
+    if (btn) btn.disabled = false;
+    updateSyncStateUI();
+  }
+}
+
 async function updateSyncStateUI() {
+  if (syncUpdateInFlight) return;
+  syncUpdateInFlight = true;
   try {
     let syncState = null;
     try {
       syncState = await callIpc("sync:getState");
     } catch (e) {
-      console.warn("sync:getState çağrısı başarısız, fallback uygulanıyor:", e);
+      console.warn("sync:getState çağrısı başarısız:", e);
     }
+    syncLastState = syncState;
 
-    // Ek fallback: HTTP API endpoint'leri (/api/sync/info veya /api/status)
-    if (!syncState || (!syncState.local_ip && !syncState.localIp && !syncState.ip && !syncState.serverIp)) {
-      try {
-        const httpInfo = await fetch("/api/sync/info").then(r => r.json()).catch(() => null);
-        if (httpInfo && (httpInfo.local_ip || httpInfo.localIp || httpInfo.ip || httpInfo.serverIp)) {
-          syncState = { ...syncState, ...httpInfo };
-        }
-      } catch (_) {}
-      if (!syncState || (!syncState.local_ip && !syncState.localIp && !syncState.ip && !syncState.serverIp)) {
-        try {
-          const httpStatus = await fetch("/api/status").then(r => r.json()).catch(() => null);
-          if (httpStatus && (httpStatus.local_ip || httpStatus.localIp || httpStatus.ip || httpStatus.serverIp)) {
-            syncState = { ...syncState, ...httpStatus };
-          }
-        } catch (_) {}
-      }
-    }
+    const isRunning = !!(syncState && (syncState.is_running ?? syncState.isRunning));
+    const rawIp = syncState?.local_ip || syncState?.localIp || syncState?.server_ip || syncState?.serverIp || "";
+    const ip = typeof rawIp === "string" ? rawIp.trim() : "";
+    const port = Number(syncState?.port) || 8765;
+    const pin = syncState?.pairing_pin || syncState?.pairingPin || "----";
+    const lastMsg = syncState?.last_message || syncState?.lastMessage || (isRunning ? "Telefon bağlantısı bekleniyor…" : "Sunucu durduruldu");
+    if (isUsableLanIp(ip)) state.serverIp = ip;
 
-    // IP çözümleme (Asla undefined veya geçersiz dize olamaz)
-    let rawIp = syncState?.local_ip || syncState?.localIp || syncState?.server_ip || syncState?.serverIp || syncState?.ip || syncState?.host;
-    let ip = "";
-    if (rawIp && typeof rawIp === "string" && rawIp !== "undefined" && rawIp !== "null" && rawIp !== "0.0.0.0" && rawIp.trim() !== "") {
-      ip = rawIp.trim();
-    } else if (state.serverIp && state.serverIp !== "undefined" && state.serverIp !== "null" && state.serverIp.trim() !== "") {
-      ip = state.serverIp.trim();
-    } else if (window.location.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-      ip = window.location.hostname;
-    } else {
-      ip = "127.0.0.1";
-    }
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    };
+    setText("syncPinCode", isRunning ? pin : "----");
+    setText("syncIpAddress", isUsableLanIp(ip) ? `${ip}:${port}` : "—");
+    setText("syncDesktopMsg", syncState ? lastMsg : "Yerel senkronizasyon servisine ulaşılamadı");
 
-    // Canlı state'e kaydet
-    state.serverIp = ip;
-
-    const port = syncState?.port || 8765;
-    const pin = syncState?.pairing_pin || syncState?.pairingPin || syncState?.pin || "1234";
-    const isRunning = syncState?.is_running !== undefined ? syncState.is_running : (syncState?.isRunning !== undefined ? syncState.isRunning : true);
-    const lastMsg = syncState?.last_message || syncState?.lastMessage || (isRunning ? "Bağlantı bekleniyor..." : "Sunucu durduruldu");
-
-    const pinEl = document.getElementById("syncPinCode");
-    if (pinEl) pinEl.textContent = pin;
-
-    const ipEl = document.getElementById("syncIpAddress");
-    if (ipEl) ipEl.textContent = `${ip}:${port}`;
-
-    const msgEl = document.getElementById("syncServerMsg");
-    if (msgEl) msgEl.textContent = lastMsg;
-
-    // Status Indicators
     const syncDot = document.getElementById("syncStatusDot");
     if (syncDot) {
       syncDot.style.display = isRunning ? "inline-block" : "none";
       syncDot.classList.toggle("sync-active", isRunning);
     }
-    const modalDot = document.getElementById("syncModalStatusDot");
-    if (modalDot) {
-      modalDot.style.display = isRunning ? "inline-block" : "none";
-    }
+    const modalDot = document.getElementById("syncDesktopDot");
+    if (modalDot) modalDot.classList.toggle("is-on", isRunning);
     const badge = document.getElementById("syncStatusBadge");
     if (badge) {
       badge.textContent = isRunning ? "Çevrimiçi" : "Hazır";
       badge.classList.toggle("online", isRunning);
     }
-
     const btnToggle = document.getElementById("btnToggleServer");
-    if (btnToggle) {
-      btnToggle.textContent = isRunning ? "Sunucuyu Durdur" : "Sunucuyu Başlat";
+    if (btnToggle) btnToggle.textContent = isRunning ? "Sunucuyu durdur" : "Sunucuyu başlat";
+    const btnRefresh = document.getElementById("btnRefreshQr");
+    if (btnRefresh) btnRefresh.hidden = !isRunning;
+
+    const qrContainer = document.getElementById("qrCodeContainer");
+    if (!qrContainer) return;
+
+    if (!syncState) {
+      desktopPairingQr = null;
+      setDesktopQrPlaceholder("Yerel senkronizasyon servisine ulaşılamadı.");
+      return;
+    }
+    if (!isRunning) {
+      desktopPairingQr = null;
+      setDesktopQrPlaceholder("QR kodu görmek için Wi-Fi sunucusunu başlatın.");
+      return;
+    }
+    if (!isUsableLanIp(ip)) {
+      desktopPairingQr = null;
+      setDesktopQrPlaceholder("Yerel ağ (Wi-Fi/LAN) IP adresi bulunamadı. Bilgisayarın ağa bağlı olduğundan emin olun.");
+      return;
     }
 
-    // Standart JSON eşleştirme formatı
-    const qrPayload = JSON.stringify({ type: "noteapp_sync", ip: ip, port: Number(port), pin: String(pin) });
-    const qrContainer = document.getElementById("qrCodeContainer");
-    if (qrContainer) {
-      qrContainer.innerHTML = renderSimpleQr(qrPayload);
+    if (!desktopPairingQr || desktopPairingQr.expires_at <= Date.now() + 15000) {
+      if (!desktopPairingQrPromise) {
+        desktopPairingQrPromise = callIpc("sync:createPairingToken")
+          .then(pairing => {
+            desktopPairingQr = pairing;
+            return pairing;
+          })
+          .finally(() => {
+            desktopPairingQrPromise = null;
+          });
+      }
+      try {
+        desktopPairingQr = await desktopPairingQrPromise;
+      } catch (_) {
+        desktopPairingQr = null;
+        setDesktopQrPlaceholder("QR eşleştirme kodu alınamadı. Sunucunun çalıştığını kontrol edin.");
+        return;
+      }
     }
+
+    const qrPayload = JSON.stringify({
+      type: "noteapp_sync",
+      version: 2,
+      host: ip,
+      port,
+      pairing_token: desktopPairingQr.pairing_token,
+      expires_at: desktopPairingQr.expires_at
+    });
+    if (qrContainer.dataset.payload !== qrPayload) {
+      qrContainer.innerHTML = renderSimpleQr(qrPayload);
+      qrContainer.dataset.payload = qrPayload;
+    }
+    const secondsLeft = Math.max(0, Math.round((desktopPairingQr.expires_at - Date.now()) / 1000));
+    setText("syncQrExpiry", `Kod ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")} içinde yenilenir`);
   } catch (err) {
     console.error("updateSyncStateUI genel hata:", err);
+  } finally {
+    syncUpdateInFlight = false;
   }
 }
 
+
 // ===================================================
-// GERÇEK, TARANABİLİR QR KOD ÜRETİCİ (ISO/IEC 18004 Standardı)
+// GERÇEK, TARANABİLİR QR KOD ÜRETİCİ (vendor/qrcode.js - qrcode-generator, MIT)
+// Eski elle yazılmış kodlayıcı format bilgisini ters/transpoze yazdığı için
+// hiçbir telefon okuyamıyordu; doğrulanmış kütüphaneyle değiştirildi.
 // ===================================================
 
 function renderSimpleQr(text) {
-  // GF(256) Math
-  const GF256_EXP = new Uint8Array(512);
-  const GF256_LOG = new Uint8Array(256);
-  let x = 1;
-  for (let i = 0; i < 255; i++) {
-    GF256_EXP[i] = x;
-    GF256_EXP[i + 255] = x;
-    GF256_LOG[x] = i;
-    x = (x << 1) ^ (x >= 128 ? 0x11d : 0);
+  if (typeof window.qrcode !== "function") {
+    return '<div class="qr-error">QR kütüphanesi yüklenemedi (vendor/qrcode.js).</div>';
   }
-
-  function gfMul(a, b) {
-    if (a === 0 || b === 0) return 0;
-    return GF256_EXP[GF256_LOG[a] + GF256_LOG[b]];
-  }
-
-  function rsGenPoly(n) {
-    let poly = [1];
-    for (let i = 0; i < n; i++) {
-      const next = new Array(poly.length + 1).fill(0);
-      const root = GF256_EXP[i];
-      for (let j = 0; j < poly.length; j++) {
-        next[j] ^= poly[j];
-        next[j + 1] ^= gfMul(poly[j], root);
-      }
-      poly = next;
-    }
-    return poly;
-  }
-
-  function rsEncode(data, ecCount) {
-    const gen = rsGenPoly(ecCount);
-    const res = new Uint8Array(data.length + ecCount);
-    res.set(data);
-    for (let i = 0; i < data.length; i++) {
-      const factor = res[i];
-      if (factor !== 0) {
-        for (let j = 0; j < gen.length; j++) {
-          res[i + j] ^= gfMul(gen[j], factor);
-        }
-      }
-    }
-    return res.slice(data.length);
-  }
-
-  // Version Table: [totalDataWords, ecWordsPerBlock, g1Blocks, g1Data, g2Blocks, g2Data]
-  const TABLE = {
-    '1-L': [19, 7, 1, 19, 0, 0],
-    '1-M': [16, 10, 1, 16, 0, 0],
-    '2-L': [34, 10, 1, 34, 0, 0],
-    '2-M': [28, 16, 1, 28, 0, 0],
-    '3-L': [55, 15, 1, 55, 0, 0],
-    '3-M': [44, 26, 1, 44, 0, 0],
-    '4-L': [80, 20, 1, 80, 0, 0],
-    '4-M': [64, 18, 2, 32, 0, 0],
-    '5-L': [108, 26, 1, 108, 0, 0],
-    '5-M': [86, 24, 2, 43, 0, 0],
-    '6-L': [136, 18, 2, 68, 0, 0],
-    '6-M': [108, 16, 4, 27, 0, 0],
-    '7-L': [156, 20, 2, 78, 0, 0],
-    '7-M': [124, 18, 4, 31, 0, 0]
-  };
-
-  // Convert text to UTF-8
-  const utf8Bytes = [];
-  for (let i = 0; i < text.length; i++) {
-    let code = text.charCodeAt(i);
-    if (code < 0x80) {
-      utf8Bytes.push(code);
-    } else if (code < 0x800) {
-      utf8Bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
-    } else if (code < 0xd800 || code >= 0xe000) {
-      utf8Bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
-    } else {
-      i++;
-      code = 0x10000 + (((code & 0x3ff) << 10) | (text.charCodeAt(i) & 0x3ff));
-      utf8Bytes.push(0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
-    }
-  }
-
-  // Choose minimal version that fits
-  let version = 1;
-  let level = 'M';
-  for (let v = 1; v <= 7; v++) {
-    const k = `${v}-M`;
-    if (TABLE[k] && TABLE[k][0] >= utf8Bytes.length + 3) {
-      version = v;
-      level = 'M';
+  let qr = null;
+  for (const level of ["M", "L"]) {
+    try {
+      qr = window.qrcode(0, level);
+      qr.addData(String(text), "Byte");
+      qr.make();
       break;
+    } catch (_) {
+      qr = null;
     }
   }
-  if (!TABLE[`${version}-${level}`] || TABLE[`${version}-${level}`][0] < utf8Bytes.length + 3) {
-    for (let v = 1; v <= 7; v++) {
-      const k = `${v}-L`;
-      if (TABLE[k] && TABLE[k][0] >= utf8Bytes.length + 3) {
-        version = v;
-        level = 'L';
-        break;
-      }
-    }
+  if (!qr) {
+    return '<div class="qr-error">QR içeriği çok uzun, kod üretilemedi.</div>';
   }
-
-  const [totalDataWords, ecWordsPerBlock, g1Blocks, g1Data, g2Blocks, g2Data] = TABLE[`${version}-${level}`];
-
-  // Bit Buffer (Byte Mode = 0100)
-  const bitBuffer = [];
-  function pushBits(val, len) {
-    for (let i = len - 1; i >= 0; i--) {
-      bitBuffer.push((val >> i) & 1);
-    }
-  }
-
-  pushBits(0b0100, 4); // Byte Mode
-  pushBits(utf8Bytes.length, 8); // Character count (8 bits for V1-9)
-  for (let b of utf8Bytes) {
-    pushBits(b, 8);
-  }
-
-  // Terminator (up to 4 bits)
-  const capacityBits = totalDataWords * 8;
-  const termLen = Math.min(4, capacityBits - bitBuffer.length);
-  pushBits(0, termLen);
-
-  // Pad to byte boundary
-  while (bitBuffer.length % 8 !== 0) {
-    bitBuffer.push(0);
-  }
-
-  // Pad bytes
-  const pad = [0xec, 0x11];
-  let padIdx = 0;
-  while (bitBuffer.length < capacityBits) {
-    pushBits(pad[padIdx % 2], 8);
-    padIdx++;
-  }
-
-  // Convert bits to data codewords
-  const dataBytes = new Uint8Array(totalDataWords);
-  for (let i = 0; i < totalDataWords; i++) {
-    let byteVal = 0;
-    for (let b = 0; b < 8; b++) {
-      byteVal = (byteVal << 1) | bitBuffer[i * 8 + b];
-    }
-    dataBytes[i] = byteVal;
-  }
-
-  // Split into blocks and compute Reed-Solomon EC
-  const blocksData = [];
-  const blocksEc = [];
-  let offset = 0;
-
-  for (let i = 0; i < g1Blocks; i++) {
-    const d = dataBytes.slice(offset, offset + g1Data);
-    blocksData.push(d);
-    blocksEc.push(rsEncode(d, ecWordsPerBlock));
-    offset += g1Data;
-  }
-  for (let i = 0; i < g2Blocks; i++) {
-    const d = dataBytes.slice(offset, offset + g2Data);
-    blocksData.push(d);
-    blocksEc.push(rsEncode(d, ecWordsPerBlock));
-    offset += g2Data;
-  }
-
-  // Interleave data codewords
-  const interleaved = [];
-  const maxDataLen = Math.max(g1Data, g2Data || 0);
-  for (let i = 0; i < maxDataLen; i++) {
-    for (let b = 0; b < blocksData.length; b++) {
-      if (i < blocksData[b].length) {
-        interleaved.push(blocksData[b][i]);
-      }
-    }
-  }
-  // Interleave EC codewords
-  for (let i = 0; i < ecWordsPerBlock; i++) {
-    for (let b = 0; b < blocksEc.length; b++) {
-      interleaved.push(blocksEc[b][i]);
-    }
-  }
-
-  // Convert to final bit array
-  const finalBits = [];
-  for (let byte of interleaved) {
-    for (let i = 7; i >= 0; i--) {
-      finalBits.push((byte >> i) & 1);
-    }
-  }
-  const remainderBitsCount = [0, 0, 7, 7, 7, 7, 7, 0][version] || 0;
-  for (let i = 0; i < remainderBitsCount; i++) finalBits.push(0);
-
-  // Matrix creation
-  const size = version * 4 + 17;
-  const matrix = Array.from({ length: size }, () => new Int8Array(size).fill(-1));
-
-  // Finder Patterns
-  function setFinder(r, c) {
-    for (let i = -1; i <= 7; i++) {
-      for (let j = -1; j <= 7; j++) {
-        const nr = r + i, nc = c + j;
-        if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
-          if (i >= 0 && i <= 6 && j >= 0 && j <= 6) {
-            const isBorder = (i === 0 || i === 6 || j === 0 || j === 6);
-            const isCenter = (i >= 2 && i <= 4 && j >= 2 && j <= 4);
-            matrix[nr][nc] = (isBorder || isCenter) ? 1 : 0;
-          } else {
-            matrix[nr][nc] = 0; // Separator
-          }
-        }
-      }
-    }
-  }
-  setFinder(0, 0);
-  setFinder(0, size - 7);
-  setFinder(size - 7, 0);
-
-  // Alignment Patterns (Version >= 2)
-  const ALIGN_POS = [[], [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38]];
-  const alignCoords = ALIGN_POS[version] || [];
-  for (let r of alignCoords) {
-    for (let c of alignCoords) {
-      if (matrix[r][c] !== -1) continue; // Skip finder areas
-      for (let i = -2; i <= 2; i++) {
-        for (let j = -2; j <= 2; j++) {
-          const isEdge = Math.max(Math.abs(i), Math.abs(j)) === 2;
-          const isCenter = (i === 0 && j === 0);
-          matrix[r + i][c + j] = (isEdge || isCenter) ? 1 : 0;
-        }
-      }
-    }
-  }
-
-  // Timing Patterns
-  for (let i = 8; i < size - 8; i++) {
-    if (matrix[6][i] === -1) matrix[6][i] = (i % 2 === 0) ? 1 : 0;
-    if (matrix[i][6] === -1) matrix[i][6] = (i % 2 === 0) ? 1 : 0;
-  }
-
-  // Dark module
-  matrix[4 * version + 9][8] = 1;
-
-  // Reserve Format Info areas
-  for (let i = 0; i <= 8; i++) {
-    if (matrix[8][i] === -1) matrix[8][i] = 0;
-    if (matrix[i][8] === -1) matrix[i][8] = 0;
-    if (matrix[8][size - 1 - i] === -1) matrix[8][size - 1 - i] = 0;
-    if (matrix[size - 1 - i][8] === -1) matrix[size - 1 - i][8] = 0;
-  }
-
-  // Data Placement (Zigzag)
-  let bitIdx = 0;
-  let dir = -1;
-  for (let col = size - 1; col > 0; col -= 2) {
-    if (col === 6) col--;
-    const rows = dir === -1
-      ? Array.from({ length: size }, (_, i) => size - 1 - i)
-      : Array.from({ length: size }, (_, i) => i);
-
-    for (let r of rows) {
-      for (let c of [col, col - 1]) {
-        if (matrix[r][c] === -1) {
-          const bit = bitIdx < finalBits.length ? finalBits[bitIdx++] : 0;
-          const mask = (r + c) % 2 === 0; // Mask Pattern 0
-          matrix[r][c] = mask ? (bit ^ 1) : bit;
-        }
-      }
-    }
-    dir = -dir;
-  }
-
-  // Format Information Bits
-  const formatBits = (level === 'M')
-    ? [1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0] // M-0
-    : [1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0]; // L-0
-
-  // 1. Top-left copy
-  for (let i = 0; i < 6; i++) matrix[8][i] = formatBits[i];
-  matrix[8][7] = formatBits[6];
-  matrix[8][8] = formatBits[7];
-  matrix[7][8] = formatBits[8];
-  for (let i = 9; i < 15; i++) matrix[14 - i][8] = formatBits[i];
-
-  // 2. Bottom-left (bits 0..6) & Top-right (bits 7..14)
-  for (let i = 0; i < 7; i++) matrix[size - 1 - i][8] = formatBits[i];
-  for (let i = 0; i < 8; i++) matrix[8][size - 8 + i] = formatBits[7 + i];
-
-  // Render SVG Path
+  const count = qr.getModuleCount();
   const border = 4;
-  const total = size + border * 2;
-  let path = '';
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      if (matrix[r][c] === 1) {
-        path += `M${c + border},${r + border}h1v1h-1z `;
-      }
+  const total = count + border * 2;
+  let path = "";
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (qr.isDark(r, c)) path += `M${c + border},${r + border}h1v1h-1z`;
     }
   }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" width="180" height="180" style="background:#FFFFFF; border-radius:12px; padding:10px; box-shadow:0 6px 20px rgba(0,0,0,0.35); shape-rendering:crispEdges;" aria-label="Wi-Fi Senkronizasyon QR Kodu">
-    <rect width="${total}" height="${total}" fill="#FFFFFF"/>
-    <path d="${path}" fill="#0A0F1D"/>
-  </svg>`;
+  return `<svg class="qr-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" shape-rendering="crispEdges" role="img" aria-label="Wi-Fi Senkronizasyon QR Kodu"><rect width="${total}" height="${total}" fill="#FFFFFF"/><path d="${path}" fill="#000000"/></svg>`;
 }
 
 // ===================================================
@@ -3117,7 +3379,7 @@ function openCommandPalette() {
         <span style="font-size:11px; background:var(--border-subtle); color:var(--text-faint); padding:2px 6px; border-radius:4px;">ESC</span>
       </div>
 
-      <div style="display:flex; gap:6px; padding:8px 16px; border-bottom:1px solid var(--border-subtle); font-size:11px; color:var(--text-faint); background:rgba(0,0,0,0.15);">
+      <div style="display:flex; gap:6px; padding:8px 16px; border-bottom:1px solid var(--border-subtle); font-size:11px; color:var(--text-faint); background:rgba(var(--wash),0.06);">
         <span>İpuçları:</span>
         <span style="color:var(--primary);">> Eylemler</span>
         <span style="color:#10B981;"># Etiketler</span>
@@ -4349,5 +4611,3 @@ function setupAudioPlayer(src) {
     });
   }
 }
-
-

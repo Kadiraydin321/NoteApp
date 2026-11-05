@@ -1,8 +1,8 @@
 {
-  "versionCode": 35,
-  "versionName": "1.4.4",
-  "buildTime": 1730752000,
-  "releaseDate": "04.11.2026",
-  "changeLog": "v1.4.4: 3 nokta pop-up menü, gelişmiş araçlar pop-up'ı, TTS sesli okuma onarımı, yoga sesi temizliği ve kasa şifre optimizasyonu.",
+  "versionCode": 36,
+  "versionName": "1.4.5",
+  "buildTime": 1793909395,
+  "releaseDate": "05.11.2026",
+  "changeLog": "v1.4.5: Animasyonlu QR ile parolalı (AES-256-GCM) not gönderme, kamera ile alma ve içe aktarmadan önce onay ekranı. Ana menü ve Ayarlar'dan erişilebilir.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }

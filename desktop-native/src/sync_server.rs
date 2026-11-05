@@ -1,15 +1,26 @@
 use crate::backup::BackupManager;
 use crate::db::Database;
 use crate::models::{Category, Note};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
+use mdns_sd::{ServiceDaemon, ServiceInfo};
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::io::Read;
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 use tiny_http::{Header, Method, Response, Server, StatusCode};
+
+const PAIRING_TOKEN_TTL_MS: u64 = 5 * 60 * 1000;
+const SESSION_TOKEN_TTL_MS: u64 = 30 * 24 * 60 * 60 * 1000;
+const MAX_PENDING_PAIRINGS: usize = 8;
+const MAX_SESSIONS: usize = 128;
+const MDNS_SERVICE_TYPE: &str = "_notdefterim-sync._tcp.local.";
 
 #[derive(Serialize, Deserialize)]
 pub struct SyncPayload {
@@ -55,6 +66,88 @@ pub struct SyncStatusEvent {
 
 pub type StatusChangeCallback = Box<dyn Fn(&SyncStatusEvent) + Send + Sync + 'static>;
 
+#[derive(Clone)]
+struct HashedCredential {
+    digest: [u8; 32],
+    expires_at: u64,
+}
+
+#[derive(Default)]
+struct PairingCredentials {
+    pending_pairings: Vec<HashedCredential>,
+    sessions: Vec<HashedCredential>,
+}
+
+impl PairingCredentials {
+    fn clear(&mut self) {
+        self.pending_pairings.clear();
+        self.sessions.clear();
+    }
+
+    fn issue_pairing(&mut self, digest: [u8; 32], expires_at: u64, now: u64) {
+        self.pending_pairings.retain(|entry| entry.expires_at > now);
+        if self.pending_pairings.len() >= MAX_PENDING_PAIRINGS {
+            self.pending_pairings.remove(0);
+        }
+        self.pending_pairings.push(HashedCredential { digest, expires_at });
+    }
+
+    fn exchange_pairing(
+        &mut self,
+        pairing_digest: [u8; 32],
+        now: u64,
+        session_digest: [u8; 32],
+        session_expires_at: u64,
+    ) -> bool {
+        self.pending_pairings.retain(|entry| entry.expires_at > now);
+        let mut matched_index = None;
+        for (index, entry) in self.pending_pairings.iter().enumerate() {
+            let matched = constant_time_digest_match(&entry.digest, &pairing_digest);
+            if matched {
+                matched_index = Some(index);
+            }
+        }
+        let Some(index) = matched_index else {
+            return false;
+        };
+        self.pending_pairings.remove(index);
+        self.sessions.retain(|entry| entry.expires_at > now);
+        if self.sessions.len() >= MAX_SESSIONS {
+            let oldest = self.sessions.iter().enumerate().min_by_key(|(_, entry)| entry.expires_at).map(|(index, _)| index);
+            if let Some(index) = oldest {
+                self.sessions.remove(index);
+            }
+        }
+        self.sessions.push(HashedCredential {
+            digest: session_digest,
+            expires_at: session_expires_at,
+        });
+        true
+    }
+
+    fn has_valid_session(&self, digest: &[u8; 32], now: u64) -> bool {
+        let mut matched = false;
+        for session in &self.sessions {
+            matched |= session.expires_at > now
+                && constant_time_digest_match(&session.digest, digest);
+        }
+        matched
+    }
+}
+
+#[derive(Serialize)]
+pub struct PairingTokenInfo {
+    pub pairing_token: String,
+    pub expires_at: u64,
+}
+
+#[derive(Serialize)]
+struct SessionTokenInfo {
+    version: u8,
+    session_token: String,
+    expires_at: u64,
+}
+
 pub struct SyncServer {
     is_running: Arc<AtomicBool>,
     pairing_pin: Arc<Mutex<String>>,
@@ -62,7 +155,88 @@ pub struct SyncServer {
     connected_clients: Arc<Mutex<usize>>,
     event_listeners: Arc<Mutex<Vec<StatusChangeCallback>>>,
     event_senders: Arc<Mutex<Vec<Sender<SyncStatusEvent>>>>,
+    pairing_credentials: Arc<Mutex<PairingCredentials>>,
+    server_thread: Mutex<Option<thread::JoinHandle<()>>>,
     db: Arc<Database>,
+}
+
+fn unix_time_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
+fn token_digest(token: &str) -> [u8; 32] {
+    Sha256::digest(token.as_bytes()).into()
+}
+
+fn constant_time_digest_match(a: &[u8; 32], b: &[u8; 32]) -> bool {
+    let mut diff = 0u8;
+    for (left, right) in a.iter().zip(b.iter()) {
+        diff |= *left ^ *right;
+    }
+    diff == 0
+}
+
+fn generate_opaque_token() -> String {
+    URL_SAFE_NO_PAD.encode(rand::rng().random::<[u8; 24]>())
+}
+
+fn start_mdns_advertisement(
+) -> Result<(ServiceDaemon, String, mdns_sd::Receiver<mdns_sd::DaemonEvent>), String> {
+    let ip = SyncServer::get_local_ip()
+        .parse::<IpAddr>()
+        .map_err(|_| "Yerel ağ IPv4 adresi bulunamadı".to_string())?;
+    if ip.is_loopback() || !is_allowed_client_ip(&SocketAddr::new(ip, 8765)) {
+        return Err("Yerel ağ IPv4 adresi kullanılamıyor; mDNS eşleştirmesi başlatılamadı".to_string());
+    }
+
+    let daemon = ServiceDaemon::new().map_err(|error| format!("mDNS servisi başlatılamadı: {error}"))?;
+    let monitor = daemon
+        .monitor()
+        .map_err(|error| format!("mDNS durumu izlenemedi: {error}"))?;
+    daemon
+        .set_service_name_len_max(30)
+        .map_err(|error| format!("mDNS hizmet adı yapılandırılamadı: {error}"))?;
+
+    let suffix = std::process::id();
+    let instance_name = format!("Not Defterim {suffix}");
+    let host_name = format!("notdefterim-{suffix}.local.");
+    let properties = [("protocol", "noteapp_sync"), ("version", "2")];
+    let service = ServiceInfo::new(
+        MDNS_SERVICE_TYPE,
+        &instance_name,
+        &host_name,
+        ip,
+        8765,
+        &properties[..],
+    )
+    .map_err(|error| format!("mDNS hizmet kaydı oluşturulamadı: {error}"))?;
+    let full_name = service.get_fullname().to_string();
+    daemon
+        .register(service)
+        .map_err(|error| format!("mDNS hizmeti yayınlanamadı: {error}"))?;
+    Ok((daemon, full_name, monitor))
+}
+
+fn mdns_startup_status<T>(result: Result<T, String>) -> (Option<T>, String) {
+    match result {
+        Ok(advertisement) => (
+            Some(advertisement),
+            "mDNS eşleştirmesi etkin".to_string(),
+        ),
+        Err(_) => (
+            None,
+            "mDNS kullanılamıyor; QR veya yerel ağ adresiyle bağlanabilirsiniz".to_string(),
+        ),
+    }
+}
+
+fn revoke_pairing_credentials(credentials: &Mutex<PairingCredentials>) {
+    if let Ok(mut credentials) = credentials.lock() {
+        credentials.clear();
+    }
 }
 
 /// Zamanlama saldırılarını (timing attack) önlemek için sabit zamanlı (constant-time) PIN doğrulaması
@@ -135,8 +309,27 @@ impl SyncServer {
             connected_clients: Arc::new(Mutex::new(0)),
             event_listeners: Arc::new(Mutex::new(Vec::new())),
             event_senders: Arc::new(Mutex::new(Vec::new())),
+            pairing_credentials: Arc::new(Mutex::new(PairingCredentials::default())),
+            server_thread: Mutex::new(None),
             db,
         }
+    }
+
+    pub fn create_pairing_token(&self) -> Result<PairingTokenInfo, String> {
+        if !self.is_running.load(Ordering::SeqCst) {
+            return Err("Wi-Fi senkronizasyon sunucusu çalışmıyor".to_string());
+        }
+        let token = generate_opaque_token();
+        let expires_at = unix_time_ms().saturating_add(PAIRING_TOKEN_TTL_MS);
+        let mut credentials = self
+            .pairing_credentials
+            .lock()
+            .map_err(|_| "Eşleştirme bilgisi kullanılamıyor".to_string())?;
+        credentials.issue_pairing(token_digest(&token), expires_at, unix_time_ms());
+        Ok(PairingTokenInfo {
+            pairing_token: token,
+            expires_at,
+        })
     }
 
     pub fn get_local_ip() -> String {
@@ -254,8 +447,14 @@ impl SyncServer {
     }
 
     pub fn start(&self) {
+        let Ok(mut thread_slot) = self.server_thread.lock() else {
+            return;
+        };
         if self.is_running.load(Ordering::SeqCst) {
             return;
+        }
+        if let Some(previous_thread) = thread_slot.take() {
+            let _ = previous_thread.join();
         }
 
         self.is_running.store(true, Ordering::SeqCst);
@@ -272,9 +471,10 @@ impl SyncServer {
         let clients_clone = self.connected_clients.clone();
         let listeners_clone = self.event_listeners.clone();
         let senders_clone = self.event_senders.clone();
+        let credentials_clone = self.pairing_credentials.clone();
         let db_clone = self.db.clone();
 
-        thread::spawn(move || {
+        let server_thread = thread::spawn(move || {
             let server = match Server::http("0.0.0.0:8765") {
                 Ok(s) => s,
                 Err(e) => {
@@ -298,7 +498,8 @@ impl SyncServer {
                 }
             };
 
-            let start_msg = "Sunucu 8765 portunda dinleniyor".to_string();
+            let (mdns, mdns_status) = mdns_startup_status(start_mdns_advertisement());
+            let start_msg = format!("Sunucu 8765 portunda dinleniyor; {mdns_status}.");
             if let Ok(mut m) = msg_clone.lock() {
                 *m = start_msg.clone();
             }
@@ -315,6 +516,27 @@ impl SyncServer {
             );
 
             while is_running_clone.load(Ordering::SeqCst) {
+                if let Some((_, _, mdns_monitor)) = mdns.as_ref() {
+                    while let Ok(event) = mdns_monitor.try_recv() {
+                        if let mdns_sd::DaemonEvent::Error(error) = event {
+                            let warning = format!("mDNS yayını kullanılamıyor; QR veya yerel ağ adresini kullanın: {error}");
+                            if let Ok(mut message) = msg_clone.lock() {
+                                *message = warning.clone();
+                            }
+                            let current_pin = pin_clone.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                            let notes_count = db_clone.get_all_notes().map(|n| n.len()).unwrap_or(0);
+                            Self::emit_status_event(
+                                true,
+                                &current_pin,
+                                &warning,
+                                0,
+                                notes_count,
+                                &listeners_clone,
+                                &senders_clone,
+                            );
+                        }
+                    }
+                }
                 match server.recv_timeout(std::time::Duration::from_millis(500)) {
                     Ok(Some(mut request)) => {
                         let remote_addr = *request.remote_addr();
@@ -383,15 +605,89 @@ impl SyncServer {
                             continue;
                         }
 
+                        if method == Method::Post && path == "/api/v2/pair" {
+                            let pairing_token = request.headers().iter().find_map(|header| {
+                                header
+                                    .field
+                                    .as_str()
+                                    .eq_ignore_ascii_case("X-Pairing-Token")
+                                    .then(|| header.value.as_str().trim().to_string())
+                            });
+                            let mut body_probe = Vec::new();
+                            let body_read = request.as_reader().take(1).read_to_end(&mut body_probe);
+                            let session = if body_read.is_ok() && body_probe.is_empty() {
+                                pairing_token.and_then(|token| {
+                                    if token.len() != 32 || !token.is_ascii() {
+                                        return None;
+                                    }
+                                    let session_token = generate_opaque_token();
+                                    let now = unix_time_ms();
+                                    let expires_at = now.saturating_add(SESSION_TOKEN_TTL_MS);
+                                    let mut credentials = credentials_clone.lock().ok()?;
+                                    if credentials.exchange_pairing(
+                                        token_digest(&token),
+                                        now,
+                                        token_digest(&session_token),
+                                        expires_at,
+                                    ) {
+                                        Some(SessionTokenInfo {
+                                            version: 2,
+                                            session_token,
+                                            expires_at,
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                })
+                            } else {
+                                None
+                            };
+                            let response = match session {
+                                Some(session) => Response::from_string(
+                                    serde_json::to_string(&session).unwrap_or_else(|_| "{}".to_string()),
+                                )
+                                .with_header(cors_header)
+                                .with_header(json_header),
+                                None => Response::from_string(r#"{"error":"Eşleştirme kodu geçersiz veya süresi dolmuş"}"#)
+                                    .with_status_code(StatusCode(401))
+                                    .with_header(cors_header)
+                                    .with_header(json_header),
+                            };
+                            let response = match Header::from_bytes(&b"Connection"[..], &b"close"[..]) {
+                                Ok(header) => response.with_header(header),
+                                Err(_) => response,
+                            };
+                            request.respond(response).ok();
+                            continue;
+                        }
+
                         // PIN Doğrulama: X-Sync-PIN, X-Pairing-PIN ve URL sorgusundaki 'pin=...' parametresini sabit zamanlı (constant-time) kontrol et
                         let maybe_pin = extract_pin_from_request(&request, &url);
                         let pin_valid = match maybe_pin {
                             Some(ref p) => constant_time_pin_match(p, &current_pin),
                             None => false,
                         };
+                        let bearer_valid = request.headers().iter().find_map(|header| {
+                            header
+                                .field
+                                .as_str()
+                                .eq_ignore_ascii_case("Authorization")
+                                .then(|| header.value.as_str())
+                        }).and_then(|value| {
+                            let token = value.strip_prefix("Bearer ")?;
+                            if token.len() != 32 || !token.is_ascii() {
+                                return None;
+                            }
+                            let digest = token_digest(token);
+                            let now = unix_time_ms();
+                            credentials_clone
+                                .lock()
+                                .ok()
+                                .map(|credentials| credentials.has_valid_session(&digest, now))
+                        }).unwrap_or(false);
 
                         // Durum rotaları haricinde PIN doğrulanamadıysa 401 Unauthorized dön
-                        if !pin_valid {
+                        if !pin_valid && !bearer_valid {
                             let resp = Response::from_string(r#"{"error":"Geçersiz veya eksik PIN kodu"}"#)
                                 .with_status_code(StatusCode(401))
                                 .with_header(cors_header)
@@ -650,6 +946,12 @@ impl SyncServer {
             }
             let final_pin = pin_clone.lock().unwrap_or_else(|e| e.into_inner()).clone();
             let final_notes = db_clone.get_all_notes().map(|n| n.len()).unwrap_or(0);
+            if let Some((mdns_daemon, mdns_full_name, _)) = mdns {
+                let _ = mdns_daemon.unregister(&mdns_full_name);
+                if let Ok(shutdown) = mdns_daemon.shutdown() {
+                    let _ = shutdown.recv_timeout(Duration::from_secs(2));
+                }
+            }
             Self::emit_status_event(
                 false,
                 &final_pin,
@@ -660,20 +962,110 @@ impl SyncServer {
                 &senders_clone,
             );
         });
+        *thread_slot = Some(server_thread);
     }
 
     pub fn stop(&self) {
-        if !self.is_running.load(Ordering::SeqCst) {
-            return;
+        let (was_running, server_thread) = match self.server_thread.lock() {
+            Ok(mut thread_slot) => (
+                self.is_running.swap(false, Ordering::SeqCst),
+                thread_slot.take(),
+            ),
+            Err(_) => (self.is_running.swap(false, Ordering::SeqCst), None),
+        };
+        revoke_pairing_credentials(&self.pairing_credentials);
+        if was_running {
+            let stop_msg = "Sunucu durduruldu".to_string();
+            if let Ok(mut m) = self.last_message.lock() {
+                *m = stop_msg;
+            }
+            if let Ok(mut c) = self.connected_clients.lock() {
+                *c = 0;
+            }
+            self.emit_status();
         }
-        self.is_running.store(false, Ordering::SeqCst);
-        let stop_msg = "Sunucu durduruldu".to_string();
-        if let Ok(mut m) = self.last_message.lock() {
-            *m = stop_msg.clone();
+        if let Some(server_thread) = server_thread {
+            let _ = server_thread.join();
         }
-        if let Ok(mut c) = self.connected_clients.lock() {
-            *c = 0;
+        revoke_pairing_credentials(&self.pairing_credentials);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pairing_tokens_expire_and_can_only_be_redeemed_once() {
+        let mut credentials = PairingCredentials::default();
+        let pairing = token_digest("pairing-secret");
+        credentials.issue_pairing(pairing, 200, 100);
+
+        assert!(!credentials.exchange_pairing(pairing, 201, token_digest("session-expired"), 500));
+
+        credentials.issue_pairing(pairing, 300, 201);
+        assert!(credentials.exchange_pairing(pairing, 202, token_digest("session-valid"), 500));
+        assert!(!credentials.exchange_pairing(pairing, 202, token_digest("session-replay"), 500));
+    }
+
+    #[test]
+    fn session_bearers_expire() {
+        let mut credentials = PairingCredentials::default();
+        credentials.sessions.push(HashedCredential {
+            digest: token_digest("session-secret"),
+            expires_at: 300,
+        });
+
+        assert!(credentials.has_valid_session(&token_digest("session-secret"), 299));
+        assert!(!credentials.has_valid_session(&token_digest("session-secret"), 300));
+    }
+
+    #[test]
+    fn stopping_server_revokes_pending_pairings_and_sessions() {
+        let credentials = Mutex::new(PairingCredentials::default());
+        {
+            let mut active = credentials.lock().unwrap();
+            active.issue_pairing(token_digest("pairing-secret"), 500, 100);
+            active.sessions.push(HashedCredential {
+                digest: token_digest("session-secret"),
+                expires_at: 500,
+            });
         }
-        self.emit_status();
+
+        revoke_pairing_credentials(&credentials);
+
+        let credentials = credentials.lock().unwrap();
+        assert!(credentials.pending_pairings.is_empty());
+        assert!(credentials.sessions.is_empty());
+    }
+
+    #[test]
+    fn mdns_startup_failure_does_not_disable_http_server() {
+        let (advertisement, status) = mdns_startup_status::<()>(Err("mDNS unavailable".to_string()));
+
+        assert!(advertisement.is_none());
+        assert!(status.contains("QR"));
+    }
+
+    #[test]
+    fn legacy_pin_authentication_remains_compatible() {
+        assert!(constant_time_pin_match("1234", "1234"));
+        assert!(!constant_time_pin_match("1235", "1234"));
+    }
+
+    #[test]
+    fn generated_pairing_tokens_fit_the_desktop_qr_payload() {
+        let token = generate_opaque_token();
+        assert_eq!(token.len(), 32);
+        assert!(token.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_'));
+        let payload = serde_json::json!({
+            "type": "noteapp_sync",
+            "version": 2,
+            "host": "255.255.255.255",
+            "port": 8765,
+            "pairing_token": token,
+            "expires_at": 1_800_000_000_000_u64
+        });
+        assert!(payload.to_string().len() <= 153);
     }
 }

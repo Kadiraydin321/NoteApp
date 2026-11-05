@@ -5,44 +5,72 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Not Defterim - Masaüstü</title>
   <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" href="components.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <a href="#editorContent" class="skip-link">Ana İçeriğe Atla</a>
-  <div class="app-container">
+  <div class="app-container" id="appShell">
     <!-- ============================================== -->
-    <!-- 1. SOL MENÜ (SIDEBAR)                          -->
+    <!-- ÜST ÇUBUK: menü, marka, arama, görünüm, tema  -->
     <!-- ============================================== -->
-    <aside class="sidebar" aria-label="Ana Menü">
-      <div>
-        <div class="brand">
-          <svg viewBox="0 0 48 48" style="width:34px;height:34px;border-radius:8px;" aria-hidden="true">
-            <rect width="48" height="48" rx="10" fill="url(#brandGrad)"/>
-            <path d="M14 16H34M14 24H28M14 32H24" stroke="white" stroke-width="3" stroke-linecap="round"/>
-            <circle cx="34" cy="32" r="6" fill="#10B981"/>
-            <path d="M32 32L34 34L37 30" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <defs>
-              <linearGradient id="brandGrad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#4F46E5"/>
-                <stop offset="1" stop-color="#7C3AED"/>
-              </linearGradient>
-            </defs>
-          </svg>
-          <div>
-            <div class="brand-title">Not Defterim</div>
-            <div class="brand-sub">Masaüstü Sürümü</div>
+    <header class="topbar" role="banner">
+      <button class="topbar-icon-btn" id="btnToggleSidebar" type="button" title="Menüyü daralt / genişlet" aria-label="Menüyü daralt veya genişlet" aria-expanded="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+      </button>
+
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+          <rect width="48" height="48" rx="12" class="brand-mark-bg"/>
+          <path d="M15 17H33M15 24H28M15 31H23" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+          <circle cx="34" cy="32" r="6" fill="#fff"/>
+          <path d="M31.5 32l2 2 3.5-4" stroke="var(--brand-mark-accent, #b26a00)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand-title">Not Defterim</span>
+      </div>
+
+      <div class="search-box" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Notlarda ara" aria-label="Notlarda ara" autocomplete="off">
+        <button class="search-clear" id="searchClear" type="button" title="Aramayı temizle" aria-label="Aramayı temizle">✕</button>
+      </div>
+
+      <div class="topbar-actions">
+        <button class="topbar-icon-btn" id="btnOpenCommandPalette" type="button" title="Komut paleti (Ctrl+K)" aria-label="Komut paletini aç">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.4 16.6 4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0 4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+        </button>
+        <div class="sort-menu-container">
+          <button class="topbar-icon-btn" id="btnSortMenu" type="button" title="Notları sırala" aria-label="Notları sırala" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg>
+          </button>
+          <div class="sort-dropdown" id="sortDropdownMenu" role="menu" aria-label="Sıralama seçenekleri" style="display:none;">
+            <div class="sort-item active" data-sort="updated-desc" role="menuitem" tabindex="0">Güncelleme: en yeni</div>
+            <div class="sort-item" data-sort="updated-asc" role="menuitem" tabindex="0">Güncelleme: en eski</div>
+            <div class="sort-item" data-sort="created-desc" role="menuitem" tabindex="0">Oluşturma: en yeni</div>
+            <div class="sort-item" data-sort="created-asc" role="menuitem" tabindex="0">Oluşturma: en eski</div>
+            <div class="sort-item" data-sort="title-asc" role="menuitem" tabindex="0">Başlık: A → Z</div>
+            <div class="sort-item" data-sort="title-desc" role="menuitem" tabindex="0">Başlık: Z → A</div>
           </div>
         </div>
 
-        <div class="theme-picker-container">
-          <button class="theme-btn" id="btnThemeToggle" title="Renk Paletini Değiştir" aria-haspopup="true" aria-expanded="false" aria-label="Renk Temasını Değiştir">
-            <span>🎨 Renk Teması</span>
-            <span id="currentThemeLabel" style="color:var(--primary); font-weight:700;">Kehribar</span>
+        <div class="view-modes" role="group" aria-label="Görünüm düzeni">
+          <button class="view-mode-btn" id="btnViewList" type="button" title="Liste görünümü" aria-label="Liste görünümüne geç">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
           </button>
-          <div class="theme-dropdown" id="themeDropdown" role="menu" aria-label="Renk Paleti Seçenekleri">
+          <button class="view-mode-btn active" id="btnViewGrid" type="button" title="Pano görünümü" aria-label="Pano görünümüne geç">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h5V5H4v6zm0 7h5v-5H4v5zm6 0h5v-5h-5v5zm6 0h5v-5h-5v5zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/></svg>
+          </button>
+        </div>
+
+        <div class="theme-picker-container">
+          <button class="theme-btn" id="btnThemeToggle" type="button" title="Renk temasını değiştir" aria-haspopup="true" aria-expanded="false" aria-label="Renk temasını değiştir">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c1.1 0 1.8-.9 1.8-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H16a5 5 0 0 0 5-5c0-4-4-7.8-9-7.8zM6.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
+            <span id="currentThemeLabel">Kehribar</span>
+          </button>
+          <div class="theme-dropdown" id="themeDropdown" role="menu" aria-label="Renk paleti seçenekleri">
             <div class="theme-option active" data-theme="amber" role="menuitem" tabindex="0">
               <span class="theme-color-preview" style="background:#F59E0B;"></span>
-              <span>Sıcak Kehribar (Mobil)</span>
+              <span>Kehribar (açık)</span>
             </div>
             <div class="theme-option" data-theme="sapphire" role="menuitem" tabindex="0">
               <span class="theme-color-preview" style="background:#38BDF8;"></span>
@@ -58,158 +86,143 @@
             </div>
           </div>
         </div>
+      </div>
+    </header>
 
-        <button class="btn-new-note" id="btnNewNote" aria-label="Yeni Not Oluştur" style="width:100%;">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="white" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          Yeni Not
+    <div class="sidebar-scrim" id="sidebarScrim" aria-hidden="true"></div>
+
+    <!-- ============================================== -->
+    <!-- SOL RAY: gezinme, kategoriler, etiketler       -->
+    <!-- ============================================== -->
+    <aside class="sidebar" aria-label="Ana menü">
+      <nav class="nav-list" role="navigation" aria-label="Filtreleme menüsü">
+        <div class="nav-item active" data-filter="all" role="button" tabindex="0" aria-label="Tüm notlar" title="Tüm notlar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
+          <span class="nav-label">Notlar</span>
+          <span class="nav-count" id="countAll">0</span>
+        </div>
+        <div class="nav-item" data-filter="pinned" role="button" tabindex="0" aria-label="Sabitlenen notlar" title="Sabitlenenler">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+          <span class="nav-label">Sabitlenenler</span>
+          <span class="nav-count" id="countPinned">0</span>
+        </div>
+        <div class="nav-item" data-filter="reminders" role="button" tabindex="0" aria-label="Hatırlatıcılar" title="Hatırlatıcılar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+          <span class="nav-label">Hatırlatıcılar</span>
+          <span class="nav-count" id="countReminders">0</span>
+        </div>
+        <div class="nav-item" data-filter="vault" role="button" tabindex="0" aria-label="Kilitli kasa" title="Kilitli kasa">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          <span class="nav-label">Kilitli kasa</span>
+          <span class="nav-count" id="countVault">0</span>
+        </div>
+        <div class="nav-item" data-filter="archive" role="button" tabindex="0" aria-label="Arşivdeki notlar" title="Arşiv">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+          <span class="nav-label">Arşiv</span>
+          <span class="nav-count" id="countArchive">0</span>
+        </div>
+        <div class="nav-item" data-filter="trash" role="button" tabindex="0" aria-label="Çöp kutusu" title="Çöp kutusu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          <span class="nav-label">Çöp kutusu</span>
+          <span class="nav-count" id="countTrash">0</span>
+        </div>
+        <button class="nav-item nav-item-button" id="navBtnGraph" type="button" aria-label="İlişki grafiği" title="İlişki grafiği">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 7.5l7 7M15.5 7.5l-7 7M8.8 6h6.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span class="nav-label">İlişki grafiği</span>
         </button>
+      </nav>
 
-        <nav class="nav-list" role="navigation" aria-label="Filtreleme Menüsü">
-          <div class="nav-item active" data-filter="all" role="button" tabindex="0" aria-label="Tüm Notlar">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-            <span>Tüm Notlar</span>
-            <span class="nav-count" id="countAll">0</span>
-          </div>
-          <div class="nav-item" data-filter="pinned" role="button" tabindex="0" aria-label="Sabitlenen Notlar">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
-            <span>Sabitlenenler</span>
-            <span class="nav-count" id="countPinned">0</span>
-          </div>
-          <div class="nav-item" data-filter="vault" role="button" tabindex="0" aria-label="Kilitli Kasa">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-            <span>Kilitli Kasa</span>
-            <span class="nav-count" id="countVault">0</span>
-          </div>
-          <div class="nav-item" data-filter="reminders" role="button" tabindex="0" aria-label="Hatırlatıcılar">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
-            <span>Hatırlatıcılar</span>
-            <span class="nav-count" id="countReminders">0</span>
-          </div>
-          <div class="nav-item" data-filter="archive" role="button" tabindex="0" aria-label="Arşivdeki Notlar">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
-            <span>Arşiv</span>
-            <span class="nav-count" id="countArchive">0</span>
-          </div>
-          <div class="nav-item" data-filter="trash" role="button" tabindex="0" aria-label="Çöp Kutusu">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-            <span>Çöp Kutusu</span>
-            <span class="nav-count" id="countTrash">0</span>
-          </div>
-          <button class="nav-item" id="navBtnGraph" type="button" aria-label="İlişki Grafiği (Graph View)" style="background:none; border:none; text-align:left; font:inherit; width:100%; cursor:pointer;">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 7.5l7 7M15.5 7.5l-7 7M8.8 6h6.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            <span>İlişki Grafiği (Graph View)</span>
-          </button>
-        </nav>
-
-        <div class="categories-section" role="region" aria-label="Kategoriler">
-          <div class="cat-header">
-            <span>KATEGORİLER</span>
-            <button class="cat-btn-add" id="btnOpenCatModal" title="Kategori Ekle" aria-label="Yeni Kategori Ekle">+</button>
-          </div>
-          <div id="catListContainer" style="display:flex; flex-direction:column; gap:2px;"></div>
+      <div class="rail-section categories-section" role="region" aria-label="Kategoriler">
+        <div class="cat-header">
+          <span>Kategoriler</span>
+          <button class="cat-btn-add" id="btnOpenCatModal" type="button" title="Kategori ekle" aria-label="Yeni kategori ekle">+</button>
         </div>
-
-        <div class="tags-section" role="region" aria-label="Dinamik Etiketler">
-          <div class="cat-header" style="display:flex; align-items:center; justify-content:space-between;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span>ETİKETLER</span>
-              <span style="font-size:11px; color:var(--text-dim); font-weight:normal;">#hashtag</span>
-            </div>
-            <button class="cat-add-btn" id="btnManageTags" title="Etiketleri Yönet" aria-label="Etiketleri Yönet" style="background:none; border:none; cursor:pointer; font-size:13px; color:var(--text-dim); padding:2px 4px; border-radius:4px;">⚙️</button>
-          </div>
-          <div id="tagListContainer" class="tag-cloud" style="display:flex; flex-wrap:wrap; gap:6px; padding:4px 0;"></div>
-        </div>
+        <div id="catListContainer" class="cat-list"></div>
       </div>
 
-      <div class="sidebar-bottom" role="group" aria-label="Alt Araçlar">
-        <button class="tool-btn" id="btnOpenSync" title="Wi-Fi Senkronizasyon" aria-label="Wi-Fi Senkronizasyon">
-          <div class="tool-btn-icon-wrapper">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4z"/></svg>
-            <div class="status-indicator" id="syncStatusDot" style="display:none;" title="Senkronizasyon Aktif"></div>
-          </div>
-          <span>Wi-Fi Senkronizasyon</span>
+      <div class="rail-section tags-section" role="region" aria-label="Dinamik etiketler">
+        <div class="cat-header">
+          <span>Etiketler</span>
+          <button class="cat-btn-add" id="btnManageTags" type="button" title="Etiketleri yönet" aria-label="Etiketleri yönet">⚙</button>
+        </div>
+        <div id="tagListContainer" class="tag-cloud"></div>
+      </div>
+
+      <div class="sidebar-bottom" role="group" aria-label="Alt araçlar">
+        <button class="tool-btn" id="btnOpenSync" type="button" title="Wi-Fi senkronizasyon" aria-label="Wi-Fi senkronizasyon">
+          <span class="tool-btn-icon-wrapper">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 0 0-6 0zm-4-4l2 2a7.074 7.074 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+            <span class="status-indicator" id="syncStatusDot" style="display:none;" title="Senkronizasyon aktif"></span>
+          </span>
+          <span class="tool-label">Wi-Fi senkronizasyon</span>
           <span class="sync-status-badge" id="syncStatusBadge">Hazır</span>
         </button>
-        <button class="tool-btn" id="btnExportBackup" title="Tüm Notları Zip Olarak Yedekle" aria-label="Yedek Al">
+        <button class="tool-btn" id="btnExportBackup" type="button" title="Tüm notları zip olarak yedekle" aria-label="Yedek al">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
-          <span>Yedek Al (.zip)</span>
+          <span class="tool-label">Yedek al (.zip)</span>
         </button>
-        <button class="tool-btn" id="btnToggleAntiSs" title="Ekran Yakalamayı ve Alt-Tab Gözetlemeyi Engelle" aria-label="Gizlilik Kalkanı Aç/Kapat">
+        <button class="tool-btn" id="btnToggleAntiSs" type="button" title="Ekran yakalamayı ve Alt-Tab gözetlemeyi engelle" aria-label="Gizlilik kalkanını aç veya kapat">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
-          <span id="antiSsLabel">Anti-SS: Açık</span>
+          <span class="tool-label" id="antiSsLabel">Anti-SS: Açık</span>
         </button>
       </div>
     </aside>
 
     <!-- ============================================== -->
-    <!-- 2. ORTA PANEL: NOT LİSTESİ                     -->
+    <!-- ANA PANO: not ekleme çubuğu + not kartları    -->
     <!-- ============================================== -->
-    <main class="center-panel" aria-label="Not Listesi Paneli">
-      <div class="search-sort-bar">
-        <div class="search-box" role="search">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-          <input type="text" class="search-input" id="searchInput" placeholder="Notlarda ara... (Ctrl+F)" aria-label="Notlarda ara">
-          <button class="search-clear" id="searchClear" title="Aramayı Temizle" aria-label="Aramayı Temizle">✕</button>
-        </div>
-        <div class="sort-menu-container" style="position:relative;">
-          <button class="icon-tool-btn" id="btnSortMenu" title="Notları Sırala" aria-label="Notları Sırala" aria-haspopup="true" aria-expanded="false">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg>
-          </button>
-          <div class="sort-dropdown" id="sortDropdownMenu" role="menu" aria-label="Sıralama Seçenekleri" style="display:none;">
-            <div class="sort-item active" data-sort="updated-desc" role="menuitem" tabindex="0">Güncelleme: En Yeni</div>
-            <div class="sort-item" data-sort="updated-asc" role="menuitem" tabindex="0">Güncelleme: En Eski</div>
-            <div class="sort-item" data-sort="created-desc" role="menuitem" tabindex="0">Oluşturma: En Yeni</div>
-            <div class="sort-item" data-sort="created-asc" role="menuitem" tabindex="0">Oluşturma: En Eski</div>
-            <div class="sort-item" data-sort="title-asc" role="menuitem" tabindex="0">Başlık: A → Z</div>
-            <div class="sort-item" data-sort="title-desc" role="menuitem" tabindex="0">Başlık: Z → A</div>
+    <main class="center-panel" aria-label="Not panosu">
+      <div class="board-inner">
+        <button class="composer" id="btnNewNoteBoard" type="button" aria-label="Yeni not oluştur">
+          <span class="composer-text">Not al…</span>
+          <span class="composer-icons" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM17.99 9l-1.41-1.42-6.59 6.59-2.58-2.57-1.42 1.41 4 4z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          </span>
+        </button>
+
+        <div class="board-toolbar">
+          <div class="filter-chips-scroll" id="filterChipsBar" role="toolbar" aria-label="Hızlı not filtreleri">
+            <button class="chip active" data-chip="all" type="button">Tümü</button>
+            <button class="chip" data-chip="pinned" type="button">Sabitler</button>
+            <button class="chip" data-chip="reminders" type="button">Hatırlatıcılar</button>
+            <button class="chip" data-chip="vault" type="button">Kasa</button>
+            <button class="chip" data-chip="archive" type="button">Arşiv</button>
+            <button class="chip" data-chip="trash" type="button">Çöp</button>
+          </div>
+          <div class="board-toolbar-end">
+            <span class="notes-count" id="notesCountLabel" aria-live="polite">0 Not</span>
+            <button class="batch-toggle-btn" id="btnToggleBatchMode" type="button" title="Çoklu not seçimi" aria-label="Çoklu seçim modunu aç">Seç</button>
           </div>
         </div>
-      </div>
 
-      <!-- Mobil Tarzı Hızlı Filtre Çipleri -->
-      <div class="filter-chips-scroll" id="filterChipsBar" role="toolbar" aria-label="Hızlı Not Filtreleri">
-        <button class="chip active" data-chip="all" aria-label="Tüm Notları Göster">📝 Tümü</button>
-        <button class="chip" data-chip="pinned" aria-label="Sabitlenen Notları Göster">📌 Sabitler</button>
-        <button class="chip" data-chip="reminders" aria-label="Hatırlatıcıları Göster">⏰ Hatırlatıcılar</button>
-        <button class="chip" data-chip="vault" aria-label="Kilitli Kasa Notlarını Göster">🔒 Kasa</button>
-        <button class="chip" data-chip="archive" aria-label="Arşivlenmiş Notları Göster">📦 Arşiv</button>
-        <button class="chip" data-chip="trash" aria-label="Çöp Kutusunu Göster">🗑️ Çöp</button>
-      </div>
+        <div class="batch-action-bar" id="batchActionBar" style="display:none;" role="toolbar" aria-label="Toplu not işlemleri">
+          <div class="batch-info">
+            <span class="batch-count-badge" id="batchCountBadge">0 seçildi</span>
+          </div>
+          <div class="batch-actions-btns">
+            <button class="batch-btn" id="btnBatchSelectAll" type="button" title="Tümünü seç / bırak">Tümü</button>
+            <button class="batch-btn" id="btnBatchPin" type="button" title="Toplu sabitle / kaldır">Sabitle</button>
+            <button class="batch-btn" id="btnBatchVault" type="button" title="Kasaya taşı">Kasa</button>
+            <button class="batch-btn" id="btnBatchArchive" type="button" title="Arşivle">Arşiv</button>
+            <button class="batch-btn btn-danger" id="btnBatchTrash" type="button" title="Çöpe taşı">Çöp</button>
+            <button class="batch-btn btn-danger" id="btnBatchDeletePermanent" type="button" title="Kalıcı sil" style="display:none;">Kalıcı sil</button>
+            <button class="batch-btn batch-btn-close" id="btnBatchCancel" type="button" title="Seçimi kapat" aria-label="Seçimi kapat">✕</button>
+          </div>
+        </div>
 
-      <!-- Toplu Eylemler Çubuğu (Batch Action Bar) -->
-      <div class="batch-action-bar" id="batchActionBar" style="display:none;" role="toolbar" aria-label="Toplu Not İşlemleri">
-        <div class="batch-info">
-          <span class="batch-count-badge" id="batchCountBadge">0 Seçildi</span>
-        </div>
-        <div class="batch-actions-btns">
-          <button class="batch-btn" id="btnBatchSelectAll" title="Tümünü Seç / Bırak">Tümü</button>
-          <button class="batch-btn" id="btnBatchPin" title="Toplu Sabitle / Kaldır">📌 Sabitle</button>
-          <button class="batch-btn" id="btnBatchVault" title="Kasaya Taşı">🔒 Kasa</button>
-          <button class="batch-btn" id="btnBatchArchive" title="Arşivle">📦 Arşiv</button>
-          <button class="batch-btn btn-danger" id="btnBatchTrash" title="Çöpe Taşı">🗑️ Çöp</button>
-          <button class="batch-btn btn-danger" id="btnBatchDeletePermanent" title="Kalıcı Sil" style="display:none;">Sil</button>
-          <button class="batch-btn batch-btn-close" id="btnBatchCancel" title="Seçimi Kapat">✕</button>
-        </div>
+        <div class="notes-container layout-grid" id="notesContainer" role="region" aria-label="Not listesi" aria-live="polite"></div>
       </div>
-
-      <div class="list-header">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span id="notesCountLabel" aria-live="polite">0 Not</span>
-          <button class="batch-toggle-btn" id="btnToggleBatchMode" title="Çoklu Not Seçimi" aria-label="Çoklu Seçim Modunu Aç">✓ Çoklu Seç</button>
-        </div>
-        <div class="view-modes" role="group" aria-label="Görünüm Düzeni">
-          <button class="view-mode-btn active" id="btnViewList" title="Liste Görünümü" aria-label="Liste Görünümüne Geç">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
-          </button>
-          <button class="view-mode-btn" id="btnViewGrid" title="Izgara / Kart Görünümü" aria-label="Izgara Görünümüne Geç">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h5V5H4v6zm0 7h5v-5H4v5zm6 0h5v-5h-5v5zm6 0h5v-5h-5v5zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/></svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="notes-container layout-list" id="notesContainer" role="region" aria-label="Not Listesi" aria-live="polite"></div>
     </main>
 
+    <button class="fab" id="btnNewNote" type="button" aria-label="Yeni not oluştur" title="Yeni not">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+    </button>
+
+    <!-- ============================================== -->
+    <!-- NOT DÜZENLEYİCİ: ortada açılan pencere        -->
+    <!-- ============================================== -->
+    <div class="editor-backdrop" id="editorBackdrop" aria-hidden="true"></div>
     <!-- ============================================== -->
     <!-- 3. SAĞ PANEL: DÜZENLEYİCİ & LIVE MARKDOWN      -->
     <!-- ============================================== -->
@@ -223,6 +236,9 @@
       <div class="editor-wrapper" id="editorContentState" style="display:none;">
         <div class="editor-top-bar" role="toolbar" aria-label="Düzenleyici Üst Menü">
           <div class="editor-top-left">
+            <button class="editor-icon-btn editor-close-btn" id="btnCloseEditor" type="button" title="Kapat (Esc)" aria-label="Düzenleyiciyi kapat">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
             <select class="cat-picker-select" id="editorCatSelect" aria-label="Kategori Seç">
               <option value="">Kategori Yok</option>
             </select>
@@ -310,6 +326,10 @@
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
                   <span>İstatistikler & Süre</span>
                 </button>
+                <button class="dropdown-item" id="btnMenuAnalytics" role="menuitem" tabindex="0">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M3 3h2v18H3V3zm4 10h3v8H7v-8zm5-6h3v14h-3V7zm5 3h3v11h-3V10z"/></svg>
+                  <span>Uygulama Analitiği</span>
+                </button>
                 <div class="dropdown-divider"></div>
                 <button class="dropdown-item" id="btnMenuExportVault" role="menuitem" tabindex="0">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
@@ -359,8 +379,8 @@
           <button class="md-tool-btn" id="btnToolHashtag" data-prefix="#" data-suffix="" title="Etiket (#tag)" aria-label="Hashtag Ekle">#</button>
 
           <div class="md-view-pills" role="group" aria-label="Düzenleyici Görünüm Modu">
-            <button class="md-pill-btn" id="btnModeEdit" aria-label="Sadece Yazma Modu">Yaz</button>
-            <button class="md-pill-btn active" id="btnModeSplit" aria-label="Bölünmüş Görünüm Modu">Bölünmüş</button>
+            <button class="md-pill-btn active" id="btnModeEdit" aria-label="Sadece Yazma Modu">Yaz</button>
+            <button class="md-pill-btn" id="btnModeSplit" aria-label="Bölünmüş Görünüm Modu">Bölünmüş</button>
             <button class="md-pill-btn" id="btnModePreview" aria-label="Sadece Önizleme Modu">Önizle</button>
           </div>
         </div>
@@ -621,40 +641,108 @@
 
   <!-- 6. Wi-Fi Senkronizasyon Modalı -->
   <div class="modal-overlay" id="modalSync" role="dialog" aria-modal="true" aria-labelledby="syncModalTitle">
-    <div class="modal-dialog sync-dialog">
+    <div class="modal-dialog sync-dialog sync-client-dialog">
       <div class="modal-title" id="syncModalTitle">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4z"/></svg>
-        <span>Wi-Fi Senkronizasyon</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 0 0-6 0zm-4-4l2 2a7.074 7.074 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+        <span>Wi-Fi senkronizasyonu</span>
       </div>
-      <div class="modal-desc">
-        Aynı Wi-Fi ağına bağlı Android telefonunuzdan <b>Not Defterim</b> uygulamasını açın ve bu QR kodu okutun ya da PIN kodunu girin:
-      </div>
-      <div class="sync-qr-wrapper" id="qrCodeContainer"></div>
-      <div class="sync-info-card">
-        <div class="sync-pin-block">
-          <div class="sync-card-label">Eşleştirme PIN Kodu:</div>
-          <div class="sync-pin-row">
-            <div id="syncPinCode" class="sync-pin-code">----</div>
-            <button id="btnCopySyncPin" title="PIN Kodunu Kopyala" class="pin-copy-badge" aria-label="PIN Kodunu Panoya Kopyala">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-              <span>Kopyala</span>
-            </button>
+      <p class="modal-desc sync-client-intro">
+        İki yön de aynı yerel ağda çalışır. Telefonun bu bilgisayara bağlanması için aşağıdaki QR kodu Android uygulamasıyla okutun; ya da telefonda sunucuyu başlatıp onun QR kodunu bu pencerede okutun.
+      </p>
+
+      <div class="sync-connect-grid">
+        <section class="sync-host-card" aria-label="Bu bilgisayarın QR kodu">
+          <div class="sync-card-eyebrow">BU BİLGİSAYAR → TELEFON</div>
+          <div class="sync-qr-box" id="qrCodeContainer" role="img" aria-label="Bu bilgisayara bağlanmak için QR kod">
+            <div class="qr-placeholder">QR kodu hazırlanıyor…</div>
           </div>
-        </div>
-        <div class="sync-ip-block">
-          <div class="sync-card-label">Masaüstü IP & Port:</div>
-          <div id="syncIpAddress" class="sync-ip-code">127.0.0.1:8765</div>
-        </div>
+          <div class="sync-qr-meta">
+            <div class="sync-qr-row"><span>Adres</span><strong id="syncIpAddress">—</strong></div>
+            <div class="sync-qr-row"><span>PIN</span><strong class="sync-pin" id="syncPinCode">----</strong><button class="sync-link-btn" id="btnCopyPin" type="button">Kopyala</button></div>
+            <div class="sync-qr-expiry" id="syncQrExpiry"></div>
+          </div>
+          <div class="sync-status-row" role="status" aria-live="polite">
+            <span class="sync-pulse-indicator" id="syncDesktopDot"></span>
+            <span id="syncDesktopMsg" class="sync-msg-text">Sunucu başlatılıyor…</span>
+          </div>
+          <div class="sync-host-actions">
+            <button class="btn-secondary" id="btnRefreshQr" type="button" hidden>QR kodu yenile</button>
+            <button class="btn-secondary" id="btnToggleServer" type="button">Sunucuyu durdur</button>
+          </div>
+        </section>
+
+        <section class="sync-scanner-card" aria-label="Android bağlantı QR kodu">
+          <div class="sync-card-eyebrow">TELEFON → BU BİLGİSAYAR</div>
+          <div class="sync-camera-frame" id="syncCameraFrame">
+            <video id="syncCameraVideo" autoplay muted playsinline hidden aria-label="QR kod kamera görüntüsü"></video>
+            <div class="sync-camera-placeholder" id="syncCameraPlaceholder">
+              <span class="sync-camera-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M9 3 7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L17 3H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
+              </span>
+              <strong>Telefondaki QR kodu tara</strong>
+              <span>QR kod yalnızca yerel HTTPS adresi ve tek kullanımlık eşleşme bilgisi içerir.</span>
+              <button class="btn-primary sync-camera-start" id="btnStartSyncCamera" type="button">Kamerayı aç</button>
+            </div>
+          </div>
+          <div class="sync-manual-entry">
+            <label for="syncQrManualInput">Kamera kullanamıyor musunuz? QR metnini yapıştırın</label>
+            <textarea id="syncQrManualInput" rows="3" autocomplete="off" spellcheck="false" placeholder='{"type":"noteapp_sync", ...}'></textarea>
+            <button class="btn-secondary" id="btnValidateSyncQr" type="button">Bağlantı bilgisini doğrula</button>
+          </div>
+        </section>
+
+        <section class="sync-device-card" id="syncPairingDetails" hidden aria-live="polite">
+          <div class="sync-card-eyebrow">DOĞRULANAN ANDROID CİHAZI</div>
+          <strong class="sync-device-address" id="syncDeviceAddress">—</strong>
+          <div class="sync-fingerprint-label">TLS sertifika parmak izi</div>
+          <code class="sync-fingerprint" id="syncCertificateFingerprint">—</code>
+          <p class="sync-transport-note">
+            QR'daki sertifika parmak iziyle HTTPS bağlantısı doğrulanır. TLS aktarım sırasında trafiği korur; notları alan cihaz içeriği okuyabilir.
+          </p>
+          <div class="sync-direction-actions">
+            <button class="btn-primary" id="btnReceiveFromAndroid" type="button">Android'den not al</button>
+            <button class="btn-secondary" id="btnSendToAndroid" type="button">Android'e not gönder</button>
+          </div>
+        </section>
       </div>
-      <div class="sync-status-row">
+      <div class="sync-status-row" role="status" aria-live="polite">
         <span class="sync-pulse-indicator" id="syncModalStatusDot"></span>
-        <span id="syncServerMsg" class="sync-msg-text">Hazır</span>
+        <span id="syncServerMsg" class="sync-msg-text">Android bağlantısını bekliyor</span>
       </div>
       <div class="modal-actions">
-        <button class="btn-secondary" id="btnRefreshPin">Yeni PIN Üret</button>
-        <button class="btn-secondary" id="btnToggleServer">Sunucuyu Durdur</button>
-        <button class="btn-primary" id="btnCloseSync">Kapat</button>
+        <button class="btn-primary" id="btnCloseSync" type="button">Kapat</button>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalSyncReview" role="dialog" aria-modal="true" aria-labelledby="syncReviewTitle" hidden>
+    <div class="modal-dialog sync-review-dialog">
+      <div class="modal-title" id="syncReviewTitle">Aktarımı onayla</div>
+      <p class="modal-desc" id="syncReviewDirection">—</p>
+      <div class="sync-review-summary">
+        <div><span>Not sayısı</span><strong id="syncTransferNoteCount">Bağlantıdan sonra hesaplanacak</strong></div>
+        <div><span>Aktarım paketi</span><strong id="syncTransferFileSize">Bağlantıdan sonra hazırlanacak</strong></div>
+      </div>
+      <p class="sync-transport-note">Onayınız olmadan notlar gönderilmez veya içe aktarılmaz. TLS yalnızca iki cihaz arasındaki aktarım yolunu korur; bu, alıcı cihazdan gizlilik sağlayan uygulama katmanı şifrelemesi değildir.</p>
+      <div class="sync-review-progress" id="syncTransferProgressPanel" hidden aria-live="polite">
+        <div class="sync-progress-heading"><span id="syncTransferStatus">Aktarım hazırlanıyor</span><strong id="syncTransferProgressPercent">0%</strong></div>
+        <progress id="syncTransferProgress" max="100" value="0" aria-label="Dosya aktarım ilerlemesi"></progress>
+        <div class="sync-progress-bytes" id="syncTransferBytes">0 B</div>
+      </div>
+      <p class="sync-transfer-unavailable" id="syncTransferUnavailable">Güvenli Android aktarım servisi hazır olduğunda bu işlem kullanılabilir olacak.</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btnCancelSyncReview" type="button">İptal</button>
+        <button class="btn-primary" id="btnConfirmSyncTransfer" type="button" disabled>Onayla ve aktar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalSyncSuccess" role="dialog" aria-modal="true" aria-labelledby="syncSuccessTitle" hidden>
+    <div class="modal-dialog sync-success-dialog">
+      <div class="sync-success-mark" aria-hidden="true">✓</div>
+      <div class="modal-title" id="syncSuccessTitle">Aktarım tamamlandı</div>
+      <p class="modal-desc" id="syncTransferSuccessMessage">Notlar başarıyla aktarıldı.</p>
+      <button class="btn-primary" id="btnCloseSyncSuccess" type="button">Tamam</button>
     </div>
   </div>
 
@@ -809,6 +897,8 @@
   <!-- Toast Bildirim Konteyneri -->
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
+  <script src="vendor/qrcode.js"></script>
   <script src="app.js"></script>
+  <script src="mobile-analytics.js"></script>
 </body>
 </html>
