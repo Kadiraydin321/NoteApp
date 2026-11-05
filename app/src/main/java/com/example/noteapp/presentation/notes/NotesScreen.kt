@@ -60,6 +60,7 @@ import com.example.noteapp.domain.util.VaultNote
 import com.example.noteapp.presentation.components.BatchActionsBottomBar
 import com.example.noteapp.presentation.components.CalendarAgendaBar
 import com.example.noteapp.presentation.components.ExportVaultDialog
+import com.example.noteapp.presentation.components.NoteLinkGraphCanvasBottomSheet
 import com.example.noteapp.presentation.components.SmartCopyBottomSheet
 import com.example.noteapp.presentation.components.TagManagerBottomSheet
 import java.time.LocalDate
@@ -248,6 +249,7 @@ fun NotesScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     var isFabExpanded by remember { mutableStateOf(false) }
     var showQuickSyncDialog by remember { mutableStateOf(false) }
+    var showGraphViewBottomSheet by remember { mutableStateOf(false) }
 
     var isCategoriesAccordionExpanded by rememberSaveable(drawerCollapseMode) {
         mutableStateOf(
@@ -514,6 +516,17 @@ fun NotesScreen(
                     onClick = {
                         scope.launch { drawerState.close() }
                         onOpenTemplates()
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Hub, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    label = { Text("🕸️ Not İlişki Grafiği (Graph View)") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        showGraphViewBottomSheet = true
                     },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
@@ -1057,6 +1070,16 @@ fun NotesScreen(
                                     )
                                 }
                             }
+
+                            // 🕸️ Not İlişki Grafiği (Graph View) Hızlı Eylem Butonu
+                            IconButton(onClick = { showGraphViewBottomSheet = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Hub,
+                                    contentDescription = "🕸️ Not İlişki Grafiği (Graph View)",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
                             if (quickActionLocation == QuickActionLocation.TOP_APP_BAR) {
                                 IconButton(onClick = { showQuickSyncDialog = true }) {
                                     Icon(
@@ -2569,6 +2592,18 @@ fun NotesScreen(
                 }
             )
         }
+    }
+
+    // 8.1. Not İlişki Grafiği (Graph View) BottomSheet
+    if (showGraphViewBottomSheet) {
+        NoteLinkGraphCanvasBottomSheet(
+            notes = state.notes,
+            onNavigateToNote = { noteId ->
+                showGraphViewBottomSheet = false
+                state.notes.find { it.id == noteId }?.let { handleOpenNote(it) }
+            },
+            onDismiss = { showGraphViewBottomSheet = false }
+        )
     }
 
     // Etiketleri Yönet Bottom Sheet

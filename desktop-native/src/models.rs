@@ -197,3 +197,38 @@ pub struct IpcEvent<T = serde_json::Value> {
     pub event: String,
     pub payload: T,
 }
+
+/// Bilgi Grafiği Düğüm Modeli (Knowledge Graph Node)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphNode {
+    pub id: i64,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>, // Kategori veya etiket
+    pub color: i32,
+    #[serde(rename = "inDegree")]
+    pub in_degree: usize,
+    #[serde(rename = "outDegree")]
+    pub out_degree: usize,
+    #[serde(rename = "isGhost")]
+    pub is_ghost: bool, // Henüz oluşturulmamış hedef not
+}
+
+/// Bilgi Grafiği Kenar Modeli (Knowledge Graph Edge)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphEdge {
+    pub source: i64,
+    pub target: i64,
+    #[serde(rename = "targetTitle")]
+    pub target_title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+/// Bilgi Grafiği Tam Veri Paketi (D3.js / Cytoscape Uyumlu)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphData {
+    pub nodes: Vec<GraphNode>,
+    pub edges: Vec<GraphEdge>,
+}
+

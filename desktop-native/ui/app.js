@@ -187,6 +187,8 @@ async function fallbackFetch(cmd, payload = {}, action = "") {
 
 document.addEventListener("DOMContentLoaded", () => {
   initUI();
+  initGlobalShortcuts();
+  checkStickyModeOnStartup();
   loadAllData();
 
   // Rust Backend Push Event Dinleyicileri
@@ -204,6 +206,32 @@ document.addEventListener("DOMContentLoaded", () => {
     loadAllData();
   });
 });
+
+function initGlobalShortcuts() {
+  window.addEventListener("keydown", (e) => {
+    // Ctrl+K veya Ctrl+P: Evrensel Komut Paleti
+    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'k' || e.key.toLowerCase() === 'p')) {
+      e.preventDefault();
+      openCommandPalette();
+    }
+    // Ctrl+G: İnteraktif İlişki Grafiği
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+      e.preventDefault();
+      openGraphModal();
+    }
+  });
+}
+
+function checkStickyModeOnStartup() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("mode") === "sticky") {
+    document.body.classList.add("sticky-mode");
+    const noteId = parseInt(params.get("id"));
+    if (noteId) {
+      state.selectedNoteId = noteId;
+    }
+  }
+}
 
 async function loadAllData() {
   try {
@@ -467,7 +495,24 @@ function initUI() {
       moreMenu.style.display = "none";
       exportCurrentNoteToVaultFile();
     });
+    document.getElementById("btnMenuPrint")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      window.print();
+    });
+    document.getElementById("btnMenuGraph")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      openGraphModal();
+    });
+    document.getElementById("btnMenuSticky")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      openStickyNote();
+    });
   }
+
+  // Doğrudan Araç Çubuğu Butonları (İlişki Grafiği, Yapışkan Not, Komut Paleti)
+  document.getElementById("btnOpenGraph")?.addEventListener("click", openGraphModal);
+  document.getElementById("btnOpenSticky")?.addEventListener("click", openStickyNote);
+  document.getElementById("btnOpenCommandPalette")?.addEventListener("click", openCommandPalette);
 
   // Hatırlatıcı Butonu (Editör Çubuğu)
   document.getElementById("btnEditorReminder")?.addEventListener("click", () => {
@@ -993,20 +1038,51 @@ function renderMarkdownToHtml(md) {
   const lines = md.split("\n");
   let html = [];
   let inCodeBlock = false;
+  let codeBlockLang = "";
   let codeBlockBuffer = [];
+  let inMathBlock = false;
+  let mathBlockBuffer = [];
 
   for (let idx = 0; idx < lines.length; idx++) {
     const line = lines[idx];
     const trimmed = line.trim();
 
-    // Çok satırlı kod blokları (```)
+    // 1. Çok satırlı Matematik Blokları ($$)
+    if (trimmed.startsWith("$$") && trimmed.endsWith("$$") && trimmed.length > 2) {
+      const formula = trimmed.slice(2, -2).trim();
+      html.push(`<div class="math-block" style="text-align:center; padding:14px; font-family:'Cambria Math','Latin Modern Math',serif; font-size:1.15em; background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:8px; margin:10px 0; overflow-x:auto;">${escapeHtml(formula)}</div>`);
+      continue;
+    } else if (trimmed === "$$") {
+      if (inMathBlock) {
+        html.push(`<div class="math-block" style="text-align:center; padding:14px; font-family:'Cambria Math','Latin Modern Math',serif; font-size:1.15em; background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:8px; margin:10px 0; overflow-x:auto;">${escapeHtml(mathBlockBuffer.join("\n"))}</div>`);
+        mathBlockBuffer = [];
+        inMathBlock = false;
+      } else {
+        inMathBlock = true;
+      }
+      continue;
+    }
+
+    if (inMathBlock) {
+      mathBlockBuffer.push(line);
+      continue;
+    }
+
+    // 2. Çok satırlı Kod & Mermaid Blokları (```)
     if (trimmed.startsWith("```")) {
       if (inCodeBlock) {
-        html.push(`<pre class="code-block"><code>${escapeHtml(codeBlockBuffer.join("\n"))}</code></pre>`);
+        const rawCode = codeBlockBuffer.join("\n");
+        if (codeBlockLang === "mermaid") {
+          html.push(renderMermaidDiagramSvg(rawCode));
+        } else {
+          html.push(`<pre class="code-block"><code class="lang-${codeBlockLang}">${escapeHtml(rawCode)}</code></pre>`);
+        }
         codeBlockBuffer = [];
+        codeBlockLang = "";
         inCodeBlock = false;
       } else {
         inCodeBlock = true;
+        codeBlockLang = trimmed.substring(3).trim().toLowerCase();
       }
       continue;
     }
@@ -1016,6 +1092,7 @@ function renderMarkdownToHtml(md) {
       continue;
     }
 
+    // 3. Başlıklar & Blok Elemanları
     if (trimmed.startsWith("# ")) {
       html.push(`<h1>${formatInline(escapeHtml(trimmed.substring(2)))}</h1>`);
     } else if (trimmed.startsWith("## ")) {
@@ -1048,20 +1125,119 @@ function renderMarkdownToHtml(md) {
   }
 
   if (inCodeBlock && codeBlockBuffer.length > 0) {
-    html.push(`<pre class="code-block"><code>${escapeHtml(codeBlockBuffer.join("\n"))}</code></pre>`);
+    const rawCode = codeBlockBuffer.join("\n");
+    if (codeBlockLang === "mermaid") {
+      html.push(renderMermaidDiagramSvg(rawCode));
+    } else {
+      html.push(`<pre class="code-block"><code>${escapeHtml(rawCode)}</code></pre>`);
+    }
+  }
+  if (inMathBlock && mathBlockBuffer.length > 0) {
+    html.push(`<div class="math-block" style="text-align:center; padding:14px; font-family:'Cambria Math',serif;">${escapeHtml(mathBlockBuffer.join("\n"))}</div>`);
   }
 
   return html.join("");
 }
 
+// Mermaid SVG Diyagram Üretici (Flowchart / Sequence Parser Fallback)
+function renderMermaidDiagramSvg(code) {
+  const lines = code.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("%%"));
+  const header = lines[0] || "graph TD";
+
+  // Flowchart veya Graph parsing: A --> B, A[Metin] --> B[Metin]
+  const edges = [];
+  const nodesMap = new Map();
+
+  lines.slice(1).forEach(l => {
+    const edgeMatch = l.match(/([a-zA-Z0-9_-]+)(?:\[(.*?)\])?\s*(-->|---|==>|-\.->)\s*([a-zA-Z0-9_-]+)(?:\[(.*?)\])?/);
+    if (edgeMatch) {
+      const fromId = edgeMatch[1];
+      const fromLabel = edgeMatch[2] || fromId;
+      const type = edgeMatch[3];
+      const toId = edgeMatch[4];
+      const toLabel = edgeMatch[5] || toId;
+
+      if (!nodesMap.has(fromId)) nodesMap.set(fromId, fromLabel);
+      if (!nodesMap.has(toId)) nodesMap.set(toId, toLabel);
+      edges.push({ from: fromId, to: toId, type });
+    }
+  });
+
+  const nodesList = Array.from(nodesMap.entries());
+  if (nodesList.length === 0) {
+    // Basit kod görünümü ile şık mermaid rozeti
+    return `
+      <div class="mermaid-diagram-box" style="background:var(--bg-main); border:1px solid var(--border-subtle); border-radius:10px; padding:16px; margin:12px 0;">
+        <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+          <span>📊 MERMAID DİYAGRAMI</span>
+        </div>
+        <pre style="margin:0; font-family:monospace; font-size:12px; color:var(--text-muted);">${escapeHtml(code)}</pre>
+      </div>
+    `;
+  }
+
+  // Dinamik SVG Çizimi (Yatay veya Dikey)
+  const isLR = header.includes("LR") || header.includes("RL");
+  const nodeW = 120;
+  const nodeH = 38;
+  const gap = 40;
+  const totalW = isLR ? (nodesList.length * (nodeW + gap) + 40) : 480;
+  const totalH = isLR ? 160 : (nodesList.length * (nodeH + gap) + 40);
+
+  let svgElements = "";
+  const positions = new Map();
+
+  nodesList.forEach(([id, label], i) => {
+    const x = isLR ? 30 + i * (nodeW + gap) : (totalW / 2 - nodeW / 2);
+    const y = isLR ? (totalH / 2 - nodeH / 2) : (30 + i * (nodeH + gap));
+    positions.set(id, { x, y, cx: x + nodeW / 2, cy: y + nodeH / 2 });
+
+    svgElements += `
+      <rect x="${x}" y="${y}" width="${nodeW}" height="${nodeH}" rx="8" fill="#1E293B" stroke="var(--primary)" stroke-width="1.5" />
+      <text x="${x + nodeW / 2}" y="${y + nodeH / 2 + 5}" fill="#F8FAFC" font-size="12" font-family="'Segoe UI',sans-serif" font-weight="600" text-anchor="middle">${escapeHtml(label)}</text>
+    `;
+  });
+
+  edges.forEach(({ from, to, type }) => {
+    const p1 = positions.get(from);
+    const p2 = positions.get(to);
+    if (p1 && p2) {
+      const isDashed = type.includes(".");
+      svgElements += `
+        <line x1="${p1.cx}" y1="${isLR ? p1.cy : p1.y + nodeH}" x2="${p2.cx}" y2="${isLR ? p2.cy : p2.y}" stroke="#94A3B8" stroke-width="2" ${isDashed ? 'stroke-dasharray="4 4"' : ''} marker-end="url(#arrow)" />
+      `;
+    }
+  });
+
+  return `
+    <div class="mermaid-diagram-box" style="background:var(--bg-main); border:1px solid var(--border-subtle); border-radius:10px; padding:16px; margin:14px 0; overflow-x:auto; text-align:center;">
+      <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:12px; display:flex; align-items:center; justify-content:center; gap:6px;">
+        <span>📊 MERMAID DİYAGRAMI (${escapeHtml(header)})</span>
+      </div>
+      <svg viewBox="0 0 ${totalW} ${totalH}" width="100%" style="max-width:${totalW}px; height:auto; display:inline-block;">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#94A3B8" />
+          </marker>
+        </defs>
+        ${svgElements}
+      </svg>
+    </div>
+  `;
+}
+
 function formatInline(text) {
   return text
-    // Wikilinks: [[Hedef Not|Görünen İsim]] veya [[Hedef Not]]
+    // 1. Wikilinks: [[Hedef Not|Görünen İsim]] veya [[Hedef Not]]
     .replace(/\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]/g, (match, target, alias) => {
       const label = alias || target;
       return `<a href="#" class="wikilink" data-target="${escapeHtml(target.trim())}" title="Not: ${escapeHtml(target.trim())}">🔗 ${escapeHtml(label.trim())}</a>`;
     })
-    // Kalın & İtalik & Üstü Çizili
+    // 2. Satır İçi Matematik Formülleri ($math$)
+    .replace(/\$([^\$\n]+)\$/g, (match, formula) => {
+      return `<span class="math-inline" style="font-family:'Cambria Math','Latin Modern Math',serif; padding:1px 6px; background:rgba(255,255,255,0.06); border-radius:4px; font-style:italic;" title="Matematik Formülü">${escapeHtml(formula)}</span>`;
+    })
+    // 3. Kalın & İtalik & Üstü Çizili
     .replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>")
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
@@ -2816,15 +2992,623 @@ function showToast(message, type = "info", duration = 3000) {
 }
 
 // ===================================================
-// ASENKRON OLAY DİNLEYİCİSİ (Rust -> Frontend Push)
+// YAPIŞKAN NOT (STICKY NOTE) YÖNETİCİSİ
 // ===================================================
-window.__IPC_EMIT__ = function(eventObj) {
-  if (!eventObj) return;
-  if (eventObj.event === "sync:statusChanged") {
-    updateSyncStateUI();
-    if (eventObj.data && eventObj.data.lastMessage) {
-      showToast(eventObj.data.lastMessage, "info");
+
+function openStickyNote(noteId) {
+  const id = noteId || state.selectedNoteId;
+  if (!id) {
+    showToast("Yapışkan nota dönüştürülecek bir not seçilmedi", "warning");
+    return;
+  }
+  const note = findNoteById(id);
+  const title = encodeURIComponent(note?.title || "Not");
+  const url = `${window.location.pathname}?mode=sticky&id=${id}`;
+  window.open(url, `sticky_${id}`, "width=380,height=440,resizable=yes,alwaysOnTop=yes,menubar=no,toolbar=no");
+}
+
+// ===================================================
+// EVRENSEL KOMUT PALETİ (Ctrl+K / Cmd+K)
+// ===================================================
+
+function openCommandPalette() {
+  const existing = document.getElementById("commandPaletteModal");
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const overlay = document.createElement("div");
+  overlay.id = "commandPaletteModal";
+  overlay.className = "modal-overlay open";
+  overlay.style.zIndex = "10000";
+
+  overlay.innerHTML = `
+    <div class="modal-dialog" style="max-width:580px; padding:0; overflow:hidden; border-radius:12px; border:1px solid var(--border-subtle); background:var(--bg-card); box-shadow:0 16px 40px rgba(0,0,0,0.6);">
+      <div style="display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border-subtle); gap:10px;">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="var(--text-faint)"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" id="cmdPaletteInput" placeholder="Notlarda ara, '>' ile eylem, '#' ile etiket, '@' ile kategori..." style="flex:1; background:transparent; border:none; outline:none; font-size:15px; color:var(--text-main); font-family:inherit;" autocomplete="off" spellcheck="false">
+        <span style="font-size:11px; background:var(--border-subtle); color:var(--text-faint); padding:2px 6px; border-radius:4px;">ESC</span>
+      </div>
+
+      <div style="display:flex; gap:6px; padding:8px 16px; border-bottom:1px solid var(--border-subtle); font-size:11px; color:var(--text-faint); background:rgba(0,0,0,0.15);">
+        <span>İpuçları:</span>
+        <span style="color:var(--primary);">> Eylemler</span>
+        <span style="color:#10B981;"># Etiketler</span>
+        <span style="color:#60A5FA;">@ Kategoriler</span>
+      </div>
+
+      <div id="cmdPaletteResults" style="max-height:360px; overflow-y:auto; padding:6px 0;"></div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  const input = overlay.querySelector("#cmdPaletteInput");
+  const resultsBox = overlay.querySelector("#cmdPaletteResults");
+  let activeIndex = 0;
+  let currentItems = [];
+
+  const actions = [
+    { title: "Yeni Not Oluştur", desc: "Boş bir taslak not açar", icon: "📝", run: () => createNewNote() },
+    { title: "İlişki Grafiğini Aç", desc: "Tüm notların bağlantı haritasını gösterir (Ctrl+G)", icon: "🕸️", run: () => openGraphModal() },
+    { title: "Wi-Fi Senkronizasyon Modalı", desc: "Android cihazla eşleştirme ve yedekleme", icon: "📶", run: () => document.getElementById("btnOpenSync")?.click() },
+    { title: "Kasayı Kilitle / Durum Değiştir", desc: "Gizli kasa notlarını güvene al", icon: "🔒", run: () => toggleLockCurrentNote() },
+    { title: "PDF / Belge Yazdır", desc: "Mevcut notu yazdır veya PDF olarak kaydet", icon: "🖨️", run: () => window.print() },
+    { title: "Yapışkan Not Olarak Aç", desc: "Mevcut notu her zaman üstte kalan küçük pencerede aç", icon: "📌", run: () => openStickyNote() },
+    { title: "Tüm Notları Zip Olarak Yedekle", desc: "Veritabanını arşiv dosyasına aktar", icon: "📦", run: () => document.getElementById("btnExportBackup")?.click() },
+    { title: "Çoklu Not Seçim Modu", desc: "Toplu silme, arşivleme ve sabitleme", icon: "✓", run: () => document.getElementById("btnToggleBatchMode")?.click() },
+    { title: "Kehribar Teması", desc: "Sıcak kehribar renk paletini uygula", icon: "🎨", run: () => applyTheme("amber") },
+    { title: "Okyanus Teması", desc: "Derin okyanus mavi paletini uygula", icon: "🎨", run: () => applyTheme("sapphire") },
+    { title: "Zümrüt Teması", desc: "Doğal zümrüt yeşil paletini uygula", icon: "🎨", run: () => applyTheme("emerald") },
+    { title: "Mürdüm Teması", desc: "Mürdüm ve lavanta paletini uygula", icon: "🎨", run: () => applyTheme("plum") }
+  ];
+
+  function renderResults() {
+    const query = input.value.trim();
+    resultsBox.innerHTML = "";
+    currentItems = [];
+
+    if (query.startsWith(">")) {
+      // Eylemler
+      const q = query.substring(1).trim().toLowerCase();
+      currentItems = actions.filter(a => a.title.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q));
+    } else if (query.startsWith("#")) {
+      // Etiketler
+      const q = query.substring(1).trim().toLowerCase();
+      const tags = new Set();
+      [...state.activeNotes, ...state.archivedNotes].forEach(n => {
+        const matches = `${n.title || ""} ${n.content || ""}`.match(/#([a-zA-ZçğıöşüÇĞİÖŞÜ0-9_-]+)/g);
+        if (matches) matches.forEach(m => tags.add(m.toLowerCase()));
+      });
+      currentItems = Array.from(tags)
+        .filter(t => t.includes(q))
+        .map(t => ({
+          title: t,
+          desc: "Bu etikete göre notları filtrele",
+          icon: "#",
+          run: () => {
+            state.selectedTag = t;
+            state.currentFilter = `tag_${t}`;
+            renderNotesList();
+          }
+        }));
+    } else if (query.startsWith("@")) {
+      // Kategoriler
+      const q = query.substring(1).trim().toLowerCase();
+      currentItems = state.categories
+        .filter(c => c.name.toLowerCase().includes(q))
+        .map(c => ({
+          title: c.name,
+          desc: "Bu kategorideki notları listele",
+          icon: "📁",
+          run: () => {
+            state.currentFilter = `cat_${c.id}`;
+            renderNotesList();
+          }
+        }));
+    } else {
+      // Düz Not Araması (Fuzzy Search)
+      const q = query.toLowerCase();
+      const allNotes = [...state.activeNotes, ...state.archivedNotes];
+      currentItems = allNotes
+        .filter(n => (n.title || "").toLowerCase().includes(q) || (n.content || "").toLowerCase().includes(q))
+        .slice(0, 15)
+        .map(n => ({
+          title: n.title || "Başlıksız Not",
+          desc: n.content ? n.content.substring(0, 70).replace(/\n/g, " ") : "(İçerik yok)",
+          icon: n.isPinned ? "📌" : (n.isLocked ? "🔒" : "📄"),
+          run: () => loadNoteIntoEditor(n, false)
+        }));
+
+      // Eğer eşleşen not azsa eylemleri de ekle
+      if (currentItems.length < 3) {
+        actions.filter(a => a.title.toLowerCase().includes(q)).forEach(a => currentItems.push(a));
+      }
+    }
+
+    if (currentItems.length === 0) {
+      resultsBox.innerHTML = `<div style="padding:20px; text-align:center; font-size:13px; color:var(--text-faint);">Eşleşen sonuç bulunamadı.</div>`;
+      return;
+    }
+
+    if (activeIndex >= currentItems.length) activeIndex = 0;
+
+    currentItems.forEach((item, idx) => {
+      const el = document.createElement("div");
+      const isSelected = idx === activeIndex;
+      el.className = `cmd-item ${isSelected ? 'selected' : ''}`;
+      el.style.cssText = `display:flex; align-items:center; gap:12px; padding:10px 16px; cursor:pointer; background:${isSelected ? 'rgba(255,255,255,0.08)' : 'transparent'}; border-left:${isSelected ? '3px solid var(--primary)' : '3px solid transparent'};`;
+
+      el.innerHTML = `
+        <span style="font-size:18px;">${item.icon}</span>
+        <div style="flex:1; overflow:hidden;">
+          <div style="font-size:14px; font-weight:600; color:${isSelected ? 'var(--primary)' : 'var(--text-main)'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.title)}</div>
+          <div style="font-size:12px; color:var(--text-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.desc)}</div>
+        </div>
+      `;
+
+      el.addEventListener("mouseenter", () => {
+        activeIndex = idx;
+        renderSelectionOnly();
+      });
+
+      el.addEventListener("click", () => {
+        overlay.remove();
+        item.run();
+      });
+
+      resultsBox.appendChild(el);
+    });
+  }
+
+  function renderSelectionOnly() {
+    const items = resultsBox.querySelectorAll(".cmd-item");
+    items.forEach((el, idx) => {
+      const isSelected = idx === activeIndex;
+      el.style.background = isSelected ? 'rgba(255,255,255,0.08)' : 'transparent';
+      el.style.borderLeft = isSelected ? '3px solid var(--primary)' : '3px solid transparent';
+      if (isSelected) el.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  input.addEventListener("input", () => {
+    activeIndex = 0;
+    renderResults();
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (currentItems.length > 0) {
+        activeIndex = (activeIndex + 1) % currentItems.length;
+        renderSelectionOnly();
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (currentItems.length > 0) {
+        activeIndex = (activeIndex - 1 + currentItems.length) % currentItems.length;
+        renderSelectionOnly();
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (currentItems[activeIndex]) {
+        overlay.remove();
+        currentItems[activeIndex].run();
+      }
+    } else if (e.key === "Escape") {
+      overlay.remove();
+    }
+  });
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  renderResults();
+  input.focus();
+}
+
+// ===================================================
+// İNTERAKTİF NOT İLİŞKİ GRAFİĞİ MOTORU (KNOWLEDGE GRAPH)
+// ===================================================
+
+function openGraphModal() {
+  const existing = document.getElementById("knowledgeGraphModal");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "knowledgeGraphModal";
+  overlay.className = "modal-overlay open";
+  overlay.style.zIndex = "9999";
+
+  overlay.innerHTML = `
+    <div class="modal-dialog" style="max-width:92vw; width:92vw; height:88vh; max-height:88vh; padding:0; display:flex; flex-direction:column; overflow:hidden; border-radius:14px; border:1px solid var(--border-subtle); background:var(--bg-main); box-shadow:0 24px 60px rgba(0,0,0,0.7);">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid var(--border-subtle); background:var(--bg-card);">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="font-size:20px;">🕸️</span>
+          <span style="font-weight:700; font-size:16px;">Not İlişki Grafiği</span>
+          <span class="nav-count" id="graphNodesCount" style="background:var(--border-subtle); padding:2px 8px; border-radius:10px; font-size:12px;">0 Not</span>
+          <span class="nav-count" id="graphEdgesCount" style="background:var(--border-subtle); padding:2px 8px; border-radius:10px; font-size:12px;">0 Bağlantı</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:14px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); cursor:pointer;">
+            <input type="checkbox" id="chkHideOrphans" style="cursor:pointer;">
+            <span>Yetim Notları Gizle</span>
+          </label>
+          <button class="btn-secondary" id="btnGraphReset" style="font-size:12px; padding:5px 12px;">Görünümü Sıfırla</button>
+          <button class="btn-primary" id="btnCloseGraphModal" style="font-size:12px; padding:5px 14px;">✕ Kapat</button>
+        </div>
+      </div>
+
+      <div style="flex:1; position:relative; overflow:hidden; background:#0B1120;">
+        <canvas id="knowledgeGraphCanvas" style="width:100%; height:100%; display:block; cursor:grab;"></canvas>
+        <div id="graphTooltip" style="position:absolute; display:none; pointer-events:none; background:rgba(15,23,42,0.92); border:1px solid var(--border-subtle); border-radius:6px; padding:6px 10px; font-size:12px; color:#F8FAFC; box-shadow:0 6px 16px rgba(0,0,0,0.4); z-index:10;"></div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  const canvas = overlay.querySelector("#knowledgeGraphCanvas");
+  const ctx = canvas.getContext("2d");
+  const tooltip = overlay.querySelector("#graphTooltip");
+  const chkOrphans = overlay.querySelector("#chkHideOrphans");
+  const btnReset = overlay.querySelector("#btnGraphReset");
+  const btnClose = overlay.querySelector("#btnCloseGraphModal");
+  const labelNodes = overlay.querySelector("#graphNodesCount");
+  const labelEdges = overlay.querySelector("#graphEdgesCount");
+
+  let animationFrameId = null;
+  let width = canvas.clientWidth || 900;
+  let height = canvas.clientHeight || 600;
+
+  function resizeCanvas() {
+    width = canvas.parentElement.clientWidth;
+    height = canvas.parentElement.clientHeight;
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  }
+  resizeCanvas();
+
+  // 1. Düğüm ve Kenar Verilerini Çıkar
+  const allNotes = state.activeNotes;
+  const nodesMap = new Map();
+  const titleToNode = new Map();
+
+  allNotes.forEach(note => {
+    const preset = NOTE_PRESETS.find(p => p.id === note.color) || NOTE_PRESETS[0];
+    const n = {
+      id: note.id,
+      title: note.title || "Başlıksız Not",
+      color: preset.color || "#F59E0B",
+      noteRef: note,
+      degree: 0,
+      x: (Math.random() - 0.5) * (width * 0.6) + width / 2,
+      y: (Math.random() - 0.5) * (height * 0.6) + height / 2,
+      vx: 0,
+      vy: 0,
+      radius: 8
+    };
+    nodesMap.set(note.id, n);
+    titleToNode.set((note.title || "").trim().toLowerCase(), n);
+  });
+
+  const rawEdges = [];
+  allNotes.forEach(note => {
+    const src = nodesMap.get(note.id);
+    const content = note.content || "";
+    const matches = content.match(/\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]/g);
+    if (matches && src) {
+      matches.forEach(m => {
+        const rawTarget = m.replace(/^\[\[/, "").replace(/\]\]$/, "").split("|")[0].trim().toLowerCase();
+        const tgt = titleToNode.get(rawTarget);
+        if (tgt && tgt.id !== src.id) {
+          rawEdges.push({ source: src, target: tgt });
+          src.degree++;
+          tgt.degree++;
+        }
+      });
+    }
+  });
+
+  // Dereceye göre dinamik yarıçap (6px - 18px)
+  nodesMap.forEach(n => {
+    n.radius = Math.min(18, Math.max(7, 7 + n.degree * 2.5));
+  });
+
+  let hideOrphans = false;
+  let activeNodes = Array.from(nodesMap.values());
+  let activeEdges = rawEdges;
+
+  function filterGraphData() {
+    if (hideOrphans) {
+      activeNodes = Array.from(nodesMap.values()).filter(n => n.degree > 0);
+      const activeIds = new Set(activeNodes.map(n => n.id));
+      activeEdges = rawEdges.filter(e => activeIds.has(e.source.id) && activeIds.has(e.target.id));
+    } else {
+      activeNodes = Array.from(nodesMap.values());
+      activeEdges = rawEdges;
+    }
+    labelNodes.textContent = `${activeNodes.length} Not`;
+    labelEdges.textContent = `${activeEdges.length} Bağlantı`;
+  }
+  filterGraphData();
+
+  chkOrphans.addEventListener("change", (e) => {
+    hideOrphans = e.target.checked;
+    filterGraphData();
+  });
+
+  // Kamera: Pan & Zoom
+  let panX = 0;
+  let panY = 0;
+  let scale = 1.0;
+
+  btnReset.addEventListener("click", () => {
+    panX = 0;
+    panY = 0;
+    scale = 1.0;
+  });
+
+  // Etkileşimler
+  let hoveredNode = null;
+  let draggedNode = null;
+  let isPanning = false;
+  let startX = 0, startY = 0;
+
+  function screenToWorld(sx, sy) {
+    return {
+      x: (sx - width / 2 - panX) / scale + width / 2,
+      y: (sy - height / 2 - panY) / scale + height / 2
+    };
+  }
+
+  canvas.addEventListener("mousedown", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const pos = screenToWorld(sx, sy);
+
+    const hit = activeNodes.find(n => {
+      const dx = n.x - pos.x;
+      const dy = n.y - pos.y;
+      return (dx * dx + dy * dy) <= (n.radius + 4) * (n.radius + 4);
+    });
+
+    if (hit) {
+      draggedNode = hit;
+      canvas.style.cursor = "grabbing";
+    } else {
+      isPanning = true;
+      startX = sx - panX;
+      startY = sy - panY;
+      canvas.style.cursor = "move";
+    }
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const pos = screenToWorld(sx, sy);
+
+    if (draggedNode) {
+      draggedNode.x = pos.x;
+      draggedNode.y = pos.y;
+      draggedNode.vx = 0;
+      draggedNode.vy = 0;
+      return;
+    }
+
+    if (isPanning) {
+      panX = sx - startX;
+      panY = sy - startY;
+      return;
+    }
+
+    // Hover kontrolü
+    hoveredNode = activeNodes.find(n => {
+      const dx = n.x - pos.x;
+      const dy = n.y - pos.y;
+      return (dx * dx + dy * dy) <= (n.radius + 4) * (n.radius + 4);
+    });
+
+    if (hoveredNode) {
+      canvas.style.cursor = "pointer";
+      tooltip.style.display = "block";
+      tooltip.style.left = `${sx + 12}px`;
+      tooltip.style.top = `${sy + 12}px`;
+      tooltip.innerHTML = `<b>${escapeHtml(hoveredNode.title)}</b><br><span style="opacity:0.7;">${hoveredNode.degree} bağlantı • Tıkla ve Aç</span>`;
+    } else {
+      canvas.style.cursor = "grab";
+      tooltip.style.display = "none";
+    }
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (draggedNode) draggedNode = null;
+    isPanning = false;
+    canvas.style.cursor = "grab";
+  });
+
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    scale = Math.min(3.0, Math.max(0.25, scale * zoomFactor));
+  });
+
+  // Tıklanınca Notu Aç
+  canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const pos = screenToWorld(sx, sy);
+
+    const hit = activeNodes.find(n => {
+      const dx = n.x - pos.x;
+      const dy = n.y - pos.y;
+      return (dx * dx + dy * dy) <= (n.radius + 4) * (n.radius + 4);
+    });
+
+    if (hit && hit.noteRef) {
+      cancelAnimationFrame(animationFrameId);
+      overlay.remove();
+      loadNoteIntoEditor(hit.noteRef, false);
+      showToast(`'${hit.title}' notu açıldı`, "info");
+    }
+  });
+
+  // Kapatma
+  btnClose.addEventListener("click", () => {
+    cancelAnimationFrame(animationFrameId);
+    overlay.remove();
+  });
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) {
+      cancelAnimationFrame(animationFrameId);
+      overlay.remove();
+    }
+  });
+
+  // 2. 60 FPS Force-Directed Fizik Motoru
+  const kRepulsion = 2200;
+  const kSpring = 0.04;
+  const springLength = 80;
+  const kCenter = 0.012;
+  const damping = 0.86;
+
+  function stepPhysics() {
+    const cx = width / 2;
+    const cy = height / 2;
+
+    // A. Coulomb İtmesi
+    for (let i = 0; i < activeNodes.length; i++) {
+      const n1 = activeNodes[i];
+      for (let j = i + 1; j < activeNodes.length; j++) {
+        const n2 = activeNodes[j];
+        let dx = n2.x - n1.x;
+        let dy = n2.y - n1.y;
+        let distSq = dx * dx + dy * dy || 1;
+        let dist = Math.sqrt(distSq);
+
+        if (dist < 400) {
+          let force = kRepulsion / distSq;
+          let fx = (dx / dist) * force;
+          let fy = (dy / dist) * force;
+          n1.vx -= fx;
+          n1.vy -= fy;
+          n2.vx += fx;
+          n2.vy += fy;
+        }
+      }
+    }
+
+    // B. Hooke Yay Çekimi
+    for (const edge of activeEdges) {
+      const n1 = edge.source;
+      const n2 = edge.target;
+      let dx = n2.x - n1.x;
+      let dy = n2.y - n1.y;
+      let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      let delta = dist - springLength;
+      let force = delta * kSpring;
+      let fx = (dx / dist) * force;
+      let fy = (dy / dist) * force;
+      n1.vx += fx;
+      n1.vy += fy;
+      n2.vx -= fx;
+      n2.vy -= fy;
+    }
+
+    // C. Merkezleme & Hız Güncelleme
+    for (const n of activeNodes) {
+      if (n === draggedNode) continue;
+      n.vx += (cx - n.x) * kCenter;
+      n.vy += (cy - n.y) * kCenter;
+      n.vx *= damping;
+      n.vy *= damping;
+      n.x += n.vx;
+      n.y += n.vy;
     }
   }
-};
+
+  // 3. Render Döngüsü
+  function draw() {
+    stepPhysics();
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.save();
+    ctx.translate(width / 2 + panX, height / 2 + panY);
+    ctx.scale(scale, scale);
+    ctx.translate(-width / 2, -height / 2);
+
+    // Bağlı komşu kümesi
+    const connectedToHover = new Set();
+    if (hoveredNode) {
+      connectedToHover.add(hoveredNode.id);
+      activeEdges.forEach(e => {
+        if (e.source.id === hoveredNode.id) connectedToHover.add(e.target.id);
+        if (e.target.id === hoveredNode.id) connectedToHover.add(e.source.id);
+      });
+    }
+
+    // A. Kenarları Çiz
+    for (const edge of activeEdges) {
+      const isHighlighted = hoveredNode && (edge.source.id === hoveredNode.id || edge.target.id === hoveredNode.id);
+      const isDimmed = hoveredNode && !isHighlighted;
+
+      ctx.beginPath();
+      ctx.moveTo(edge.source.x, edge.source.y);
+      ctx.lineTo(edge.target.x, edge.target.y);
+      ctx.strokeStyle = isHighlighted ? "var(--primary)" : (isDimmed ? "rgba(148,163,184,0.08)" : "rgba(148,163,184,0.25)");
+      ctx.lineWidth = isHighlighted ? 2.5 : 1.2;
+      ctx.stroke();
+    }
+
+    // B. Düğümleri Çiz
+    for (const n of activeNodes) {
+      const isTarget = hoveredNode && n.id === hoveredNode.id;
+      const isConnected = hoveredNode && connectedToHover.has(n.id);
+      const isDimmed = hoveredNode && !isConnected;
+
+      ctx.save();
+      ctx.globalAlpha = isDimmed ? 0.18 : 1.0;
+
+      // Glow
+      if (isTarget) {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.radius + 8, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(245,158,11,0.25)";
+        ctx.fill();
+      }
+
+      // Düğüm Gövdesi
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+      ctx.fillStyle = n.color || "#38BDF8";
+      ctx.fill();
+      ctx.strokeStyle = isTarget ? "#FFFFFF" : (isConnected ? "var(--primary)" : "rgba(255,255,255,0.2)");
+      ctx.lineWidth = isTarget ? 3 : 1.5;
+      ctx.stroke();
+
+      // Düğüm Başlığı (Label)
+      if (scale > 0.6 || isConnected || n.degree > 1) {
+        ctx.font = `${isTarget ? 'bold 12px' : '11px'} 'Segoe UI',sans-serif`;
+        ctx.fillStyle = isTarget ? "#FFFFFF" : (isDimmed ? "rgba(248,250,252,0.3)" : "#E2E8F0");
+        ctx.textAlign = "center";
+        ctx.fillText(n.title, n.x, n.y + n.radius + 14);
+      }
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+    animationFrameId = requestAnimationFrame(draw);
+  }
+
+  animationFrameId = requestAnimationFrame(draw);
+}
 

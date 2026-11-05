@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -144,6 +145,31 @@ type VaultStatus struct {
 	IsUnlocked  bool `json:"isUnlocked"`
 }
 
+// Bilgi Grafiği Düğüm Modeli (Knowledge Graph Node)
+type GraphNode struct {
+	ID        int64  `json:"id"`
+	Title     string `json:"title"`
+	Group     string `json:"group,omitempty"`
+	Color     int64  `json:"color"`
+	InDegree  int    `json:"inDegree"`
+	OutDegree int    `json:"outDegree"`
+	IsGhost   bool   `json:"isGhost"`
+}
+
+// Bilgi Grafiği Kenar Modeli (Knowledge Graph Edge)
+type GraphEdge struct {
+	Source      int64  `json:"source"`
+	Target      int64  `json:"target"`
+	TargetTitle string `json:"targetTitle"`
+	Label       string `json:"label,omitempty"`
+}
+
+// Bilgi Grafiği Tam Veri Paketi (D3.js / Cytoscape Uyumlu)
+type GraphData struct {
+	Nodes []GraphNode `json:"nodes"`
+	Edges []GraphEdge `json:"edges"`
+}
+
 // ===================================================
 // VERİ DEPOSU (DATA STORE)
 // ===================================================
@@ -227,6 +253,120 @@ func (ds *DataStore) save() error {
 	ds.Lock()
 	defer ds.Unlock()
 	return ds.saveUnsafe()
+}
+
+// Wikilinks Regex: [[başlık]] ve [[başlık|etiket]] kalıplarını yakalar
+var wikilinkRegex = regexp.MustCompile(`\[\[([^\[\]\|]+)(?:\|([^\[\]]+))?\]\]`)
+
+// computeGraph: Notlardaki çift yönlü [[wikilink]] bağlantılarını tarayarak
+// düğüm (nodes) ve kenarlardan (edges) oluşan bilgi grafiği topolojisini hesaplar.
+func (ds *DataStore) computeGraph() GraphData {
+	activeNotes := make([]Note, 0)
+	titleToID := make(map[string]int64)
+
+	for _, n := range ds.data.Notes {
+		if !n.IsInTrash && !n.IsDeleted {
+			activeNotes = append(activeNotes, n)
+			cleanTitle := strings.ToLower(strings.TrimSpace(n.Title))
+			if cleanTitle != "" {
+				titleToID[cleanTitle] = n.ID
+			}
+		}
+	}
+
+	inDegrees := make(map[int64]int)
+	outDegrees := make(map[int64]int)
+	edges := make([]GraphEdge, 0)
+	ghostNodes := make(map[string]int64)
+	var ghostIDCounter int64 = -1
+
+	type edgeKey struct {
+		src int64
+		tgt int64
+	}
+	seenEdges := make(map[edgeKey]bool)
+
+	for _, n := range activeNotes {
+		// Not içeriğindeki [[...]] kalıplarını tara
+		matches := wikilinkRegex.FindAllStringSubmatch(n.Content, -1)
+		for _, m := range matches {
+			if len(m) < 2 {
+				continue
+			}
+			targetTitle := strings.TrimSpace(m[1])
+			if targetTitle == "" {
+				continue
+			}
+			var alias string
+			if len(m) >= 3 && m[2] != "" {
+				alias = strings.TrimSpace(m[2])
+			}
+
+			targetKey := strings.ToLower(targetTitle)
+			var targetID int64
+			isGhost := false
+
+			if tid, ok := titleToID[targetKey]; ok {
+				targetID = tid
+			} else {
+				// Henüz mevcut olmayan hedef not (Ghost Node)
+				if gid, ok := ghostNodes[targetKey]; ok {
+					targetID = gid
+				} else {
+					targetID = ghostIDCounter
+					ghostNodes[targetKey] = ghostIDCounter
+					ghostIDCounter--
+				}
+				isGhost = true
+			}
+
+			ek := edgeKey{src: n.ID, tgt: targetID}
+			if !seenEdges[ek] {
+				seenEdges[ek] = true
+				outDegrees[n.ID]++
+				if !isGhost {
+					inDegrees[targetID]++
+				}
+
+				edges = append(edges, GraphEdge{
+					Source:      n.ID,
+					Target:      targetID,
+					TargetTitle: targetTitle,
+					Label:       alias,
+				})
+			}
+		}
+	}
+
+	nodes := make([]GraphNode, 0, len(activeNotes)+len(ghostNodes))
+	for _, n := range activeNotes {
+		nodes = append(nodes, GraphNode{
+			ID:        n.ID,
+			Title:     n.Title,
+			Group:     "",
+			Color:     n.Color,
+			InDegree:  inDegrees[n.ID],
+			OutDegree: outDegrees[n.ID],
+			IsGhost:   false,
+		})
+	}
+
+	for titleKey, gid := range ghostNodes {
+		nodes = append(nodes, GraphNode{
+			ID:        gid,
+			Title:     titleKey,
+			Group:     "uncreated",
+			Color:     -7829368, // Gri hayalet düğüm rengi
+			InDegree:  1,
+			OutDegree: 0,
+			IsGhost:   true,
+		})
+	}
+
+	return GraphData{
+		Nodes: nodes,
+		Edges: edges,
+	}
 }
 
 // ===================================================
@@ -1440,6 +1580,43 @@ func main() {
 		// ----------------------------------------------------
 		case "window:setAntiScreenshot", "setAntiScreenshot":
 			// Windows WebView2 veya Edge App modunda kabul edilir
+			sendOK(true)
+
+		// ----------------------------------------------------
+		// BİLGİ GRAFİĞİ (KNOWLEDGE GRAPH TOPOLOJİSİ)
+		// ----------------------------------------------------
+		case "graph:getGraph", "getGraph", "graph:data":
+			graph := store.computeGraph()
+			sendOK(graph)
+
+		// ----------------------------------------------------
+		// YAPIŞKAN NOT PENCERESİ (STICKY NOTE)
+		// ----------------------------------------------------
+		case "window:openSticky", "openSticky":
+			id := parseIDFromPayload(req.Payload)
+			stickyURL := fmt.Sprintf("%s/?mode=sticky&id=%d", appURL, id)
+			edgePath := findEdgePath()
+
+			if edgePath != "" {
+				stickyProfile := filepath.Join(os.Getenv("APPDATA"), "NotDefterim", "StickyProfile")
+				_ = os.MkdirAll(stickyProfile, 0755)
+				stickyCmd := exec.Command(edgePath,
+					fmt.Sprintf("--app=%s", stickyURL),
+					"--window-size=380,440",
+					fmt.Sprintf("--user-data-dir=%s", stickyProfile),
+				)
+				go func() {
+					_ = stickyCmd.Start()
+				}()
+			} else if runtime.GOOS == "windows" {
+				go func() {
+					_ = exec.Command("cmd", "/c", "start", stickyURL).Start()
+				}()
+			} else {
+				go func() {
+					_ = exec.Command("xdg-open", stickyURL).Start()
+				}()
+			}
 			sendOK(true)
 
 		default:

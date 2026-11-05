@@ -145,6 +145,7 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] v2.0.0 (Faz 2): Etkileşimli Bilgi Ağı (Knowledge Graph), Komut Paleti (Ctrl+K), Yapışkan Notlar (Sticky Notes) ve Android Jetpack Compose Canvas grafik görselleştirmesi tamamlandı.
 - [x] v1.4.4: Gerçek taranabilir yerel QR motoru (qrious), koyu cam (glassmorphism) pop-up'ları ve mobil kamera-öncelikli otomatik Wi-Fi senkronizasyonu entegre edildi.
 - [x] v1.4.4: Tek tıkla bağımsız masaüstü motoru (Go/Wry Native Engine) ve anında başlatıcılar (`Baslat_NotDefterim.bat`, `Baslat_NotDefterim_Desktop.bat`) devreye alındı.
 - [x] v1.4.4: Masaüstü %100 saf Rust (Wry / WebView2) mimarisine taşındı; Kotlin Desktop ve Electron modülleri tamamen arındırıldı.

@@ -1,6 +1,6 @@
-use crate::models::{Category, Note};
+use crate::models::{Category, GraphData, GraphEdge, GraphNode, Note};
 use rusqlite::{params, Connection, Result};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::PathBuf;
 
@@ -38,6 +38,59 @@ fn now_millis() -> i64 {
         .unwrap_or_default()
         .as_millis() as i64
 }
+
+/// Markdown içeriğindeki tüm `[[Hedef Not]]` veya `[[Hedef#Bölüm|Görünen]]` bağlantılarını ayrıştırır.
+fn extract_wikilinks(content: &str) -> Vec<(String, Option<String>)> {
+    let mut links = Vec::new();
+    let mut rest = content;
+    while let Some(start) = rest.find("[[") {
+        let after_start = &rest[start + 2..];
+        if let Some(end) = after_start.find("]]") {
+            let inner = after_start[..end].trim();
+            if !inner.is_empty() && !inner.contains('\n') {
+                let (target_part, alias) = if let Some(pipe_idx) = inner.find('|') {
+                    (inner[..pipe_idx].trim(), Some(inner[pipe_idx + 1..].trim().to_string()))
+                } else {
+                    (inner, None)
+                };
+                let target_clean = if let Some(hash_idx) = target_part.find('#') {
+                    target_part[..hash_idx].trim()
+                } else {
+                    target_part
+                };
+                if !target_clean.is_empty() {
+                    links.push((target_clean.to_string(), alias));
+                }
+            }
+            rest = &after_start[end + 2..];
+        } else {
+            break;
+        }
+    }
+    links
+}
+
+/// Not içeriğindeki bağlantıları ayrıştırıp `note_links` tablosuna B-Tree indeksli olarak kaydeder.
+fn sync_note_links_internal(conn: &Connection, source_id: i64, content: &str) -> Result<()> {
+    conn.execute("DELETE FROM note_links WHERE source_note_id = ?1", params![source_id])?;
+    let links = extract_wikilinks(content);
+    let now = now_millis();
+    for (target_title, alias) in links {
+        let target_id: Option<i64> = conn.query_row(
+            "SELECT id FROM notes WHERE title = ?1 COLLATE NOCASE AND isInTrash = 0 LIMIT 1",
+            params![target_title],
+            |r| r.get(0),
+        ).ok();
+
+        conn.execute(
+            "INSERT INTO note_links (source_note_id, target_title, target_note_id, alias, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![source_id, target_title, target_id, alias, now],
+        )?;
+    }
+    Ok(())
+}
+
 
 pub struct Database {
     db_path: PathBuf,
@@ -144,16 +197,34 @@ impl Database {
             [],
         )?;
 
-        // 3. Şema ve sütun migrasyonu (Eski sürümlerden gelen isDeleted, reminderTime sütunları)
+        // 3. İki yönlü bağlantılar ve graf kenar tablosu (Wikilinks Graph Edges)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS note_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_note_id INTEGER NOT NULL,
+                target_title TEXT NOT NULL COLLATE NOCASE,
+                target_note_id INTEGER,
+                alias TEXT,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (source_note_id) REFERENCES notes(id) ON DELETE CASCADE,
+                FOREIGN KEY (target_note_id) REFERENCES notes(id) ON DELETE SET NULL
+            );",
+            [],
+        )?;
+
+        // 4. Şema ve sütun migrasyonu (Eski sürümlerden gelen isDeleted, reminderTime sütunları)
         Self::migrate_schema(&conn)?;
 
-        // 4. Hızlı arama, filtreleme ve çöp kutusu indeksleri
+        // 5. Hızlı arama, filtreleme, graf ve çöp kutusu indeksleri
         conn.execute_batch(
             "CREATE INDEX IF NOT EXISTS idx_notes_status ON notes(isInTrash, isArchived, isPinned, updatedAt DESC);
              CREATE INDEX IF NOT EXISTS idx_notes_category ON notes(categoryId);
              CREATE INDEX IF NOT EXISTS idx_notes_reminder ON notes(reminderDateTime) WHERE reminderDateTime IS NOT NULL;
              CREATE INDEX IF NOT EXISTS idx_notes_locked ON notes(isLocked);
-             CREATE INDEX IF NOT EXISTS idx_notes_trash ON notes(isInTrash, deletedAt);",
+             CREATE INDEX IF NOT EXISTS idx_notes_trash ON notes(isInTrash, deletedAt);
+             CREATE INDEX IF NOT EXISTS idx_links_target_title ON note_links(target_title, source_note_id);
+             CREATE INDEX IF NOT EXISTS idx_links_source_id ON note_links(source_note_id);
+             CREATE INDEX IF NOT EXISTS idx_links_target_id ON note_links(target_note_id);",
         )?;
 
         Ok(())
@@ -288,7 +359,9 @@ impl Database {
                 note.folder_id
             ],
         )?;
-        Ok(conn.last_insert_rowid())
+        let new_id = conn.last_insert_rowid();
+        sync_note_links_internal(&conn, new_id, &note.content).ok();
+        Ok(new_id)
     }
 
     pub fn update_note(&self, note: &Note) -> Result<()> {
@@ -326,6 +399,7 @@ impl Database {
                 note.id
             ],
         )?;
+        sync_note_links_internal(&conn, note.id, &note.content).ok();
         Ok(())
     }
 
@@ -352,6 +426,7 @@ impl Database {
     pub fn delete_permanently(&self, id: i64) -> Result<()> {
         let conn = self.get_conn()?;
         conn.execute("DELETE FROM notes WHERE id = ?1", params![id])?;
+        conn.execute("DELETE FROM note_links WHERE source_note_id = ?1", params![id]).ok();
         Ok(())
     }
 
@@ -386,6 +461,7 @@ impl Database {
     }
 
     /// Wikilinks: Belirtilen not başlığına referans veren (`[[Başlık]]` veya `[[Başlık|Etiket]]`) diğer notları döner.
+    /// Optimize `note_links` B-Tree indeksini ve içerik arama fallback'ini bir arada kullanır.
     pub fn get_notes_linking_to(&self, title: &str, exclude_id: Option<i64>) -> Result<Vec<Note>> {
         let conn = self.get_conn()?;
         let p1 = format!("%[[{}]]%", title);
@@ -394,26 +470,126 @@ impl Database {
         let mut notes = Vec::new();
         if let Some(ex_id) = exclude_id {
             let query = format!(
-                "SELECT {} FROM notes WHERE isInTrash = 0 AND id != ?1 AND (content LIKE ?2 OR content LIKE ?3) ORDER BY isPinned DESC, updatedAt DESC",
+                "SELECT {} FROM notes WHERE isInTrash = 0 AND id != ?1 AND (
+                    id IN (SELECT source_note_id FROM note_links WHERE target_title = ?2 COLLATE NOCASE)
+                    OR content LIKE ?3 OR content LIKE ?4
+                ) ORDER BY isPinned DESC, updatedAt DESC",
                 NOTE_COLUMNS
             );
             let mut stmt = conn.prepare(&query)?;
-            let rows = stmt.query_map(params![ex_id, p1, p2], |r| Self::row_to_note(r))?;
+            let rows = stmt.query_map(params![ex_id, title, p1, p2], |r| Self::row_to_note(r))?;
             for item in rows {
                 notes.push(item?);
             }
         } else {
             let query = format!(
-                "SELECT {} FROM notes WHERE isInTrash = 0 AND (content LIKE ?1 OR content LIKE ?2) ORDER BY isPinned DESC, updatedAt DESC",
+                "SELECT {} FROM notes WHERE isInTrash = 0 AND (
+                    id IN (SELECT source_note_id FROM note_links WHERE target_title = ?1 COLLATE NOCASE)
+                    OR content LIKE ?2 OR content LIKE ?3
+                ) ORDER BY isPinned DESC, updatedAt DESC",
                 NOTE_COLUMNS
             );
             let mut stmt = conn.prepare(&query)?;
-            let rows = stmt.query_map(params![p1, p2], |r| Self::row_to_note(r))?;
+            let rows = stmt.query_map(params![title, p1, p2], |r| Self::row_to_note(r))?;
             for item in rows {
                 notes.push(item?);
             }
         }
         Ok(notes)
+    }
+
+    /// Bilgi Grafiği: Tüm aktif notları düğümler, aralarındaki wikilink'leri kenarlar olarak hesaplar.
+    pub fn get_graph_data(&self) -> Result<GraphData> {
+        let conn = self.get_conn()?;
+        let active_notes = self.get_active_notes()?;
+        let mut note_map = HashMap::new();
+        let mut in_degrees = HashMap::new();
+        let mut out_degrees = HashMap::new();
+
+        for n in &active_notes {
+            note_map.insert(n.id, n);
+            in_degrees.insert(n.id, 0usize);
+            out_degrees.insert(n.id, 0usize);
+        }
+
+        let mut stmt = conn.prepare(
+            "SELECT source_note_id, target_title, target_note_id, alias FROM note_links",
+        )?;
+        let edge_rows = stmt.query_map([], |row| {
+            let src: i64 = row.get(0)?;
+            let target_title: String = row.get(1)?;
+            let target_id: Option<i64> = row.get(2)?;
+            let alias: Option<String> = row.get(3)?;
+            Ok((src, target_title, target_id, alias))
+        })?;
+
+        let mut edges = Vec::new();
+        let mut ghost_nodes = HashMap::new();
+        let mut ghost_id_counter = -1i64;
+
+        for r in edge_rows {
+            let (src, target_title, target_id, alias) = r?;
+            if !note_map.contains_key(&src) {
+                continue;
+            }
+
+            *out_degrees.entry(src).or_insert(0) += 1;
+
+            let final_target_id = if let Some(t_id) = target_id {
+                if note_map.contains_key(&t_id) {
+                    *in_degrees.entry(t_id).or_insert(0) += 1;
+                    t_id
+                } else {
+                    let g_id = *ghost_nodes.entry(target_title.clone()).or_insert_with(|| {
+                        let id = ghost_id_counter;
+                        ghost_id_counter -= 1;
+                        id
+                    });
+                    g_id
+                }
+            } else {
+                let g_id = *ghost_nodes.entry(target_title.clone()).or_insert_with(|| {
+                    let id = ghost_id_counter;
+                    ghost_id_counter -= 1;
+                    id
+                });
+                g_id
+            };
+
+            edges.push(GraphEdge {
+                source: src,
+                target: final_target_id,
+                target_title: target_title.clone(),
+                label: alias,
+            });
+        }
+
+        let mut nodes = Vec::new();
+        for n in active_notes {
+            nodes.push(GraphNode {
+                id: n.id,
+                title: n.title,
+                group: None,
+                color: n.color,
+                in_degree: *in_degrees.get(&n.id).unwrap_or(&0),
+                out_degree: *out_degrees.get(&n.id).unwrap_or(&0),
+                is_ghost: false,
+            });
+        }
+
+        for (title, g_id) in ghost_nodes {
+            nodes.push(GraphNode {
+                id: g_id,
+                title,
+                group: Some("uncreated".to_string()),
+                color: -7829368,
+                in_degree: 1,
+                out_degree: 0,
+                is_ghost: true,
+            });
+        }
+
+        Ok(GraphData { nodes, edges })
     }
 
     /// Başlık, içerik veya etiketlerde arama yapar.
@@ -588,6 +764,7 @@ impl Database {
 
         tx.execute("DELETE FROM notes", [])?;
         tx.execute("DELETE FROM categories", [])?;
+        tx.execute("DELETE FROM note_links", [])?;
 
         for cat in categories {
             tx.execute(
@@ -630,6 +807,12 @@ impl Database {
         }
 
         tx.commit()?;
+
+        // Notlar eklendikten sonra tüm graf kenarlarını senkronize et
+        for note in notes {
+            let _ = sync_note_links_internal(&conn, note.id, &note.content);
+        }
+
         Ok(())
     }
 
