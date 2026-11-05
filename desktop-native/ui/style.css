@@ -605,8 +605,10 @@ body {
   align-items: center;
   gap: 6px;
   overflow-x: auto;
-  padding: 10px 2px 4px;
+  padding: 8px 2px 6px;
   scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
 }
 .filter-chips-scroll::-webkit-scrollbar {
   display: none;
@@ -616,22 +618,24 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 6px 11px;
   border-radius: 999px;
-  font-size: clamp(10px, 0.9vw, 12px);
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-color);
   cursor: pointer;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: all 0.15s ease;
+  overflow: visible;
+  text-overflow: clip;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
 }
 .chip:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text-main);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 .chip.active {
   background: var(--primary);
@@ -684,22 +688,24 @@ body {
 .more-menu-dropdown,
 .popup-menu,
 .dropdown-menu-popup,
-.dropdown-popover {
+.dropdown-menu,
+.dropdown-popover,
+#editorMoreMenu {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 220px;
-  background: rgba(18, 24, 38, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  padding: 6px;
+  min-width: 230px !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px !important;
+  padding: 8px !important;
   display: flex;
   flex-direction: column;
   gap: 3px;
   z-index: 500;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
   animation: popupMenuEnter 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -714,61 +720,72 @@ body {
   }
 }
 
-/* Dropdown Öğeleri (Buton ve Div Öğeleri İçin Tarayıcı Sıfırlaması Dahil) */
+/* Dropdown Öğeleri (Kesinlikle Beyaz Arka Plan Yok - Dark Glassmorphism) */
 button.dropdown-item,
 .dropdown-item,
+.dropdown-menu button,
+#editorMoreMenu button,
 .sort-item,
 .menu-item,
 .popup-menu-item {
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  border: none;
-  outline: none;
-  margin: 0;
-  box-shadow: none;
-  font-family: inherit;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 9px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #CBD5E1;
-  cursor: pointer;
-  text-align: left;
-  user-select: none;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 10px 14px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #e2e8f0 !important;
+  cursor: pointer !important;
+  text-align: left !important;
+  user-select: none !important;
+  transition: all 0.2s ease !important;
 }
 
 button.dropdown-item:hover,
 .dropdown-item:hover,
+.dropdown-menu button:hover,
+#editorMoreMenu button:hover,
 .sort-item:hover,
 .menu-item:hover,
 .popup-menu-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #FFFFFF;
-  transform: translateX(2px);
+  background: rgba(56, 189, 248, 0.12) !important;
+  background-color: rgba(56, 189, 248, 0.12) !important;
+  color: #38bdf8 !important;
+  transform: translateX(3px) !important;
 }
 
 button.dropdown-item:active,
-.dropdown-item:active {
-  transform: scale(0.98);
+.dropdown-item:active,
+.dropdown-menu button:active,
+#editorMoreMenu button:active {
+  transform: scale(0.98) !important;
 }
 
 .sort-item.active,
 .menu-item.active,
 .popup-menu-item.active,
 .dropdown-item.active {
-  background: var(--primary-subtle);
-  color: var(--primary);
-  font-weight: 600;
+  background: var(--primary-subtle) !important;
+  color: var(--primary) !important;
+  font-weight: 600 !important;
 }
 
+/* Tıklanmama sorununu kökten çözen çocuk eleman kuralı */
 button.dropdown-item svg,
 .dropdown-item svg,
+.dropdown-menu button svg,
+#editorMoreMenu button svg,
 .sort-item svg,
 .menu-item svg,
 .popup-menu-item svg {
@@ -777,21 +794,29 @@ button.dropdown-item svg,
   fill: currentColor;
   opacity: 0.85;
   flex-shrink: 0;
+  pointer-events: none !important;
+}
+
+button.dropdown-item span,
+.dropdown-item span,
+.dropdown-menu button span,
+#editorMoreMenu button span {
+  pointer-events: none !important;
 }
 
 button.dropdown-item.danger,
 .dropdown-item.danger,
 .menu-item.danger,
 .popup-menu-item.danger {
-  color: #F87171;
+  color: #F87171 !important;
 }
 
 button.dropdown-item.danger:hover,
 .dropdown-item.danger:hover,
 .menu-item.danger:hover,
 .popup-menu-item.danger:hover {
-  background: rgba(239, 68, 68, 0.16);
-  color: #EF4444;
+  background: rgba(239, 68, 68, 0.16) !important;
+  color: #EF4444 !important;
 }
 
 .menu-item-shortcut {
@@ -802,14 +827,15 @@ button.dropdown-item.danger:hover,
   padding: 1px 5px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
+  pointer-events: none !important;
 }
 
 .dropdown-divider,
 .menu-divider {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.08);
-  margin: 5px 6px;
-  border: none;
+  height: 1px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  margin: 6px 0 !important;
+  border: none !important;
 }
 
 .notes-container {
@@ -850,8 +876,9 @@ button.dropdown-item.danger:hover,
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
 .note-card.active {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary), 0 8px 24px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+  background: rgba(30, 41, 59, 0.7) !important;
+  box-shadow: 0 4px 20px rgba(56, 189, 248, 0.12), inset 0 0 12px rgba(56, 189, 248, 0.05) !important;
 }
 
 /* ===================================================
@@ -1651,16 +1678,18 @@ mark {
   display: flex;
 }
 .modal-dialog, .modal-box {
-  background: var(--bg-card);
-  border: 1px solid var(--border-strong);
-  border-radius: 18px;
-  width: 440px;
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 16px !important;
+  width: 460px;
   max-width: 92vw;
   padding: 24px;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   animation: modalScaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 @keyframes modalScaleIn {
@@ -2006,7 +2035,8 @@ mark {
    5. WI-FI SENKRONİZASYON ELEMANLARI & ANİMASYONLARI
    =================================================== */
 .sync-dialog {
-  width: 490px;
+  width: 500px;
+  max-width: 92vw;
 }
 .sync-qr-wrapper {
   display: flex;
@@ -2014,17 +2044,20 @@ mark {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  margin: 6px 0;
-  min-height: 194px;
+  margin: 8px 0;
+  min-height: 200px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
 }
 .sync-qr-wrapper img,
 .sync-qr-wrapper canvas,
 .sync-qr-wrapper svg,
 .sync-qr-box {
-  background: #FFFFFF;
+  background: #FFFFFF !important;
   padding: 12px;
   border-radius: 12px;
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
   display: block;
   margin: 0 auto;
   max-width: 100%;
@@ -2045,23 +2078,26 @@ mark {
   text-align: center;
 }
 .sync-info-card {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border-strong);
-  border-radius: 14px;
-  padding: 14px 16px;
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 14px !important;
+  padding: 14px 18px !important;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  gap: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  margin-top: 8px;
 }
 .sync-card-label {
   color: var(--text-dim);
   font-size: 11px;
   font-weight: 500;
   margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 .sync-pin-row {
   display: flex;
@@ -2069,9 +2105,9 @@ mark {
   gap: 10px;
 }
 .sync-pin-code {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
-  letter-spacing: 4px;
+  letter-spacing: 5px;
   color: #38BDF8;
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
@@ -2079,7 +2115,7 @@ mark {
   background: rgba(56, 189, 248, 0.15);
   border: 1px solid rgba(56, 189, 248, 0.3);
   color: #38BDF8;
-  padding: 4px 8px;
+  padding: 4px 9px;
   border-radius: 6px;
   font-size: 11.5px;
   font-weight: 600;
@@ -2100,10 +2136,15 @@ mark {
   text-align: right;
 }
 .sync-ip-code {
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, monospace;
   font-size: 13px;
-  color: #CBD5E1;
+  color: #E2E8F0;
   font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: inline-block;
 }
 .sync-status-row {
   display: flex;

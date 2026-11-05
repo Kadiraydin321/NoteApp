@@ -145,6 +145,7 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] Masaüstü UI/UX Parlatma & Hata Düzeltmeleri: 3-nokta menüsü koyu cam morfolojisi (dark glassmorphism, blur 16px) ve pointer-events koruması, 11 menü butonunun tam olay bağlantıları, Wi-Fi IP undefined:8765 çözümleme motoru ve sekme metin taşması ("K...") giderildi.
 - [x] Air-Gapped Optical Stream: Çevrimdışı animasyonlu QR akışı (15 FPS), parça sıralama, CRC32 sağlama doğrulaması ve çift yönlü optik aktarım test süiti (%100 yeşil) tamamlandı.
 - [x] Güvenlik & Antivirüs Temizliği: Şüpheli sezgisel (heuristic) ldflags bayrakları ve tarayıcı user-data-dir profil parametreleri kaldırılarak false-positive riskleri tamamen giderildi.
 - [x] v2.0.0 (Faz 2): Etkileşimli Bilgi Ağı (Knowledge Graph), Komut Paleti (Ctrl+K), Yapışkan Notlar (Sticky Notes) ve Android Jetpack Compose Canvas grafik görselleştirmesi tamamlandı.

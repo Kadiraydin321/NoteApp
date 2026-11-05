@@ -261,9 +261,31 @@ async function loadAllData() {
 }
 
 function findNoteById(id) {
-  return state.activeNotes.find(n => n.id === id) ||
-         state.archivedNotes.find(n => n.id === id) ||
-         state.trashNotes.find(n => n.id === id);
+  if (id === undefined || id === null) return null;
+  return state.activeNotes.find(n => String(n.id) === String(id)) ||
+         state.archivedNotes.find(n => String(n.id) === String(id)) ||
+         state.trashNotes.find(n => String(n.id) === String(id)) ||
+         null;
+}
+
+function getActiveOrSelectedNote() {
+  let note = null;
+  if (state.selectedNoteId) {
+    note = findNoteById(state.selectedNoteId);
+  }
+  if (!note && state.activeNotes && state.activeNotes.length > 0) {
+    const edTitle = document.getElementById("editorTitle")?.value;
+    if (edTitle) {
+      note = state.activeNotes.find(n => n.title === edTitle);
+    }
+    if (!note) {
+      note = state.activeNotes[0];
+    }
+    if (note) {
+      state.selectedNoteId = note.id;
+    }
+  }
+  return note;
 }
 
 // ===================================================
@@ -451,66 +473,55 @@ function initUI() {
   const btnMore = document.getElementById("btnEditorMoreActions");
   const moreMenu = document.getElementById("editorMoreMenu");
   if (btnMore && moreMenu) {
+    const closeMoreMenu = () => {
+      moreMenu.style.display = "none";
+      btnMore.setAttribute("aria-expanded", "false");
+    };
+
     btnMore.addEventListener("click", (e) => {
       e.stopPropagation();
       const isOpen = moreMenu.style.display === "block";
       moreMenu.style.display = isOpen ? "none" : "block";
       btnMore.setAttribute("aria-expanded", !isOpen);
     });
-    document.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      btnMore.setAttribute("aria-expanded", "false");
+
+    // Menü içine tıklandığında dışa tıklama yöneticisinin menüyü zamansız kapatmasını engelle
+    moreMenu.addEventListener("click", (e) => {
+      e.stopPropagation();
     });
 
-    // Menü Butonları Dinleyicileri
-    document.getElementById("btnMenuShare")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      openShareModal();
+    // Dışarı tıklanınca kapat
+    document.addEventListener("click", () => {
+      closeMoreMenu();
     });
-    document.getElementById("btnMenuAdvanced")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      openAdvancedToolsModal();
-    });
-    document.getElementById("btnMenuReminder")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      openReminderModal();
-    });
-    document.getElementById("btnMenuDuplicate")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      duplicateCurrentNote();
-    });
-    document.getElementById("btnMenuSaveTemplate")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      saveAsTemplate();
-    });
-    document.getElementById("btnMenuHistory")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      openVersionHistoryModal();
-    });
-    document.getElementById("btnMenuStats")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      openStatsModal();
-    });
-    document.getElementById("btnMenuExportVault")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      exportCurrentNoteToVaultFile();
-    });
-    document.getElementById("btnMenuPrint")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      window.print();
-    });
-    document.getElementById("btnMenuGraph")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      openGraphModal();
-    });
-    document.getElementById("btnMenuSticky")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      openStickyNote();
-    });
-    document.getElementById("btnMenuOpticalStream")?.addEventListener("click", () => {
-      moreMenu.style.display = "none";
-      startOpticalStream();
-    });
+
+    // Güvenli Buton Bağlayıcı (Tıklama Garantili ve Menüyü Kapatan)
+    const bindMenuBtn = (elementId, handler) => {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeMoreMenu();
+          handler(e);
+        });
+      }
+    };
+
+    // Tüm Menü Butonları (Tek tek eksiksiz bağlandı)
+    bindMenuBtn("btnMenuShare", () => openShareModal());
+    bindMenuBtn("btnMenuPrint", () => window.print());
+    bindMenuBtn("btnMenuGraphThis", () => openGraphModal());
+    bindMenuBtn("btnMenuGraph", () => openGraphModal());
+    bindMenuBtn("btnMenuOpticalStream", () => startOpticalStream());
+    bindMenuBtn("btnMenuAdvanced", () => openAdvancedToolsModal());
+    bindMenuBtn("btnMenuReminder", () => openReminderModal());
+    bindMenuBtn("btnMenuDuplicate", () => duplicateCurrentNote());
+    bindMenuBtn("btnMenuSaveTemplate", () => saveAsTemplate());
+    bindMenuBtn("btnMenuHistory", () => openVersionHistoryModal());
+    bindMenuBtn("btnMenuStats", () => openStatsModal());
+    bindMenuBtn("btnMenuExportVault", () => exportCurrentNoteToVaultFile());
+    bindMenuBtn("btnMenuSticky", () => openStickyNote());
   }
 
   // Doğrudan Araç Çubuğu Butonları (İlişki Grafiği, Yapışkan Not, Optik Akış, Komut Paleti)
@@ -1957,9 +1968,9 @@ function initModals() {
 // ===================================================
 
 function openShareModal() {
-  const note = findNoteById(state.selectedNoteId);
+  const note = getActiveOrSelectedNote();
   if (!note) {
-    showToast("Paylaşılacak bir not seçilmedi", "warning");
+    showToast("Paylaşılacak bir not bulunamadı!", "warning");
     return;
   }
 
@@ -2144,8 +2155,11 @@ function generateNoteCardPng(note) {
 
 // Gelişmiş Araçlar Modalı
 function openAdvancedToolsModal() {
-  const note = findNoteById(state.selectedNoteId);
-  if (!note) return;
+  const note = getActiveOrSelectedNote();
+  if (!note) {
+    showToast("Gelişmiş araçlar için bir not seçilmedi!", "warning");
+    return;
+  }
 
   const existing = document.getElementById("dynamicModalContainer");
   if (existing) existing.remove();
@@ -2225,8 +2239,11 @@ function openAdvancedToolsModal() {
 
 // Versiyon Geçmişi Modalı
 function openVersionHistoryModal() {
-  const note = findNoteById(state.selectedNoteId);
-  if (!note) return;
+  const note = getActiveOrSelectedNote();
+  if (!note) {
+    showToast("Versiyon geçmişi için bir not seçilmedi!", "warning");
+    return;
+  }
 
   const versions = state.noteVersions.get(note.id) || [];
 
@@ -2299,8 +2316,11 @@ function openVersionHistoryModal() {
 
 // İstatistikler Modalı
 function openStatsModal() {
-  const note = findNoteById(state.selectedNoteId);
-  if (!note) return;
+  const note = getActiveOrSelectedNote();
+  if (!note) {
+    showToast("İstatistikleri görüntülemek için bir not seçilmedi!", "warning");
+    return;
+  }
 
   const content = note.content || "";
   const chars = content.length;
@@ -2368,8 +2388,11 @@ function openStatsModal() {
 
 // Hatırlatıcı Modalı
 function openReminderModal() {
-  const note = findNoteById(state.selectedNoteId);
-  if (!note) return;
+  const note = getActiveOrSelectedNote();
+  if (!note) {
+    showToast("Hatırlatıcı ayarlamak için bir not seçilmedi!", "warning");
+    return;
+  }
 
   const existing = document.getElementById("dynamicModalContainer");
   if (existing) existing.remove();
@@ -2503,8 +2526,11 @@ function openTemplatePickerModal() {
 
 // Notu Çoğalt
 async function duplicateCurrentNote() {
-  const note = findNoteById(state.selectedNoteId);
-  if (!note) return;
+  const note = getActiveOrSelectedNote();
+  if (!note) {
+    showToast("Çoğaltılacak bir not bulunamadı!", "warning");
+    return;
+  }
 
   const duplicated = {
     ...note,
@@ -2531,8 +2557,11 @@ async function duplicateCurrentNote() {
 
 // Şablon Olarak Sakla
 function saveAsTemplate() {
-  const note = findNoteById(state.selectedNoteId);
-  if (!note) return;
+  const note = getActiveOrSelectedNote();
+  if (!note) {
+    showToast("Şablon olarak kaydedilecek not bulunamadı!", "warning");
+    return;
+  }
 
   const key = `notdefterim_template_${Date.now()}`;
   localStorage.setItem(key, JSON.stringify({ title: note.title, content: note.content }));
@@ -2541,8 +2570,11 @@ function saveAsTemplate() {
 
 // .notevault Dosyası Olarak Dışa Aktar
 function exportCurrentNoteToVaultFile() {
-  const note = findNoteById(state.selectedNoteId);
-  if (!note) return;
+  const note = getActiveOrSelectedNote();
+  if (!note) {
+    showToast(".notevault olarak aktarılacak not bulunamadı!", "warning");
+    return;
+  }
 
   const exportData = {
     version: "1.4.4",
@@ -2601,8 +2633,40 @@ async function updateSyncStateUI() {
       console.warn("sync:getState çağrısı başarısız, fallback uygulanıyor:", e);
     }
 
-    // Backend'den gelen veride hem snake_case hem camelCase desteği ve sağlam fallback
-    const ip = syncState?.local_ip || syncState?.localIp || (window.location.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? window.location.hostname : "192.168.1.35");
+    // Ek fallback: HTTP API endpoint'leri (/api/sync/info veya /api/status)
+    if (!syncState || (!syncState.local_ip && !syncState.localIp && !syncState.ip && !syncState.serverIp)) {
+      try {
+        const httpInfo = await fetch("/api/sync/info").then(r => r.json()).catch(() => null);
+        if (httpInfo && (httpInfo.local_ip || httpInfo.localIp || httpInfo.ip || httpInfo.serverIp)) {
+          syncState = { ...syncState, ...httpInfo };
+        }
+      } catch (_) {}
+      if (!syncState || (!syncState.local_ip && !syncState.localIp && !syncState.ip && !syncState.serverIp)) {
+        try {
+          const httpStatus = await fetch("/api/status").then(r => r.json()).catch(() => null);
+          if (httpStatus && (httpStatus.local_ip || httpStatus.localIp || httpStatus.ip || httpStatus.serverIp)) {
+            syncState = { ...syncState, ...httpStatus };
+          }
+        } catch (_) {}
+      }
+    }
+
+    // IP çözümleme (Asla undefined veya geçersiz dize olamaz)
+    let rawIp = syncState?.local_ip || syncState?.localIp || syncState?.server_ip || syncState?.serverIp || syncState?.ip || syncState?.host;
+    let ip = "";
+    if (rawIp && typeof rawIp === "string" && rawIp !== "undefined" && rawIp !== "null" && rawIp !== "0.0.0.0" && rawIp.trim() !== "") {
+      ip = rawIp.trim();
+    } else if (state.serverIp && state.serverIp !== "undefined" && state.serverIp !== "null" && state.serverIp.trim() !== "") {
+      ip = state.serverIp.trim();
+    } else if (window.location.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+      ip = window.location.hostname;
+    } else {
+      ip = "127.0.0.1";
+    }
+
+    // Canlı state'e kaydet
+    state.serverIp = ip;
+
     const port = syncState?.port || 8765;
     const pin = syncState?.pairing_pin || syncState?.pairingPin || syncState?.pin || "1234";
     const isRunning = syncState?.is_running !== undefined ? syncState.is_running : (syncState?.isRunning !== undefined ? syncState.isRunning : true);
