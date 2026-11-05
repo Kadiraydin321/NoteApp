@@ -3,6 +3,7 @@ package com.example.noteapp.presentation.settings
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,6 +17,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -33,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -52,15 +55,21 @@ import com.example.noteapp.biometric.findFragmentActivity
 import com.example.noteapp.data.settings.*
 import com.example.noteapp.data.sync.OpticalImportResult
 import com.example.noteapp.data.sync.OpticalTransferManager
+import com.example.noteapp.data.sync.DiscoveredSyncServer
 import com.example.noteapp.data.sync.QrSyncManager
 import com.example.noteapp.data.sync.SyncQrPayload
 import com.example.noteapp.data.updater.UpdateStatus
 import com.example.noteapp.presentation.detail.NoteColors
 import com.example.noteapp.presentation.sync.OpticalQrScannerDialog
+import com.example.noteapp.presentation.sync.OpticalQrSenderDialog
 import com.example.noteapp.presentation.sync.ScannerMode
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.MultiFormatWriter
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +100,11 @@ fun SettingsScreen(
     onImportFromUri: (Uri, Boolean, String?) -> Unit,
     onDismissBackupMessage: () -> Unit,
     onCheckSyncConnection: (String) -> Unit = {},
-    onAutoDiscoverServer: (String?) -> Unit = {},
+    onDiscoverSyncServers: () -> Unit = {},
+    onSelectDiscoveredSyncServer: (DiscoveredSyncServer) -> Unit = {},
+    onStartAndroidSyncServer: () -> Unit = {},
+    onStopAndroidSyncServer: () -> Unit = {},
+    onRespondToIncomingSync: (String, Boolean, Boolean) -> Unit = { _, _, _ -> },
     onSendNotesToDesktop: (String, String, Boolean, String?) -> Unit = { _, _, _, _ -> },
     onPullNotesFromDesktop: (String, String, Boolean, String?) -> Unit = { _, _, _, _ -> },
     onDismissSyncMessage: () -> Unit = {},
@@ -125,6 +138,9 @@ fun SettingsScreen(
     var importPasswordVisible by remember { mutableStateOf(false) }
     var importClearExistingNotes by remember { mutableStateOf(false) }
     var showSetPinDialog by remember { mutableStateOf(false) }
+    var incomingClearExisting by remember(syncUiState.incomingTransfer?.id) { mutableStateOf(false) }
+    var pendingTransferDirection by remember { mutableStateOf<String?>(null) }
+    var transferClearExistingConfirmed by remember(pendingTransferDirection) { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var setPinVisible by remember { mutableStateOf(false) }
     var showUpdateDetailsDialog by remember { mutableStateOf(false) }
@@ -170,13 +186,13 @@ fun SettingsScreen(
     }
 
     var syncHostInput by remember(settings.lastSyncHost) {
-        mutableStateOf(settings.lastSyncHost.ifBlank { "192.168.1." })
+        mutableStateOf(settings.lastSyncHost)
     }
     var syncPinInput by remember(settings.lastSyncPin) {
         mutableStateOf(settings.lastSyncPin)
     }
-    var syncClearExisting by remember { mutableStateOf(false) }
     var showScannerDialog by remember { mutableStateOf(false) }
+    var showOpticalSender by remember { mutableStateOf(false) }
     var activeScannerMode by remember { mutableStateOf(ScannerMode.WIFI_SYNC_PAIRING) }
     var showManualConnection by remember { mutableStateOf(false) }
 
@@ -1097,6 +1113,66 @@ fun SettingsScreen(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
 
+                // Animasyonlu QR ile İnternetsiz Not Aktarımı (gönder / kamera ile al)
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.QrCode2,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Animasyonlu QR ile Not Aktarımı",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            "İnternet ve kablo olmadan: notlar parolayla şifrelenip dönen QR karelerine dönüştürülür, diğer cihazın kamerası okur. İçe aktarmadan önce not sayısı gösterilir ve onayınız istenir.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = { showOpticalSender = true },
+                            enabled = opticalTransferManager != null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 50.dp),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.QrCode2, contentDescription = null, modifier = Modifier.size(22.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text("Animasyonlu QR ile Gönder", fontWeight = FontWeight.Bold)
+                        }
+                        FilledTonalButton(
+                            onClick = {
+                                activeScannerMode = ScannerMode.OPTICAL_STREAM
+                                showScannerDialog = true
+                            },
+                            enabled = opticalTransferManager != null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 50.dp),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(22.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text("Kamera ile Not Al", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
                 // Masaüstü Wi-Fi Senkronizasyonu Sub-Card
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -1152,9 +1228,78 @@ fun SettingsScreen(
                             }
                         }
 
-                        // 2. İkincil Eylem: Ağda Otomatik Bul ve Eşitle 🔍
+                        OutlinedButton(
+                            onClick = {
+                                if (syncUiState.isHosting) onStopAndroidSyncServer() else onStartAndroidSyncServer()
+                            },
+                            enabled = !syncUiState.isOperating,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                if (syncUiState.isHosting) Icons.Default.Stop else Icons.Default.WifiTethering,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                if (syncUiState.isHosting) "Bu telefondaki HTTPS sunucusunu durdur"
+                                else "Bu telefonu aktarım sunucusu yap",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        syncUiState.hostQrPayload?.let { payload ->
+                            val qrBitmap = remember(payload) {
+                                payload.toQrJson()?.let(::createSyncQrBitmap)
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    if (qrBitmap != null) {
+                                        Image(
+                                            bitmap = qrBitmap.asImageBitmap(),
+                                            contentDescription = "HTTPS eşitleme eşleştirme QR kodu",
+                                            modifier = Modifier.size(220.dp)
+                                        )
+                                    } else {
+                                        Text("Eşleştirme QR kodu oluşturulamadı.", color = MaterialTheme.colorScheme.error)
+                                    }
+                                    Text(payload.fullUrl, style = MaterialTheme.typography.labelMedium)
+                                    Text(
+                                        "QR kodu 2 dakika geçerlidir. Diğer cihazda kamerayla taratın; veri aktarımı TLS sertifika parmak izi doğrulandıktan sonra başlar.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        if (syncUiState.uploadProgress.totalBytes > 0L) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                LinearProgressIndicator(
+                                    progress = syncUiState.uploadProgress.percent / 100f,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Text(
+                                    "Gelen aktarım: ${syncUiState.uploadProgress.percent}% (${syncUiState.uploadProgress.receivedBytes / 1024} / ${syncUiState.uploadProgress.totalBytes / 1024} KB)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Keşif yalnızca cihaz adresini bulur; eşleşme için QR/PIN kimlik doğrulaması gerekir.
                         FilledTonalButton(
-                            onClick = { onAutoDiscoverServer(syncHostInput) },
+                            onClick = onDiscoverSyncServers,
                             enabled = !syncUiState.isDiscovering && !syncUiState.isOperating,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1164,29 +1309,46 @@ fun SettingsScreen(
                             if (syncUiState.isDiscovering) {
                                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Wi-Fi Ağı Taranıyor...")
+                                Text("Yakındaki masaüstü aranıyor…")
                             } else {
                                 Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Ağda Otomatik Bul ve Eşitle 🔍", fontWeight = FontWeight.SemiBold)
+                                Text("Yakındaki masaüstü bilgisayarları bul", fontWeight = FontWeight.SemiBold)
                             }
                         }
 
-                        // 3. Üçüncü Eylem: Optik / Kamera ile Not Al (Air-Gapped Stream)
-                        OutlinedButton(
-                            onClick = {
-                                activeScannerMode = ScannerMode.OPTICAL_STREAM
-                                showScannerDialog = true
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 44.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Optik / Kamera ile Not Al (Air-Gapped Stream)", fontWeight = FontWeight.Medium)
+                        syncUiState.discoveryMessage?.let { discoveryMessage ->
+                            Text(
+                                discoveryMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (syncUiState.discoveredServers.isEmpty() && !syncUiState.isDiscovering) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                }
+                            )
                         }
+                        syncUiState.discoveredServers.forEach { server ->
+                            OutlinedButton(
+                                onClick = { onSelectDiscoveredSyncServer(server) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = Alignment.Start
+                                ) {
+                                    Text(server.name, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "${server.host}:${server.port} · Eşleşmek için masaüstü QR kodunu okutun",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        // Optik akış (Animasyonlu QR) girişi artık yukarıdaki ayrı kartta
 
                         // Bağlantı Durum Kartı ve Hızlı Eşitleme Butonları
                         if (syncUiState.isConnected == true) {
@@ -1206,14 +1368,21 @@ fun SettingsScreen(
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                     }
+                                    if (syncUiState.hasSession) {
+                                        Text(
+                                            "Güvenli oturum etkin. Oturum anahtarı yalnızca bellekte tutulur; uygulama veya masaüstü yeniden başlatıldığında QR ile tekrar eşleşin.",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
 
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Button(
-                                            onClick = { onSendNotesToDesktop(syncHostInput, syncPinInput, syncClearExisting, settings.masterPin) },
-                                            enabled = syncHostInput.isNotBlank() && syncPinInput.length == 4 && !syncUiState.isOperating,
+                                            onClick = { pendingTransferDirection = "send" },
+                                            enabled = syncHostInput.isNotBlank() && (syncUiState.hasSession || syncPinInput.matches(Regex("[0-9]{4}"))) && !syncUiState.isOperating,
                                             modifier = Modifier.weight(1f).heightIn(min = 40.dp),
                                             shape = RoundedCornerShape(10.dp)
                                         ) {
@@ -1223,8 +1392,8 @@ fun SettingsScreen(
                                         }
 
                                         FilledTonalButton(
-                                            onClick = { onPullNotesFromDesktop(syncHostInput, syncPinInput, syncClearExisting, settings.masterPin) },
-                                            enabled = syncHostInput.isNotBlank() && syncPinInput.length == 4 && !syncUiState.isOperating,
+                                            onClick = { pendingTransferDirection = "receive" },
+                                            enabled = syncHostInput.isNotBlank() && (syncUiState.hasSession || syncPinInput.matches(Regex("[0-9]{4}"))) && !syncUiState.isOperating,
                                             modifier = Modifier.weight(1f).heightIn(min = 40.dp),
                                             shape = RoundedCornerShape(10.dp)
                                         ) {
@@ -1232,6 +1401,17 @@ fun SettingsScreen(
                                             Spacer(Modifier.width(4.dp))
                                             Text("Çek 📥")
                                         }
+                                    }
+                                    if (syncUiState.uploadProgress.totalBytes > 0L) {
+                                        LinearProgressIndicator(
+                                            progress = syncUiState.uploadProgress.percent / 100f,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                        Text(
+                                            "Aktarım: ${syncUiState.uploadProgress.percent}% (${syncUiState.uploadProgress.receivedBytes / 1024} / ${syncUiState.uploadProgress.totalBytes / 1024} KB)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
                             }
@@ -1287,8 +1467,8 @@ fun SettingsScreen(
                                     OutlinedTextField(
                                         value = syncHostInput,
                                         onValueChange = { syncHostInput = it },
-                                        label = { Text("Bilgisayar IP") },
-                                        placeholder = { Text("192.168.1.X") },
+                                        label = { Text("Bilgisayar adresi") },
+                                        placeholder = { Text("192.168.1.25:8765 veya bilgisayar.local") },
                                         singleLine = true,
                                         modifier = Modifier.weight(1.8f)
                                     )
@@ -1324,17 +1504,11 @@ fun SettingsScreen(
                                     }
                                 }
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("Mevcut Notların Üzerine Yaz", style = MaterialTheme.typography.bodySmall)
-                                    Switch(
-                                        checked = syncClearExisting,
-                                        onCheckedChange = { syncClearExisting = it }
-                                    )
-                                }
+                                Text(
+                                    "Gelişmiş bağlantı yalnızca aynı yerel ağ içindir. Aktarım başlatılırken yön, not sayısı ve mevcut veriyi değiştirme seçeneği ayrıca onaylanır.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
@@ -2605,6 +2779,119 @@ fun SettingsScreen(
         }
     }
 
+    pendingTransferDirection?.let { direction ->
+        val isSending = direction == "send"
+        AlertDialog(
+            onDismissRequest = { pendingTransferDirection = null },
+            icon = {
+                Icon(
+                    if (isSending) Icons.Default.Upload else Icons.Default.Download,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text(if (isSending) "Gönderimi onayla" else "Alımı onayla", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val noteCount = if (isSending) {
+                        syncUiState.localNotesCount
+                    } else {
+                        syncUiState.serverStatus?.notesCount ?: 0
+                    }
+                    Text(
+                        if (isSending) "$noteCount not bu cihazdan ${syncUiState.serverStatus?.appName ?: "eşleşen cihaza"} gönderilecek."
+                        else "$noteCount not ${syncUiState.serverStatus?.appName ?: "eşleşen cihazdan"} bu telefona alınacak."
+                    )
+                    Text("ZIP aktarımı en fazla 50 MiB olabilir. Aktarım sırasında gönderilen/alınan baytlar yüzdeyle gösterilir.")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = transferClearExistingConfirmed,
+                            onCheckedChange = { transferClearExistingConfirmed = it }
+                        )
+                        Text("Mevcut notları silip aktarılanlarla değiştir")
+                    }
+                    Text(
+                        "Silme yalnızca bu kutuyu işaretleyip onayladığınızda uygulanır.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (isSending) {
+                            onSendNotesToDesktop(
+                                syncHostInput,
+                                syncPinInput,
+                                transferClearExistingConfirmed,
+                                settings.masterPin
+                            )
+                        } else {
+                            onPullNotesFromDesktop(
+                                syncHostInput,
+                                syncPinInput,
+                                transferClearExistingConfirmed,
+                                settings.masterPin
+                            )
+                        }
+                        pendingTransferDirection = null
+                    }
+                ) {
+                    Text("Aktarımı başlat")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingTransferDirection = null }) { Text("İptal") }
+            }
+        )
+    }
+
+    syncUiState.incomingTransfer?.let { transfer ->
+        AlertDialog(
+            onDismissRequest = {
+                onRespondToIncomingSync(transfer.id, false, false)
+            },
+            icon = {
+                Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            },
+            title = { Text("Gelen aktarım onayı", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("${transfer.notesCount} not · ${transfer.sizeBytes / (1024 * 1024)} MiB")
+                    Text("Arşiv bu telefona alınacak. Onaylamadan hiçbir not içe aktarılmaz.")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = incomingClearExisting,
+                            onCheckedChange = { incomingClearExisting = it }
+                        )
+                        Text("Mevcut notları silip arşivdekilerle değiştir")
+                    }
+                    Text(
+                        "Silme seçeneği yalnızca bu kutuyu açıkça işaretleyip onayladığınızda uygulanır.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onRespondToIncomingSync(transfer.id, true, incomingClearExisting)
+                    },
+                    enabled = !transfer.requestedClearExisting || incomingClearExisting
+                ) {
+                    Text("Aktarımı onayla")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onRespondToIncomingSync(transfer.id, false, false) }) {
+                    Text("Reddet")
+                }
+            }
+        )
+    }
+
     // 7. Senkronizasyon Bilgilendirme / Sonuç İletişim Kutusu
     syncUiState.message?.let { msg ->
         AlertDialog(
@@ -2636,6 +2923,12 @@ fun SettingsScreen(
     }
 
     // 7.1. QR & Optik Akış Tarayıcı Dialog
+    if (showOpticalSender && opticalTransferManager != null) {
+        OpticalQrSenderDialog(
+            opticalTransferManager = opticalTransferManager,
+            onDismiss = { showOpticalSender = false }
+        )
+    }
     if (showScannerDialog && qrSyncManager != null && opticalTransferManager != null) {
         OpticalQrScannerDialog(
             mode = activeScannerMode,
@@ -2643,8 +2936,8 @@ fun SettingsScreen(
             opticalTransferManager = opticalTransferManager,
             onDismiss = { showScannerDialog = false },
             onWifiSyncScanned = { payload ->
-                syncHostInput = payload.ip
-                syncPinInput = payload.pin
+                syncHostInput = payload.fullUrl
+                syncPinInput = payload.pin.orEmpty()
                 onQrSyncScanned(payload)
                 showScannerDialog = false
             },
@@ -2759,6 +3052,22 @@ fun SettingsScreen(
         )
     }
 }
+
+private fun createSyncQrBitmap(contents: String): Bitmap? = runCatching {
+    val hints = mapOf(
+        EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
+        EncodeHintType.MARGIN to 2
+    )
+    val matrix = MultiFormatWriter().encode(contents, BarcodeFormat.QR_CODE, 512, 512, hints)
+    val pixels = IntArray(matrix.width * matrix.height) { index ->
+        val x = index % matrix.width
+        val y = index / matrix.width
+        if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+    }
+    Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888).apply {
+        setPixels(pixels, 0, matrix.width, 0, 0, matrix.width, matrix.height)
+    }
+}.getOrNull()
 
 /**
  * Modern Material 3 Kart Grubu Konteyneri.

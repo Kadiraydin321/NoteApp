@@ -862,7 +862,13 @@ class MainActivity : FragmentActivity() {
                             onImportFromUri = { uri, clear, pass -> viewModel.importBackupFromUri(uri, clear, pass) },
                             onDismissBackupMessage = viewModel::dismissMessage,
                             onCheckSyncConnection = viewModel::checkSyncConnection,
-                            onAutoDiscoverServer = viewModel::autoDiscoverServer,
+                            onDiscoverSyncServers = viewModel::discoverSyncServers,
+                            onSelectDiscoveredSyncServer = viewModel::selectDiscoveredSyncServer,
+                            onStartAndroidSyncServer = viewModel::startAndroidSyncServer,
+                            onStopAndroidSyncServer = viewModel::stopAndroidSyncServer,
+                            onRespondToIncomingSync = { id, approved, clear ->
+                                viewModel.respondToIncomingSync(id, approved, clear)
+                            },
                             onSendNotesToDesktop = viewModel::sendNotesToDesktop,
                             onPullNotesFromDesktop = viewModel::pullNotesFromDesktop,
                             onDismissSyncMessage = viewModel::dismissSyncMessage,

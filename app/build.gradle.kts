@@ -15,8 +15,8 @@ android {
         applicationId = "com.example.noteapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 35
-        versionName = "1.4.4"
+        versionCode = 36
+        versionName = "1.4.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("Long", "BUILD_TIME", "${System.currentTimeMillis()}L")
@@ -47,6 +47,8 @@ android {
 }
 
 dependencies {
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)

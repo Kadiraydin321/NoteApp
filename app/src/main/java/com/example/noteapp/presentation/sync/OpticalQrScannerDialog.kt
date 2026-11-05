@@ -39,13 +39,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -54,8 +57,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -70,6 +75,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,6 +86,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.noteapp.data.sync.OpticalImportResult
+import com.example.noteapp.data.sync.OpticalImportSummary
 import com.example.noteapp.data.sync.OpticalStreamProgress
 import com.example.noteapp.data.sync.OpticalTransferManager
 import com.example.noteapp.data.sync.QrSyncManager
@@ -95,6 +103,10 @@ import java.util.concurrent.Executors
 enum class ScannerMode {
     WIFI_SYNC_PAIRING, // Masaüstü Wi-Fi Eşleşme QR Kodu
     OPTICAL_STREAM     // Animasyonlu Optik Veri Akışı (Air-Gapped)
+}
+
+enum class OpticalReceivePhase {
+    SCANNING, NEED_PASSWORD, DECRYPTING, CONFIRM, IMPORTING, DONE
 }
 
 @Composable
@@ -136,9 +148,29 @@ fun OpticalQrScannerDialog(
 
     // Optik Akış İlerleme Durumu
     var opticalProgress by remember { mutableStateOf(OpticalStreamProgress()) }
-    var isImporting by remember { mutableStateOf(false) }
+    var phase by remember { mutableStateOf(OpticalReceivePhase.SCANNING) }
     var importSuccessResult by remember { mutableStateOf<OpticalImportResult?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var pendingEnvelope by remember { mutableStateOf<String?>(null) }
+    var pendingJson by remember { mutableStateOf<String?>(null) }
+    var pendingSummary by remember { mutableStateOf<OpticalImportSummary?>(null) }
+    var pendingIsLegacyPlain by remember { mutableStateOf(false) }
+    var passwordInput by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    val isImporting = phase == OpticalReceivePhase.IMPORTING || phase == OpticalReceivePhase.DECRYPTING
+
+    fun restartScanning(message: String? = null) {
+        opticalTransferManager.reset()
+        opticalProgress = OpticalStreamProgress()
+        pendingEnvelope = null
+        pendingJson = null
+        pendingSummary = null
+        pendingIsLegacyPlain = false
+        passwordInput = ""
+        passwordError = null
+        errorMessage = message
+        phase = OpticalReceivePhase.SCANNING
+    }
 
     // Titreşim Yardımcısı
     fun triggerVibration() {
@@ -197,7 +229,7 @@ fun OpticalQrScannerDialog(
 
                             imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
                                 val mediaImage = imageProxy.image
-                                if (mediaImage != null && !isImporting && importSuccessResult == null) {
+                                if (mediaImage != null && phase == OpticalReceivePhase.SCANNING && importSuccessResult == null) {
                                     val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
                                     barcodeScanner.process(image)
                                         .addOnSuccessListener { barcodes ->
@@ -221,28 +253,33 @@ fun OpticalQrScannerDialog(
                                                         val progress = opticalTransferManager.processChunk(rawValue)
                                                         coroutineScope.launch(Dispatchers.Main) {
                                                             opticalProgress = progress
+                                                            progress.errorMessage?.let { errorMessage = it }
 
-                                                            // %100 tamamlandıysa otomatik birleştir ve veritabanına aktar
-                                                            if (progress.isComplete && !isImporting && importSuccessResult == null) {
-                                                                isImporting = true
+                                                            // Tüm kareler geldiğinde birleştirilir; içe aktarma yalnızca kullanıcı onayıyla yapılır
+                                                            if (progress.isComplete && phase == OpticalReceivePhase.SCANNING) {
                                                                 triggerVibration()
-
-                                                                val assembleResult = opticalTransferManager.assembleAndVerify()
-                                                                assembleResult.onSuccess { fullJson ->
-                                                                    val importResult = opticalTransferManager.importAssembledNotes(fullJson)
-                                                                    importResult.onSuccess { res ->
-                                                                        importSuccessResult = res
-                                                                        isImporting = false
-                                                                        triggerVibration()
-                                                                        onOpticalTransferComplete(res)
-                                                                    }.onFailure { err ->
-                                                                        errorMessage = err.localizedMessage ?: "Aktarım başarısız oldu"
-                                                                        isImporting = false
+                                                                opticalTransferManager.assembleAndVerify()
+                                                                    .onSuccess { assembled ->
+                                                                        errorMessage = null
+                                                                        if (opticalTransferManager.isEncryptedStream) {
+                                                                            pendingEnvelope = assembled
+                                                                            phase = OpticalReceivePhase.NEED_PASSWORD
+                                                                        } else {
+                                                                            opticalTransferManager.summarize(assembled)
+                                                                                .onSuccess { summary ->
+                                                                                    pendingJson = assembled
+                                                                                    pendingSummary = summary
+                                                                                    pendingIsLegacyPlain = true
+                                                                                    phase = OpticalReceivePhase.CONFIRM
+                                                                                }
+                                                                                .onFailure { err ->
+                                                                                    restartScanning(err.localizedMessage ?: "Veri okunamadı")
+                                                                                }
+                                                                        }
                                                                     }
-                                                                }.onFailure { err ->
-                                                                    errorMessage = err.localizedMessage ?: "Doğrulama hatası"
-                                                                    isImporting = false
-                                                                }
+                                                                    .onFailure { err ->
+                                                                        restartScanning(err.localizedMessage ?: "Doğrulama hatası")
+                                                                    }
                                                             }
                                                         }
                                                     }
@@ -339,7 +376,7 @@ fun OpticalQrScannerDialog(
                 }
 
                 Text(
-                    text = if (mode == ScannerMode.WIFI_SYNC_PAIRING) "Masaüstü QR Eşleşmesi" else "Optik Akış Tarayıcı",
+                    text = if (mode == ScannerMode.WIFI_SYNC_PAIRING) "Masaüstü QR Eşleşmesi" else "Kamera ile Not Al",
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
@@ -423,7 +460,17 @@ fun OpticalQrScannerDialog(
                                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                                     Spacer(Modifier.width(10.dp))
                                     Text(
-                                        "Parçalar Birleştiriliyor & Doğrulanıyor...",
+                                        if (phase == OpticalReceivePhase.DECRYPTING) "Şifre çözülüyor..." else "Notlar içe aktarılıyor...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            } else if (phase != OpticalReceivePhase.SCANNING) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "Tüm kareler alındı. Devam etmek için onay verin.",
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold
                                     )
@@ -466,7 +513,7 @@ fun OpticalQrScannerDialog(
                                     )
                                 } else {
                                     Text(
-                                        "Kamerayı masaüstündeki animasyonlu QR koda sabit tutun.",
+                                        "Kamerayı telefonun veya masaüstünün animasyonlu QR koduna sabit tutun. Kareler sırayla okunur; kaçırılanlar döngüde tekrar gelir.",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -487,7 +534,119 @@ fun OpticalQrScannerDialog(
             }
         }
     }
+
+    if (mode == ScannerMode.OPTICAL_STREAM && phase == OpticalReceivePhase.NEED_PASSWORD) {
+        AlertDialog(
+            onDismissRequest = { restartScanning() },
+            icon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Aktarım Parolası") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Bu akış şifreli. Gönderen cihazda belirlenen parolayı girin. Notlar henüz içe aktarılmadı.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = {
+                            passwordInput = it
+                            passwordError = null
+                        },
+                        label = { Text("Parola") },
+                        singleLine = true,
+                        isError = passwordError != null,
+                        supportingText = passwordError?.let { { Text(it) } },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = passwordInput.isNotEmpty(),
+                    onClick = {
+                        val envelope = pendingEnvelope ?: return@Button
+                        val chars = passwordInput.toCharArray()
+                        phase = OpticalReceivePhase.DECRYPTING
+                        coroutineScope.launch {
+                            val decrypted = opticalTransferManager.decryptEnvelope(envelope, chars)
+                            chars.fill('\u0000')
+                            decrypted
+                                .onSuccess { json ->
+                                    opticalTransferManager.summarize(json)
+                                        .onSuccess { summary ->
+                                            pendingJson = json
+                                            pendingSummary = summary
+                                            pendingIsLegacyPlain = false
+                                            passwordInput = ""
+                                            phase = OpticalReceivePhase.CONFIRM
+                                        }
+                                        .onFailure { err -> restartScanning(err.localizedMessage ?: "Veri okunamadı") }
+                                }
+                                .onFailure { err ->
+                                    passwordError = err.localizedMessage ?: "Şifre çözülemedi"
+                                    phase = OpticalReceivePhase.NEED_PASSWORD
+                                }
+                        }
+                    }
+                ) { Text("Çöz") }
+            },
+            dismissButton = {
+                TextButton(onClick = { restartScanning() }) { Text("İptal") }
+            }
+        )
+    }
+
+    val summaryToConfirm = pendingSummary
+    if (mode == ScannerMode.OPTICAL_STREAM && phase == OpticalReceivePhase.CONFIRM && summaryToConfirm != null) {
+        AlertDialog(
+            onDismissRequest = { restartScanning() },
+            icon = { Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Notlar İçe Aktarılsın mı?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "${summaryToConfirm.notesCount} not, ${summaryToConfirm.categoriesCount} kategori (${formatPayloadSize(summaryToConfirm.payloadBytes)}). " +
+                            "Notlar mevcut notlarınızın yanına eklenir; hiçbir not silinmez.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    if (pendingIsLegacyPlain) {
+                        Text(
+                            "⚠ Bu akış eski, şifresiz formatta üretilmiş; içeriği ekranı gören herkes okuyabilir. Yalnızca kendi cihazınızdan geldiğinden eminseniz içe aktarın.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val json = pendingJson ?: return@Button
+                    phase = OpticalReceivePhase.IMPORTING
+                    coroutineScope.launch {
+                        opticalTransferManager.importAssembledNotes(json)
+                            .onSuccess { res ->
+                                importSuccessResult = res
+                                phase = OpticalReceivePhase.DONE
+                                triggerVibration()
+                                onOpticalTransferComplete(res)
+                            }
+                            .onFailure { err ->
+                                restartScanning(err.localizedMessage ?: "Aktarım başarısız oldu")
+                            }
+                    }
+                }) { Text("İçe Aktar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { restartScanning() }) { Text("Vazgeç") }
+            }
+        )
+    }
 }
+
+internal fun formatPayloadSize(bytes: Int): String =
+    if (bytes < 1024) "$bytes B" else "%.1f KB".format(java.util.Locale.US, bytes / 1024.0)
 
 @Composable
 fun ScanningReticleOverlay(

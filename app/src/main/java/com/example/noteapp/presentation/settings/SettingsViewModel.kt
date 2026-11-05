@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.noteapp.data.backup.BackupManager
@@ -15,21 +17,33 @@ import com.example.noteapp.data.settings.AppSettings
 import com.example.noteapp.data.settings.AppSettingsManager
 import com.example.noteapp.data.settings.WidgetFilterMode
 import com.example.noteapp.data.sync.DesktopSyncClient
+import com.example.noteapp.data.sync.AndroidSyncServer
+import com.example.noteapp.data.sync.DiscoveredSyncServer
+import com.example.noteapp.data.sync.IncomingSyncTransfer
 import com.example.noteapp.data.sync.OpticalImportResult
 import com.example.noteapp.data.sync.OpticalTransferManager
 import com.example.noteapp.data.sync.QrSyncManager
+import com.example.noteapp.data.sync.SyncUploadProgress
+import com.example.noteapp.data.sync.SyncHostTransferResult
+import com.example.noteapp.data.sync.SyncPairingSession
+import com.example.noteapp.data.sync.SyncServiceDiscovery
 import com.example.noteapp.data.sync.SyncQrPayload
 import com.example.noteapp.data.sync.SyncResult
 import com.example.noteapp.data.sync.SyncServerStatus
 import com.example.noteapp.data.updater.AppUpdateManager
 import com.example.noteapp.data.updater.UpdateStatus
+import com.example.noteapp.domain.repository.NoteRepository
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.net.Inet4Address
 import javax.inject.Inject
 
 data class BackupUiState(
@@ -43,11 +57,20 @@ data class BackupUiState(
 
 data class SyncUiState(
     val isOperating: Boolean = false,
+    val isHosting: Boolean = false,
+    val hostQrPayload: SyncQrPayload? = null,
+    val incomingTransfer: IncomingSyncTransfer? = null,
+    val uploadProgress: SyncUploadProgress = SyncUploadProgress(),
+    val localNotesCount: Int = 0,
     val statusChecking: Boolean = false,
     val isDiscovering: Boolean = false,
     val isConnected: Boolean? = null,
     val serverStatus: SyncServerStatus? = null,
     val discoveredHost: String? = null,
+    val discoveredServers: List<DiscoveredSyncServer> = emptyList(),
+    val discoveryMessage: String? = null,
+    val hasSession: Boolean = false,
+    val sessionExpiresAt: Long? = null,
     val operationTitle: String? = null,
     val message: String? = null,
     val isSuccess: Boolean? = null
@@ -78,7 +101,10 @@ class SettingsViewModel @Inject constructor(
     private val app: Application,
     private val settingsManager: AppSettingsManager,
     private val backupManager: BackupManager,
+    private val noteRepository: NoteRepository,
     private val desktopSyncClient: DesktopSyncClient,
+    private val androidSyncServer: AndroidSyncServer,
+    private val syncServiceDiscovery: SyncServiceDiscovery,
     private val updateManager: AppUpdateManager,
     private val maintenanceManager: DatabaseMaintenanceManager,
     val qrSyncManager: QrSyncManager,
@@ -92,6 +118,13 @@ class SettingsViewModel @Inject constructor(
 
     private val _syncUiState = MutableStateFlow(SyncUiState())
     val syncUiState: StateFlow<SyncUiState> = _syncUiState.asStateFlow()
+    private data class ActiveSyncSession(
+        val host: String,
+        val session: SyncPairingSession,
+        val tlsCertSha256: String?
+    )
+    private var activeSyncSession: ActiveSyncSession? = null
+    private var syncDiscoveryJob: Job? = null
 
     private val _updateUiState = MutableStateFlow(UpdateUiState())
     val updateUiState: StateFlow<UpdateUiState> = _updateUiState.asStateFlow()
@@ -101,6 +134,32 @@ class SettingsViewModel @Inject constructor(
 
     init {
         loadStorageInfo()
+        viewModelScope.launch {
+            _syncUiState.value = _syncUiState.value.copy(
+                localNotesCount = noteRepository.getAllNotes().size
+            )
+        }
+        viewModelScope.launch {
+            androidSyncServer.incomingTransfer.collect { transfer ->
+                _syncUiState.value = _syncUiState.value.copy(incomingTransfer = transfer)
+            }
+        }
+        viewModelScope.launch {
+            androidSyncServer.uploadProgress.collect { progress ->
+                _syncUiState.value = _syncUiState.value.copy(uploadProgress = progress)
+            }
+        }
+        viewModelScope.launch {
+            androidSyncServer.transferResult.collect { result ->
+                if (result != null) {
+                    _syncUiState.value = _syncUiState.value.copy(
+                        isOperating = false,
+                        message = result.message,
+                        isSuccess = result.success
+                    )
+                }
+            }
+        }
         viewModelScope.launch {
             updateManager.updateStatus.collect { status ->
                 _updateUiState.value = _updateUiState.value.copy(
@@ -114,6 +173,57 @@ class SettingsViewModel @Inject constructor(
                     hasShownDialogForVersion = updateManager.hasShownDialogForVersion
                 )
             }
+        }
+    }
+
+    fun startAndroidSyncServer() {
+        viewModelScope.launch {
+            try {
+                val connectivity = app.getSystemService(ConnectivityManager::class.java)
+                    ?: throw IllegalStateException("Ağ bağlantısı yöneticisi kullanılamıyor.")
+                val network = connectivity.activeNetwork
+                    ?: throw IllegalStateException("Önce Wi-Fi ağına bağlanın.")
+                val capabilities = connectivity.getNetworkCapabilities(network)
+                if (capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) != true) {
+                    throw IllegalStateException("Eşitleme sunucusu için Wi-Fi bağlantısı gerekiyor.")
+                }
+                val host = connectivity.getLinkProperties(network)
+                    ?.linkAddresses
+                    ?.asSequence()
+                    ?.map { it.address }
+                    ?.filterIsInstance<Inet4Address>()
+                    ?.firstOrNull { !it.isLoopbackAddress && (it.isSiteLocalAddress || it.isLinkLocalAddress) }
+                    ?.hostAddress
+                    ?: throw IllegalStateException("Wi-Fi ağında kullanılabilir yerel IPv4 adresi bulunamadı.")
+                val payload = androidSyncServer.start(host)
+                _syncUiState.value = _syncUiState.value.copy(
+                    isHosting = true,
+                    hostQrPayload = payload,
+                    message = "HTTPS eşitleme sunucusu yerel ağda başlatıldı.",
+                    isSuccess = true
+                )
+            } catch (error: Exception) {
+                androidSyncServer.stop()
+                _syncUiState.value = _syncUiState.value.copy(
+                    isHosting = false,
+                    hostQrPayload = null,
+                    message = error.localizedMessage ?: "HTTPS eşitleme sunucusu başlatılamadı.",
+                    isSuccess = false
+                )
+            }
+        }
+    }
+
+    fun stopAndroidSyncServer() {
+        androidSyncServer.stop()
+        _syncUiState.value = _syncUiState.value.copy(isHosting = false, hostQrPayload = null)
+    }
+
+    fun respondToIncomingSync(transferId: String, approved: Boolean, clearExistingConfirmed: Boolean = false) {
+        if (approved) {
+            androidSyncServer.approveIncoming(transferId, clearExistingConfirmed)
+        } else {
+            androidSyncServer.rejectIncoming(transferId)
         }
     }
 
@@ -405,65 +515,125 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Yerel ağdaki bilgisayarı otomatik arar ve bulunursa IP'yi kaydeder.
-     */
-    fun autoDiscoverServer(currentInput: String? = null) {
-        viewModelScope.launch {
+    fun discoverSyncServers() {
+        syncDiscoveryJob?.cancel()
+        syncDiscoveryJob = viewModelScope.launch {
+            val found = linkedMapOf<String, DiscoveredSyncServer>()
             _syncUiState.value = _syncUiState.value.copy(
                 isDiscovering = true,
-                message = "Yerel ağdaki bilgisayar taranıyor...",
-                isSuccess = null
+                discoveredServers = emptyList(),
+                discoveryMessage = "Aynı Wi-Fi ağındaki masaüstü cihazları aranıyor…"
             )
-            val preferred = currentInput?.ifBlank { null } ?: settings.value.lastSyncHost.ifBlank { null }
-            val result = desktopSyncClient.autoDiscoverServer(preferred)
-            result.onSuccess { (host, status) ->
-                settingsManager.setLastSyncHost(host)
+            try {
+                withTimeoutOrNull(12_000) {
+                    syncServiceDiscovery.discover().collect { server ->
+                        found[server.endpoint] = server
+                        _syncUiState.value = _syncUiState.value.copy(
+                            discoveredServers = found.values.toList(),
+                            discoveryMessage = null
+                        )
+                    }
+                }
                 _syncUiState.value = _syncUiState.value.copy(
                     isDiscovering = false,
-                    isConnected = true,
-                    serverStatus = status,
-                    discoveredHost = host,
-                    message = "Bilgisayar bulundu: $host (${status.appName}, ${status.notesCount} not)",
-                    isSuccess = true
+                    discoveryMessage = if (found.isEmpty()) {
+                        "Masaüstü bulunamadı. İki cihazın aynı Wi-Fi ağında ve masaüstü uygulamasının açık olduğundan emin olun."
+                    } else {
+                        "${found.size} masaüstü bulundu. Cihazı seçin; eşleşme için QR kodunu okutmanız gerekir."
+                    }
                 )
-            }.onFailure { err ->
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
                 _syncUiState.value = _syncUiState.value.copy(
                     isDiscovering = false,
-                    message = err.localizedMessage ?: "Ağda bilgisayar bulunamadı.",
-                    isSuccess = false
+                    discoveryMessage = error.localizedMessage
+                        ?: "Yerel ağ keşfi başarısız oldu. Ağ iznini ve Wi-Fi bağlantısını kontrol edin."
                 )
             }
         }
     }
 
-    /**
-     * Masaüstü QR kodundan taranan IP ve PIN bilgilerini işler, otomatik bağlantıyı başlatır.
-     */
+    fun selectDiscoveredSyncServer(server: DiscoveredSyncServer) {
+        if (activeSyncSession?.host != server.endpoint) activeSyncSession = null
+        settingsManager.setLastSyncHost(server.endpoint)
+        _syncUiState.value = _syncUiState.value.copy(
+            discoveredHost = server.endpoint,
+            isConnected = false,
+            serverStatus = null,
+            hasSession = activeSyncSession != null,
+            sessionExpiresAt = activeSyncSession?.session?.expiresAt,
+            discoveryMessage = "Masaüstü bulundu. Eşleşme için bu bilgisayardaki QR kodunu okutun.",
+            message = null,
+            isSuccess = null
+        )
+    }
+
     fun onQrSyncScanned(payload: SyncQrPayload) {
         viewModelScope.launch {
-            settingsManager.setLastSyncHost(payload.ip)
-            settingsManager.setLastSyncPin(payload.pin)
+            val host = payload.fullUrl
+            settingsManager.setLastSyncHost(host)
             _syncUiState.value = _syncUiState.value.copy(
-                discoveredHost = payload.ip,
-                message = "Masaüstü QR okundu (${payload.ip}:${payload.port}, PIN: ${payload.pin}). Bağlanıyor..."
+                isOperating = true,
+                operationTitle = "QR eşleşmesi doğrulanıyor…",
+                discoveredHost = host,
+                message = null,
+                discoveryMessage = null,
+                isSuccess = null
             )
-            val connRes = desktopSyncClient.checkConnection(payload.ip)
+
+            val pin: String
+            val sessionToken: String?
+            val tlsCertSha256 = payload.tlsCertSha256
+            if (payload.isSessionPairing) {
+                val pairing = desktopSyncClient.pairSession(
+                    host,
+                    payload.pairingToken.orEmpty(),
+                    tlsCertSha256
+                )
+                if (pairing.isFailure) {
+                    activeSyncSession = null
+                    _syncUiState.value = _syncUiState.value.copy(
+                        isOperating = false,
+                        isConnected = false,
+                        hasSession = false,
+                        sessionExpiresAt = null,
+                        message = pairing.exceptionOrNull()?.message
+                            ?: "QR eşleşmesi başarısız oldu. Masaüstünden yeni QR kodu üretip tekrar okutun.",
+                        isSuccess = false
+                    )
+                    return@launch
+                }
+                val session = pairing.getOrThrow()
+                activeSyncSession = ActiveSyncSession(host, session, tlsCertSha256)
+                _syncUiState.value = _syncUiState.value.copy(
+                    hasSession = true,
+                    sessionExpiresAt = session.expiresAt,
+                    operationTitle = "Masaüstü oturumu oluşturuldu. Notlar alınıyor…"
+                )
+                pin = ""
+                sessionToken = session.sessionToken
+            } else {
+                pin = payload.pin.orEmpty()
+                sessionToken = null
+            }
+
+            val connRes = desktopSyncClient.checkConnection(host, tlsCertSha256)
             if (connRes.isSuccess) {
                 val status = connRes.getOrThrow()
                 _syncUiState.value = _syncUiState.value.copy(
+                    isOperating = false,
                     isConnected = true,
                     serverStatus = status,
-                    message = "Masaüstüne bağlandı: ${status.appName} (${status.notesCount} not). Eşitleniyor..."
-                )
-                pullNotesFromDesktop(
-                    host = payload.ip,
-                    pin = payload.pin,
-                    clearExisting = false,
-                    vaultPassword = settings.value.masterPin
+                    message = if (sessionToken != null) {
+                        "Güvenli oturum açıldı: ${status.appName} (${status.notesCount} not)."
+                    } else {
+                        "Eski PIN eşleşmesi doğrulandı: ${status.appName} (${status.notesCount} not)."
+                    }
                 )
             } else {
                 _syncUiState.value = _syncUiState.value.copy(
+                    isOperating = false,
                     isConnected = false,
                     message = connRes.exceptionOrNull()?.message ?: "Masaüstüne bağlanılamadı.",
                     isSuccess = false
@@ -493,7 +663,19 @@ class SettingsViewModel @Inject constructor(
                 message = null,
                 isSuccess = null
             )
-            val result = desktopSyncClient.sendNotesToDesktop(host, pin, clearExisting, vaultPassword)
+            val session = validSessionFor(host)
+            val result = desktopSyncClient.sendNotesToDesktop(
+                host,
+                pin,
+                clearExisting,
+                vaultPassword,
+                session?.sessionToken,
+                activeTlsPinFor(host)
+            ) { sentBytes, totalBytes ->
+                _syncUiState.value = _syncUiState.value.copy(
+                    uploadProgress = SyncUploadProgress(sentBytes, totalBytes)
+                )
+            }
             when (result) {
                 is SyncResult.Success -> {
                     settingsManager.setLastSyncHost(host)
@@ -506,8 +688,12 @@ class SettingsViewModel @Inject constructor(
                     )
                 }
                 is SyncResult.Error -> {
+                    if (result.requiresRePair) activeSyncSession = null
                     _syncUiState.value = _syncUiState.value.copy(
                         isOperating = false,
+                        isConnected = if (result.requiresRePair) false else _syncUiState.value.isConnected,
+                        hasSession = if (result.requiresRePair) false else _syncUiState.value.hasSession,
+                        sessionExpiresAt = if (result.requiresRePair) null else _syncUiState.value.sessionExpiresAt,
                         message = result.message,
                         isSuccess = false
                     )
@@ -534,7 +720,19 @@ class SettingsViewModel @Inject constructor(
                 message = null,
                 isSuccess = null
             )
-            val result = desktopSyncClient.pullNotesFromDesktop(host, pin, clearExisting, vaultPassword)
+            val session = validSessionFor(host)
+            val result = desktopSyncClient.pullNotesFromDesktop(
+                host,
+                pin,
+                clearExisting,
+                vaultPassword,
+                session?.sessionToken,
+                activeTlsPinFor(host)
+            ) { receivedBytes, totalBytes ->
+                _syncUiState.value = _syncUiState.value.copy(
+                    uploadProgress = SyncUploadProgress(receivedBytes, totalBytes)
+                )
+            }
             when (result) {
                 is SyncResult.Success -> {
                     settingsManager.setLastSyncHost(host)
@@ -548,8 +746,12 @@ class SettingsViewModel @Inject constructor(
                     )
                 }
                 is SyncResult.Error -> {
+                    if (result.requiresRePair) activeSyncSession = null
                     _syncUiState.value = _syncUiState.value.copy(
                         isOperating = false,
+                        isConnected = if (result.requiresRePair) false else _syncUiState.value.isConnected,
+                        hasSession = if (result.requiresRePair) false else _syncUiState.value.hasSession,
+                        sessionExpiresAt = if (result.requiresRePair) null else _syncUiState.value.sessionExpiresAt,
                         message = result.message,
                         isSuccess = false
                     )
@@ -567,6 +769,31 @@ class SettingsViewModel @Inject constructor(
 
     fun dismissSyncMessage() {
         _syncUiState.value = _syncUiState.value.copy(message = null, isSuccess = null)
+    }
+
+    private fun validSessionFor(host: String): SyncPairingSession? {
+        val active = activeSyncSession ?: return null
+        if (active.session.expiresAt <= System.currentTimeMillis() || syncOrigin(active.host) != syncOrigin(host)) {
+            activeSyncSession = null
+            _syncUiState.value = _syncUiState.value.copy(hasSession = false, sessionExpiresAt = null)
+            return null
+        }
+        return active.session
+    }
+
+    private fun activeTlsPinFor(host: String): String? =
+        activeSyncSession
+            ?.takeIf { syncOrigin(it.host) == syncOrigin(host) }
+            ?.tlsCertSha256
+
+    private fun syncOrigin(host: String): String? {
+        val candidate = if (host.startsWith("http://", true) || host.startsWith("https://", true)) host else "http://$host"
+        return runCatching {
+            val uri = java.net.URI(candidate)
+            val address = uri.host ?: return null
+            val port = if (uri.port == -1) 8765 else uri.port
+            "${address.lowercase()}:$port"
+        }.getOrNull()
     }
 
     // ==========================================
@@ -645,5 +872,10 @@ class SettingsViewModel @Inject constructor(
 
     fun dismissMaintenanceMessage() {
         _maintenanceUiState.value = _maintenanceUiState.value.copy(message = null)
+    }
+
+    override fun onCleared() {
+        androidSyncServer.stop()
+        super.onCleared()
     }
 }

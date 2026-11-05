@@ -132,6 +132,45 @@ class OpticalTransferAndQrSyncTest {
         assertNull(qrSyncManager.parseSyncPayload("""{"other":"data"}"""))
     }
 
+    @Test
+    fun testParseV2PairingPayloadAndRejectExpiredOrNonLocalTargets() {
+        val now = System.currentTimeMillis()
+        val valid = """{"type":"noteapp_sync","version":2,"host":"192.168.1.45","port":8765,"pairing_token":"${"a".repeat(32)}","expires_at":${now + 60_000}}"""
+
+        val payload = qrSyncManager.parseSyncPayload(valid, now)
+        assertNotNull(payload)
+        assertTrue(payload?.isSessionPairing == true)
+        assertEquals("192.168.1.45", payload?.ip)
+        assertEquals(8765, payload?.port)
+        assertEquals(now + 60_000, payload?.expiresAt)
+
+        assertNull(qrSyncManager.parseSyncPayload(valid.replace("\"expires_at\":${now + 60_000}", "\"expires_at\":$now"), now))
+        assertNull(qrSyncManager.parseSyncPayload(valid.replace("192.168.1.45", "example.com"), now))
+        assertNull(qrSyncManager.parseSyncPayload(valid.replace("\"version\":2", "\"version\":3"), now))
+        assertNull(qrSyncManager.parseSyncPayload(valid.replace("a".repeat(32), "a".repeat(31)), now))
+        assertNull(qrSyncManager.parseSyncPayload(valid.replace("a".repeat(32), "a".repeat(31) + "+"), now))
+    }
+
+    @Test
+    fun testParseV3TlsPinnedPairingPayloadAndRejectMalformedPin() {
+        val now = System.currentTimeMillis()
+        val fingerprint = "a".repeat(64)
+        val valid = """{"type":"noteapp_sync","version":3,"scheme":"https","host":"192.168.1.45","port":8765,"tls_cert_sha256":"$fingerprint","pairing_token":"${"b".repeat(32)}","expires_at":${now + 60_000}}"""
+
+        val payload = qrSyncManager.parseSyncPayload(valid, now)
+        assertNotNull(payload)
+        assertTrue(payload?.isSessionPairing == true)
+        assertEquals("https://192.168.1.45:8765", payload?.fullUrl)
+        assertEquals(fingerprint, payload?.tlsCertSha256)
+        assertEquals(payload, payload?.toQrJson()?.let { qrSyncManager.parseSyncPayload(it, now) })
+
+        assertNull(qrSyncManager.parseSyncPayload(valid.replace("\"scheme\":\"https\"", "\"scheme\":\"http\""), now))
+        assertNull(qrSyncManager.parseSyncPayload(valid.replace(fingerprint, "A".repeat(64)), now))
+        assertNull(qrSyncManager.parseSyncPayload(valid.replace(fingerprint, "a".repeat(63)), now))
+        assertNull(qrSyncManager.parseSyncPayload(valid.replace("\"pairing_token\":\"${"b".repeat(32)}\"", "\"pairing_token\":\"${"b".repeat(31)}\""), now))
+        assertNull(qrSyncManager.parseSyncPayload(valid.replace("\"expires_at\":${now + 60_000}", "\"expires_at\":$now"), now))
+    }
+
     // -------------------------------------------------------------
     // OPTICAL AIR-GAPPED TRANSFER TESTS
     // -------------------------------------------------------------
@@ -280,5 +319,126 @@ class OpticalTransferAndQrSyncTest {
         val verifyResult = opticalTransferManager.assembleAndVerify()
         assertTrue(verifyResult.isSuccess)
         assertEquals(desktopChunkPayload, verifyResult.getOrNull())
+    }
+
+    // -------------------------------------------------------------
+    // ŞİFRELİ (v2) ANİMASYONLU QR AKIŞI
+    // -------------------------------------------------------------
+
+    private fun seedNotes() {
+        fakeRepo.categories.add(Category(id = 1, name = "Kişisel", color = 5))
+        fakeRepo.notes.add(Note(id = 1, title = "Gizli Not", content = "Parolalı aktarım içeriği çğıöşü", categoryId = 1, isPinned = true))
+        fakeRepo.notes.add(Note(id = 2, title = "Kilitli", content = "şifreli-saklanan-icerik", isLocked = true))
+        fakeRepo.notes.add(Note(id = 3, title = "Çöp", content = "silinmiş", isDeleted = true))
+    }
+
+    private fun receiverFrom(frames: List<String>): OpticalTransferManager {
+        val receiverRepo = FakeNoteRepository()
+        val receiver = OpticalTransferManager(receiverRepo)
+        frames.shuffled().forEach { receiver.processChunk(it) }
+        return receiver
+    }
+
+    @Test
+    fun testEncryptedTransferRoundTripRequiresPasswordAndSkipsLockedAndDeleted() = runBlocking {
+        seedNotes()
+        val pkg = opticalTransferManager.prepareTransfer("dogru-parola".toCharArray()).getOrThrow()
+        assertEquals(1, pkg.noteCount)
+        assertEquals(1, pkg.skippedLockedCount)
+
+        val frames = pkg.frames(250)
+        assertTrue(frames.size > 1)
+        frames.forEach { assertFalse("Çerçeve düz metin içermemeli", it.contains("Parolalı")) }
+
+        val receiver = receiverFrom(frames)
+        assertTrue(receiver.getProgress().isComplete)
+        assertTrue(receiver.isEncryptedStream)
+
+        val envelope = receiver.assembleAndVerify().getOrThrow()
+        assertTrue(receiver.decryptEnvelope(envelope, "yanlis-parola".toCharArray()).isFailure)
+
+        val json = receiver.decryptEnvelope(envelope, "dogru-parola".toCharArray()).getOrThrow()
+        val summary = receiver.summarize(json).getOrThrow()
+        assertEquals(1, summary.notesCount)
+        assertEquals(1, summary.categoriesCount)
+
+        // Özet ve onay öncesinde hiçbir şey içe aktarılmamış olmalı
+        val receiverRepo = FakeNoteRepository()
+        val importer = OpticalTransferManager(receiverRepo)
+        assertTrue(receiverRepo.notes.isEmpty())
+        val result = importer.importAssembledNotes(json).getOrThrow()
+        assertEquals(1, result.notesCount)
+        assertEquals("Gizli Not", receiverRepo.notes[0].title)
+        assertEquals("Parolalı aktarım içeriği çğıöşü", receiverRepo.notes[0].content)
+        assertTrue(receiverRepo.notes[0].isPinned)
+    }
+
+    @Test
+    fun testPrepareTransferRejectsShortPasswordAndEmptyNotes() = runBlocking {
+        seedNotes()
+        assertTrue(opticalTransferManager.prepareTransfer("abc".toCharArray()).isFailure)
+        fakeRepo.notes.clear()
+        assertTrue(opticalTransferManager.prepareTransfer("yeterince-uzun".toCharArray()).isFailure)
+    }
+
+    @Test
+    fun testTamperedFrameFailsCrcAndTamperedCipherFailsGcm() = runBlocking {
+        seedNotes()
+        val pkg = opticalTransferManager.prepareTransfer("dogru-parola".toCharArray()).getOrThrow()
+        val frames = pkg.frames(300).toMutableList()
+
+        // Bir karenin verisini bozup CRC'yi aynı bırak
+        val tampered = JSONObject(frames[0])
+        val data = tampered.getString("d")
+        tampered.put("d", (if (data[10] == 'A') 'B' else 'A').let { data.substring(0, 10) + it + data.substring(11) })
+        frames[0] = tampered.toString()
+        val receiver = receiverFrom(frames)
+        val crcResult = receiver.assembleAndVerify()
+        assertTrue(crcResult.isFailure)
+        assertTrue(crcResult.exceptionOrNull() is SecurityException)
+
+        // CRC'si de yeniden hesaplanmış (saldırgan) zarf: GCM etiketi reddetmeli
+        val envelope = pkg.envelope
+        val flipped = envelope.substring(0, 40) + (if (envelope[40] == 'A') 'B' else 'A') + envelope.substring(41)
+        assertTrue(receiverFrom(emptyList()).decryptEnvelope(flipped, "dogru-parola".toCharArray()).isFailure)
+    }
+
+    @Test
+    fun testFramesFromDifferentTransfersAreNotMixed() = runBlocking {
+        seedNotes()
+        val first = opticalTransferManager.prepareTransfer("dogru-parola".toCharArray()).getOrThrow().frames(250)
+        val second = opticalTransferManager.prepareTransfer("dogru-parola".toCharArray()).getOrThrow().frames(250)
+        val receiver = OpticalTransferManager(FakeNoteRepository())
+        receiver.processChunk(first[0])
+        val progress = receiver.processChunk(second[1])
+        assertEquals(1, progress.receivedCount)
+        assertFalse(progress.isComplete)
+    }
+
+    @Test
+    fun testUnsupportedAndMalformedFramesAreRejected() {
+        val future = """{"v":3,"i":"abc","s":1,"t":1,"d":"x","c":5}"""
+        assertNull(opticalTransferManager.parseChunk(future))
+        assertTrue(opticalTransferManager.isUnsupportedVersion(future))
+        assertNotNull(opticalTransferManager.processChunk(future).errorMessage)
+
+        assertNull(opticalTransferManager.parseChunk("""{"v":2,"s":1,"t":1,"d":"x","c":5}"""))   // aktarım kimliği yok
+        assertNull(opticalTransferManager.parseChunk("""{"v":2,"i":"abc","s":1,"t":1,"d":"x"}""")) // CRC yok
+        assertNull(opticalTransferManager.parseChunk("""{"s":5,"t":3,"d":"x","c":1}"""))          // s > t
+        assertNull(opticalTransferManager.parseChunk("""{"s":1,"t":99999,"d":"x","c":1}"""))      // t sınırı
+    }
+
+    @Test
+    fun testLegacyPlainStreamIsFlaggedUnencryptedAndNeverAutoImported() {
+        val payload = """{"notes":[{"title":"Eski"}],"categories":[]}"""
+        val crc = CRC32().also { it.update(payload.toByteArray(Charsets.UTF_8)) }.value
+        val frame = JSONObject().apply { put("s", 1); put("t", 1); put("d", payload); put("c", crc) }.toString()
+        val progress = opticalTransferManager.processChunk(frame)
+        assertTrue(progress.isComplete)
+        assertFalse(progress.isEncrypted)
+        assertFalse(opticalTransferManager.isEncryptedStream)
+        assertTrue(fakeRepo.notes.isEmpty())
+        assertEquals(1, opticalTransferManager.summarize(opticalTransferManager.assembleAndVerify().getOrThrow()).getOrThrow().notesCount)
+        assertTrue(fakeRepo.notes.isEmpty())
     }
 }

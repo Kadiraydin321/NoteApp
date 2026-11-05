@@ -63,6 +63,8 @@ import com.example.noteapp.presentation.components.ExportVaultDialog
 import com.example.noteapp.presentation.components.NoteLinkGraphCanvasBottomSheet
 import com.example.noteapp.presentation.components.SmartCopyBottomSheet
 import com.example.noteapp.presentation.components.TagManagerBottomSheet
+import com.example.noteapp.presentation.sync.OpticalTransferAction
+import com.example.noteapp.presentation.sync.OpticalTransferHost
 import java.time.LocalDate
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -250,6 +252,7 @@ fun NotesScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     var isFabExpanded by remember { mutableStateOf(false) }
     var showQuickSyncDialog by remember { mutableStateOf(false) }
+    var opticalTransferAction by remember { mutableStateOf<OpticalTransferAction?>(null) }
     var showGraphViewBottomSheet by remember { mutableStateOf(false) }
 
     var isCategoriesAccordionExpanded by rememberSaveable(drawerCollapseMode) {
@@ -528,6 +531,28 @@ fun NotesScreen(
                     onClick = {
                         scope.launch { drawerState.close() }
                         showGraphViewBottomSheet = true
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.QrCode2, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    label = { Text("Animasyonlu QR ile Gönder") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        opticalTransferAction = OpticalTransferAction.SEND
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    label = { Text("Kamera ile Not Al") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        opticalTransferAction = OpticalTransferAction.RECEIVE
                     },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
@@ -2516,6 +2541,11 @@ fun NotesScreen(
                 }
             }
         )
+    }
+
+    // 8.0. Animasyonlu QR ile Gönder / Kamera ile Al
+    opticalTransferAction?.let { action ->
+        OpticalTransferHost(action = action, onDismiss = { opticalTransferAction = null })
     }
 
     // 8. Hızlı Wi-Fi Senkronizasyonu Dialogu
