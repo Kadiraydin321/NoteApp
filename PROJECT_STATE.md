@@ -145,6 +145,7 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] Air-Gapped Optical Stream: Çevrimdışı animasyonlu QR akışı (15 FPS), parça sıralama, CRC32 sağlama doğrulaması ve çift yönlü optik aktarım test süiti (%100 yeşil) tamamlandı.
 - [x] Güvenlik & Antivirüs Temizliği: Şüpheli sezgisel (heuristic) ldflags bayrakları ve tarayıcı user-data-dir profil parametreleri kaldırılarak false-positive riskleri tamamen giderildi.
 - [x] v2.0.0 (Faz 2): Etkileşimli Bilgi Ağı (Knowledge Graph), Komut Paleti (Ctrl+K), Yapışkan Notlar (Sticky Notes) ve Android Jetpack Compose Canvas grafik görselleştirmesi tamamlandı.
 - [x] v1.4.4: Gerçek taranabilir yerel QR motoru (qrious), koyu cam (glassmorphism) pop-up'ları ve mobil kamera-öncelikli otomatik Wi-Fi senkronizasyonu entegre edildi.

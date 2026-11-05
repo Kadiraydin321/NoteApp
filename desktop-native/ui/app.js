@@ -507,11 +507,16 @@ function initUI() {
       moreMenu.style.display = "none";
       openStickyNote();
     });
+    document.getElementById("btnMenuOpticalStream")?.addEventListener("click", () => {
+      moreMenu.style.display = "none";
+      startOpticalStream();
+    });
   }
 
-  // Doğrudan Araç Çubuğu Butonları (İlişki Grafiği, Yapışkan Not, Komut Paleti)
+  // Doğrudan Araç Çubuğu Butonları (İlişki Grafiği, Yapışkan Not, Optik Akış, Komut Paleti)
   document.getElementById("btnOpenGraph")?.addEventListener("click", openGraphModal);
   document.getElementById("btnOpenSticky")?.addEventListener("click", openStickyNote);
+  document.getElementById("btnOpenOpticalStream")?.addEventListener("click", () => startOpticalStream());
   document.getElementById("btnOpenCommandPalette")?.addEventListener("click", openCommandPalette);
 
   // Hatırlatıcı Butonu (Editör Çubuğu)
@@ -3056,6 +3061,7 @@ function openCommandPalette() {
     { title: "Kasayı Kilitle / Durum Değiştir", desc: "Gizli kasa notlarını güvene al", icon: "🔒", run: () => toggleLockCurrentNote() },
     { title: "PDF / Belge Yazdır", desc: "Mevcut notu yazdır veya PDF olarak kaydet", icon: "🖨️", run: () => window.print() },
     { title: "Yapışkan Not Olarak Aç", desc: "Mevcut notu her zaman üstte kalan küçük pencerede aç", icon: "📌", run: () => openStickyNote() },
+    { title: "Optik Veri Akışı (Air-Gapped QR Transfer)", desc: "Ağsız, tamamen çevrimdışı kamera ile dosya ve not aktarımı", icon: "📡", run: () => startOpticalStream() },
     { title: "Tüm Notları Zip Olarak Yedekle", desc: "Veritabanını arşiv dosyasına aktar", icon: "📦", run: () => document.getElementById("btnExportBackup")?.click() },
     { title: "Çoklu Not Seçim Modu", desc: "Toplu silme, arşivleme ve sabitleme", icon: "✓", run: () => document.getElementById("btnToggleBatchMode")?.click() },
     { title: "Kehribar Teması", desc: "Sıcak kehribar renk paletini uygula", icon: "🎨", run: () => applyTheme("amber") },
@@ -3611,4 +3617,216 @@ function openGraphModal() {
 
   animationFrameId = requestAnimationFrame(draw);
 }
+
+// ===================================================
+// OPTİK / KAMERA İLE VERİ AKTARIMI (AIR-GAPPED STREAM)
+// ===================================================
+
+/**
+ * IEEE 802.3 CRC32 hesaplama fonksiyonu.
+ * Java/Android java.util.zip.CRC32 ile birebir aynı unsigned 32-bit checksum üretir.
+ */
+function computeCrc32(str) {
+  let table = window.__crc32Table;
+  if (!table) {
+    table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let k = 0; k < 8; k++) {
+        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      table[i] = c;
+    }
+    window.__crc32Table = table;
+  }
+  const bytes = new TextEncoder().encode(str);
+  let crc = 0 ^ (-1);
+  for (let i = 0; i < bytes.length; i++) {
+    crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 0xFF];
+  }
+  return (crc ^ (-1)) >>> 0;
+}
+
+let opticalStreamState = {
+  frames: [],
+  currentIndex: 0,
+  isPlaying: true,
+  fps: 7,
+  timerId: null,
+  activeNoteTitle: ""
+};
+
+/**
+ * Dinamik optik akış projektörünü başlatır.
+ * Aktif not ve kategorileri JSON olarak paketler, ~220 baytlık parçalara böler
+ * ve Android OpticalTransferManager.kt ile uyumlu çerçeveler üretir.
+ */
+function startOpticalStream(noteId) {
+  const note = (noteId ? (state.activeNotes.find(n => n.id === noteId) || state.allNotes.find(n => n.id === noteId)) : null) ||
+               (state.activeNoteId ? (state.activeNotes.find(n => n.id === state.activeNoteId) || state.allNotes.find(n => n.id === state.activeNoteId)) : null) ||
+               (state.activeNotes && state.activeNotes.length > 0 ? state.activeNotes[0] : null);
+
+  if (!note) {
+    showToast("Aktarılacak not bulunamadı!", "error");
+    return;
+  }
+
+  // Not ve kategori JSON paketi
+  const payloadData = {
+    notes: [note],
+    categories: state.categories || []
+  };
+  const payloadStr = JSON.stringify(payloadData);
+  const totalCrc = computeCrc32(payloadStr);
+
+  // Android kamera tarayıcısının (<10ms) en rahat okuyabildiği boyut: ~220 karakter
+  const chunkSize = 220;
+  const chunks = [];
+  for (let i = 0; i < payloadStr.length; i += chunkSize) {
+    chunks.push(payloadStr.slice(i, i + chunkSize));
+  }
+
+  const totalFrames = chunks.length;
+  // Android OpticalTransferManager.kt ile %100 eşleşen format: { s, t, d, c }
+  const frames = chunks.map((chunk, idx) => JSON.stringify({
+    s: idx + 1,
+    t: totalFrames,
+    d: chunk,
+    c: totalCrc
+  }));
+
+  opticalStreamState.frames = frames;
+  opticalStreamState.currentIndex = 0;
+  opticalStreamState.isPlaying = true;
+  opticalStreamState.fps = 7;
+  opticalStreamState.activeNoteTitle = note.title || "Adsız Not";
+
+  const modal = document.getElementById("modalOpticalStream");
+  const qrContainer = document.getElementById("opticalQrContainer");
+  const frameBadge = document.getElementById("opticalFrameBadge");
+  const progressBar = document.getElementById("opticalProgressBar");
+  const btnPlayPause = document.getElementById("btnOpticalPlayPause");
+  const btnPrev = document.getElementById("btnOpticalPrev");
+  const btnNext = document.getElementById("btnOpticalNext");
+  const btnClose = document.getElementById("btnCloseOpticalStream");
+  const fpsChips = document.querySelectorAll("#modalOpticalStream .fps-chip");
+
+  if (!modal) return;
+
+  function renderCurrentFrame() {
+    if (!opticalStreamState.frames || opticalStreamState.frames.length === 0) return;
+    const curIdx = opticalStreamState.currentIndex;
+    const frameData = opticalStreamState.frames[curIdx];
+
+    if (qrContainer) {
+      qrContainer.innerHTML = renderSimpleQr(frameData);
+    }
+    if (frameBadge) {
+      frameBadge.textContent = `Kare ${curIdx + 1} / ${totalFrames}`;
+    }
+    if (progressBar) {
+      const pct = Math.round(((curIdx + 1) / totalFrames) * 100);
+      progressBar.style.width = `${pct}%`;
+    }
+  }
+
+  function startLoop() {
+    stopLoop();
+    const intervalMs = Math.round(1000 / opticalStreamState.fps);
+    opticalStreamState.timerId = setInterval(() => {
+      opticalStreamState.currentIndex = (opticalStreamState.currentIndex + 1) % totalFrames;
+      renderCurrentFrame();
+    }, intervalMs);
+  }
+
+  function stopLoop() {
+    if (opticalStreamState.timerId) {
+      clearInterval(opticalStreamState.timerId);
+      opticalStreamState.timerId = null;
+    }
+  }
+
+  function updatePlayPauseBtn() {
+    if (btnPlayPause) {
+      btnPlayPause.textContent = opticalStreamState.isPlaying ? "⏸ Duraklat" : "▶ Oynat";
+    }
+  }
+
+  // İlk kareyi çiz ve döngüyü başlat
+  renderCurrentFrame();
+  startLoop();
+  updatePlayPauseBtn();
+
+  // FPS çipleri aktifliği
+  fpsChips.forEach(chip => {
+    const fpsVal = parseInt(chip.dataset.fps, 10);
+    if (fpsVal === opticalStreamState.fps) {
+      chip.classList.add("active");
+    } else {
+      chip.classList.remove("active");
+    }
+  });
+
+  // Olay Dinleyicileri (Tek seferlik bağlama)
+  if (!modal.__opticalEventsBound) {
+    modal.__opticalEventsBound = true;
+
+    btnPlayPause?.addEventListener("click", () => {
+      opticalStreamState.isPlaying = !opticalStreamState.isPlaying;
+      updatePlayPauseBtn();
+      if (opticalStreamState.isPlaying) {
+        startLoop();
+      } else {
+        stopLoop();
+      }
+    });
+
+    btnPrev?.addEventListener("click", () => {
+      stopLoop();
+      opticalStreamState.isPlaying = false;
+      updatePlayPauseBtn();
+      opticalStreamState.currentIndex = (opticalStreamState.currentIndex - 1 + opticalStreamState.frames.length) % opticalStreamState.frames.length;
+      renderCurrentFrame();
+    });
+
+    btnNext?.addEventListener("click", () => {
+      stopLoop();
+      opticalStreamState.isPlaying = false;
+      updatePlayPauseBtn();
+      opticalStreamState.currentIndex = (opticalStreamState.currentIndex + 1) % opticalStreamState.frames.length;
+      renderCurrentFrame();
+    });
+
+    fpsChips.forEach(chip => {
+      chip.addEventListener("click", () => {
+        fpsChips.forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+        const newFps = parseInt(chip.dataset.fps, 10) || 7;
+        opticalStreamState.fps = newFps;
+        if (opticalStreamState.isPlaying) {
+          startLoop();
+        }
+      });
+    });
+
+    const closeModal = () => {
+      stopLoop();
+      opticalStreamState.isPlaying = false;
+      modal.classList.remove("open");
+    };
+
+    btnClose?.addEventListener("click", closeModal);
+
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+  }
+
+  // Modalı göster
+  modal.classList.add("open");
+  showToast(`📡 "${opticalStreamState.activeNoteTitle}" için optik veri akışı başladı (${totalFrames} kare)`, "info");
+}
+
 

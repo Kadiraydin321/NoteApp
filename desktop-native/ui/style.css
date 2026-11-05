@@ -2164,6 +2164,106 @@ mark {
 }
 
 /* ===================================================
+   5.1. OPTİK AKIŞ (AIR-GAPPED OPTICAL STREAM & QR)
+   =================================================== */
+.optical-dialog {
+  max-width: 480px;
+  text-align: center;
+}
+
+.optical-projector-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  margin: 10px 0;
+}
+
+.optical-qr-box {
+  background: #FFFFFF !important;
+  padding: 14px;
+  border-radius: 14px;
+  margin: 0 auto;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  min-width: 240px;
+}
+
+.optical-qr-box svg,
+.optical-qr-box canvas,
+.optical-qr-box img {
+  display: block;
+  width: 220px;
+  height: 220px;
+}
+
+.optical-hud {
+  margin-top: 14px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.optical-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: #38BDF8;
+  letter-spacing: 0.5px;
+}
+
+.optical-progress-track {
+  height: 6px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.optical-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3B82F6, #10B981);
+  transition: width 0.1s linear;
+}
+
+.optical-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fps-chip {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #CBD5E1;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.fps-chip:hover,
+.fps-chip.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+/* ===================================================
    6. GİZLİLİK KALKANI (Privacy Shield)
    =================================================== */
 .privacy-shield {

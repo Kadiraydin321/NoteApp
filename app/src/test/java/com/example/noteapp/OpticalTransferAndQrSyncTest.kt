@@ -138,7 +138,7 @@ class OpticalTransferAndQrSyncTest {
 
     @Test
     fun testProcessOpticalChunksAndAssemble() = runBlocking {
-        // Örnek bir not yedek JSON verisi oluşturalım
+        // Ã–rnek bir not yedek JSON verisi oluÅŸturalÄ±m
         val originalPayload = JSONObject().apply {
             put("version", 1)
             put("type", "noteapp_backup")
@@ -146,27 +146,27 @@ class OpticalTransferAndQrSyncTest {
             put("notes", org.json.JSONArray().apply {
                 put(JSONObject().apply {
                     put("title", "Optik Gizli Not")
-                    put("content", "Bu not tamamen optik kamera akışıyla aktarıldı!")
+                    put("content", "Bu not tamamen optik kamera akÄ±ÅŸÄ±yla aktarÄ±ldÄ±!")
                     put("isPinned", true)
                     put("isArchived", false)
                     put("color", 1)
-                    put("categoryName", "Güvenlik")
+                    put("categoryName", "GÃ¼venlik")
                 })
             })
             put("categories", org.json.JSONArray().apply {
                 put(JSONObject().apply {
-                    put("name", "Güvenlik")
+                    put("name", "GÃ¼venlik")
                     put("color", 0xFF00ACC1.toInt())
                 })
             })
         }.toString()
 
-        // CRC32 hesaplayalım
+        // CRC32 hesaplayalÄ±m
         val crc = CRC32()
         crc.update(originalPayload.toByteArray(Charsets.UTF_8))
         val expectedCrc = crc.value
 
-        // Veriyi 3 parçaya bölelim
+        // Veriyi 3 parÃ§aya bÃ¶lelim
         val chunkSize = (originalPayload.length + 2) / 3
         val chunks = mutableListOf<String>()
         val total = 3
@@ -183,7 +183,7 @@ class OpticalTransferAndQrSyncTest {
             chunks.add(chunkJson)
         }
 
-        // Parçaları KARIŞIK sırayla besleyelim (2, 3, sonra 1)
+        // ParÃ§alarÄ± KARIÅIK sÄ±rayla besleyelim (2, 3, sonra 1)
         var p2 = opticalTransferManager.processChunk(chunks[1]) // seq 2
         assertEquals(1, p2.receivedCount)
         assertEquals(3, p2.totalChunks)
@@ -201,25 +201,25 @@ class OpticalTransferAndQrSyncTest {
         assertTrue(p1.missingChunks.isEmpty())
         assertEquals(100, p1.progressPercent)
 
-        // Birleştirme ve CRC32 doğrulama
+        // BirleÅŸtirme ve CRC32 doÄŸrulama
         val assembleResult = opticalTransferManager.assembleAndVerify()
         assertTrue(assembleResult.isSuccess)
         val assembledText = assembleResult.getOrThrow()
         assertEquals(originalPayload, assembledText)
 
-        // Veritabanına aktarma
+        // VeritabanÄ±na aktarma
         val importResult = opticalTransferManager.importAssembledNotes(assembledText)
         assertTrue(importResult.isSuccess)
         val result = importResult.getOrThrow()
         assertEquals(1, result.notesCount)
         assertEquals(1, result.categoriesCount)
 
-        // FakeRepo kontrolü
+        // FakeRepo kontrolÃ¼
         assertEquals(1, fakeRepo.notes.size)
         assertEquals("Optik Gizli Not", fakeRepo.notes[0].title)
         assertTrue(fakeRepo.notes[0].isPinned)
         assertEquals(1, fakeRepo.categories.size)
-        assertEquals("Güvenlik", fakeRepo.categories[0].name)
+        assertEquals("GÃ¼venlik", fakeRepo.categories[0].name)
     }
 
     @Test
@@ -228,7 +228,7 @@ class OpticalTransferAndQrSyncTest {
         val crc = CRC32()
         crc.update(originalPayload.toByteArray(Charsets.UTF_8))
         val realCrc = crc.value
-        val corruptedCrc = realCrc + 9999L // Hatalı checksum
+        val corruptedCrc = realCrc + 9999L // HatalÄ± checksum
 
         val chunkJson = JSONObject().apply {
             put("s", 1)
@@ -240,8 +240,45 @@ class OpticalTransferAndQrSyncTest {
         opticalTransferManager.processChunk(chunkJson)
         val result = opticalTransferManager.assembleAndVerify()
 
-        // Checksum uyuşmadığında SecurityException fırlatılmalı
+        // Checksum uyuÅŸmadÄ±ÄŸÄ±nda SecurityException fÄ±rlatÄ±lmalÄ±
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is SecurityException)
+    }
+
+    @Test
+    fun testDesktopAppJsCrc32Compatibility() {
+        // Masaüstü app.js computeCrc32 fonksiyonu ile hesaplanmış referans test vektörleri
+        val testVectors = listOf(
+            "123456789" to 3421780262L,
+            "Not Defterim - Türkçe Karakter Testi: çğıöşü ÇĞİÖŞÜ" to 1249012273L,
+            "{\"notes\":[{\"title\":\"Test Not\",\"content\":\"Optik Akış Testi\"}],\"categories\":[]}" to 2420340548L
+        )
+
+        val crc = CRC32()
+        for ((input, expectedJsCrc) in testVectors) {
+            crc.reset()
+            crc.update(input.toByteArray(Charsets.UTF_8))
+            val javaCrc = crc.value
+            assertEquals("Dize için Java CRC32 ile Masaüstü computeCrc32 eşit olmalı: $input", expectedJsCrc, javaCrc)
+        }
+
+        // app.js startOpticalStream tarafından üretilen gerçek çerçeve simülasyonu
+        val desktopChunkPayload = "{\"notes\":[{\"title\":\"Test Not\",\"content\":\"Optik Akış Testi\"}],\"categories\":[]}"
+        val totalCrc = 2420340548L
+        val frameJson = """{"s":1,"t":1,"d":"${desktopChunkPayload.replace("\"", "\\\"")}","c":$totalCrc}"""
+
+        val parsed = opticalTransferManager.parseChunk(frameJson)
+        assertNotNull(parsed)
+        assertEquals(1, parsed?.sequence)
+        assertEquals(1, parsed?.total)
+        assertEquals(totalCrc, parsed?.checksum)
+        assertEquals(desktopChunkPayload, parsed?.data)
+
+        opticalTransferManager.reset()
+        val progress = opticalTransferManager.processChunk(frameJson)
+        assertTrue(progress.isComplete)
+        val verifyResult = opticalTransferManager.assembleAndVerify()
+        assertTrue(verifyResult.isSuccess)
+        assertEquals(desktopChunkPayload, verifyResult.getOrNull())
     }
 }
