@@ -158,6 +158,7 @@ fun NotesScreen(
     onToggleCategoryLock: (Long) -> Unit = {},
     isNoteConcealed: (Note) -> Boolean = { false },
     masterPin: String? = null,
+    onDailyJournalClick: () -> Unit = {},
     onSettingsClick: () -> Unit
 ) {
     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
@@ -1069,6 +1070,15 @@ fun NotesScreen(
                                         tint = if (groupingMode != NoteGroupingMode.FLAT) MaterialTheme.colorScheme.primary else LocalContentColor.current
                                     )
                                 }
+                            }
+
+                            // 📅 F15: Günün Notu (Daily Journal / Günlük Not) Hızlı Erişim Butonu
+                            IconButton(onClick = onDailyJournalClick) {
+                                Icon(
+                                    imageVector = Icons.Default.Today,
+                                    contentDescription = "Günün Notu",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             }
 
                             // 🕸️ Not İlişki Grafiği (Graph View) Hızlı Eylem Butonu

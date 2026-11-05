@@ -110,9 +110,12 @@
         </div>
 
         <div class="tags-section" role="region" aria-label="Dinamik Etiketler">
-          <div class="cat-header">
-            <span>ETİKETLER</span>
-            <span style="font-size:11px; color:var(--text-dim); font-weight:normal;">#hashtag</span>
+          <div class="cat-header" style="display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>ETİKETLER</span>
+              <span style="font-size:11px; color:var(--text-dim); font-weight:normal;">#hashtag</span>
+            </div>
+            <button class="cat-add-btn" id="btnManageTags" title="Etiketleri Yönet" aria-label="Etiketleri Yönet" style="background:none; border:none; cursor:pointer; font-size:13px; color:var(--text-dim); padding:2px 4px; border-radius:4px;">⚙️</button>
           </div>
           <div id="tagListContainer" class="tag-cloud" style="display:flex; flex-wrap:wrap; gap:6px; padding:4px 0;"></div>
         </div>
@@ -314,6 +317,21 @@
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Ses Dosyası Oynatıcı Çubuğu (Audio Player Bar) -->
+        <div class="audio-player-bar" id="audioPlayerBar" style="display:none;" role="region" aria-label="Ses Dosyası Oynatıcı">
+          <div class="audio-info">
+            <span class="audio-icon">🎵</span>
+            <span class="audio-title" id="audioPlayerTitle">Ses Kaydı</span>
+          </div>
+          <div class="audio-controls">
+            <button class="audio-btn-play" id="btnAudioPlayPause" title="Oynat / Duraklat" aria-label="Oynat">▶</button>
+            <span class="audio-time" id="audioPlayerTime">00:00 / 00:00</span>
+            <input type="range" class="audio-seek-bar" id="audioSeekBar" value="0" min="0" max="100" step="0.1" aria-label="İlerleme">
+            <button class="audio-btn-mute" id="btnAudioMute" title="Sesi Kapat / Aç" aria-label="Sesi Aç/Kapat">🔊</button>
+            <input type="range" class="audio-volume-bar" id="audioVolumeBar" value="100" min="0" max="100" aria-label="Ses Düzeyi">
           </div>
         </div>
 
@@ -737,6 +755,48 @@
         <button class="btn-primary" id="btnCloseOpticalStream">Kapat</button>
       </div>
     </div>
+  </div>
+
+  <!-- 10. Etiket Yönetimi Modalı -->
+  <div class="modal-overlay" id="modalTagManager" role="dialog" aria-modal="true" aria-labelledby="tagManagerModalTitle">
+    <div class="modal-dialog" style="max-width:540px; width:92vw; max-height:85vh; display:flex; flex-direction:column;">
+      <div class="modal-title" id="tagManagerModalTitle">
+        <span>🏷️ Etiket Yönetimi</span>
+      </div>
+      <div class="modal-desc">
+        Notlarınızdaki tüm etiketleri buradan yeniden adlandırabilir veya topluca silebilirsiniz.
+      </div>
+      <div id="tagManagerList" class="tag-manager-list" style="flex:1; overflow-y:auto; margin:14px 0; max-height:360px; display:flex; flex-direction:column; gap:8px;"></div>
+      <div class="modal-actions" style="margin-top:12px;">
+        <button class="btn-primary" id="btnCloseTagManager" style="width:100%;">Tamam</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 11. Not Kartı Sağ Tık Bağlam Menüsü (Context Menu) -->
+  <div class="context-menu-popover" id="noteContextMenu" role="menu" style="display:none;">
+    <button class="context-menu-item" id="ctxPinNote">
+      <span class="ctx-icon">📌</span>
+      <span class="ctx-label" id="ctxPinLabel">Sabitle</span>
+    </button>
+    <button class="context-menu-item" id="ctxLockNote">
+      <span class="ctx-icon">🔒</span>
+      <span class="ctx-label" id="ctxLockLabel">Kasaya Taşı</span>
+    </button>
+    <div class="context-menu-divider"></div>
+    <div class="ctx-color-section">
+      <div class="ctx-color-title">🎨 Not Rengi</div>
+      <div class="ctx-color-palette" id="ctxColorPalette"></div>
+    </div>
+    <div class="context-menu-divider"></div>
+    <button class="context-menu-item" id="ctxDuplicateNote">
+      <span class="ctx-icon">📋</span>
+      <span class="ctx-label">Notu Çoğalt</span>
+    </button>
+    <button class="context-menu-item danger" id="ctxDeleteNote">
+      <span class="ctx-icon">🗑️</span>
+      <span class="ctx-label" id="ctxDeleteLabel">Çöp Kutusuna Taşı</span>
+    </button>
   </div>
 
   <!-- 4. Alt-Tab Gizlilik Kalkanı (Privacy Shield) -->

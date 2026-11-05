@@ -13,6 +13,9 @@ import com.example.noteapp.domain.util.CalendarNoteGrouper
 import com.example.noteapp.domain.util.CategoryLockManager
 import com.example.noteapp.domain.util.TagSuggestionEngine
 import java.time.LocalDate
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import com.example.noteapp.widget.NotesWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -782,6 +785,43 @@ class NotesViewModel @Inject constructor(
                 }
                 is SyncResult.NeedsPassword -> {
                     _quickSyncState.value = QuickSyncState(isOperating = false, message = result.message, isSuccess = false)
+                }
+            }
+        }
+    }
+
+    /**
+     * F15: Günün Notu (Daily Journal / Günlük Not)
+     * Bugünün tarihine ait not varsa id'sini döner, yoksa '#günlük' etiketli
+     * yeni bir dailyNote oluşturup veritabanına kaydeder.
+     */
+    fun openOrCreateDailyNote(onNoteReady: (Long) -> Unit) {
+        viewModelScope.launch {
+            val todayStr = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date())
+            val expectedTitle = "📅 Günün Notu - $todayStr"
+
+            val activeNotes = repository.getActiveNotesList()
+            val existing = activeNotes.firstOrNull {
+                it.title.equals(expectedTitle, ignoreCase = true) ||
+                (it.title.contains(todayStr) && (it.title.contains("Günün Notu", ignoreCase = true) || it.title.contains("Günlük Not", ignoreCase = true)))
+            }
+
+            if (existing != null) {
+                withContext(Dispatchers.Main) {
+                    onNoteReady(existing.id)
+                }
+            } else {
+                val newDailyNote = Note(
+                    title = expectedTitle,
+                    content = "#günlük\n\n",
+                    color = 0,
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
+                )
+                val newId = repository.insertNote(newDailyNote)
+                NotesWidgetProvider.updateAllWidgets(app)
+                withContext(Dispatchers.Main) {
+                    onNoteReady(newId)
                 }
             }
         }

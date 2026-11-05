@@ -3204,3 +3204,553 @@ body.sticky-mode .content-textarea::placeholder {
     text-decoration: underline !important;
   }
 }
+
+/* ===================================================
+   FAZ 3: SAĞ TIK BAĞLAM MENÜSÜ (#noteContextMenu)
+   =================================================== */
+#noteContextMenu,
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  padding: 6px;
+  min-width: 190px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  animation: contextMenuScaleIn 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+@keyframes contextMenuScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+button.context-menu-item,
+.context-menu-item {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #E2E8F0;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+}
+
+button.context-menu-item:hover,
+.context-menu-item:hover {
+  background: rgba(56, 189, 248, 0.15) !important;
+  color: #38BDF8 !important;
+  transform: translateX(2px);
+}
+
+button.context-menu-item:active,
+.context-menu-item:active {
+  transform: scale(0.98);
+}
+
+button.context-menu-item svg,
+.context-menu-item svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+  opacity: 0.85;
+  flex-shrink: 0;
+  pointer-events: none !important;
+}
+
+button.context-menu-item span,
+.context-menu-item span {
+  pointer-events: none !important;
+}
+
+button.context-menu-item.danger,
+.context-menu-item.danger {
+  color: #F87171 !important;
+}
+
+button.context-menu-item.danger:hover,
+.context-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.16) !important;
+  color: #EF4444 !important;
+}
+
+.context-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+  border: none;
+}
+
+/* Hızlı Renk Paleti Çubuğu (12 Renk Dairesi) */
+.context-color-palette,
+.context-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 6px 4px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 4px;
+}
+
+.context-color-circle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+.context-color-circle:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 8px currentColor;
+  border-color: #FFFFFF;
+}
+
+.context-color-circle.active {
+  transform: scale(1.15);
+  border-color: #FFFFFF;
+  box-shadow: 0 0 0 2px #38BDF8;
+}
+
+/* ===================================================
+   FAZ 3: ETİKET YÖNETİMİ MODALI (#modalTagManager)
+   =================================================== */
+.tag-manager-dialog {
+  width: 480px;
+  max-width: 92vw;
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7) !important;
+}
+
+.tag-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tag-manager-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: #FFFFFF;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.tag-manager-input:focus {
+  border-color: #38BDF8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.tag-manager-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px 4px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tag-badge-item,
+.tag-chip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #CBD5E1;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.tag-badge-item:hover,
+.tag-chip-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tag-btn-delete {
+  background: none;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transition: all 0.15s ease;
+}
+
+.tag-btn-delete:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #EF4444;
+}
+
+/* ===================================================
+   FAZ 3: SES OYNATICI ÇUBUĞU (.audio-player-bar)
+   =================================================== */
+.audio-player-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 10px 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.audio-play-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary-gradient);
+  color: #FFFFFF;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.35);
+  flex-shrink: 0;
+}
+
+.audio-play-btn:hover {
+  transform: scale(1.06);
+  filter: brightness(1.1);
+}
+
+.audio-play-btn:active {
+  transform: scale(0.95);
+}
+
+.audio-play-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  pointer-events: none;
+}
+
+.audio-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.audio-filename {
+  font-size: 12px;
+  font-weight: 600;
+  color: #E2E8F0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+.audio-scrubber,
+.audio-range-track {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+input[type="range"].audio-range {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"].audio-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #38BDF8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+input[type="range"].audio-range::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+.audio-time,
+.audio-duration {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #94A3B8;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.audio-btn-play,
+.audio-btn-mute {
+  background: var(--primary-gradient);
+  color: #FFFFFF;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.audio-btn-mute {
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 14px;
+}
+
+.audio-btn-play:hover,
+.audio-btn-mute:hover {
+  transform: scale(1.08);
+}
+
+.audio-seek-bar,
+.audio-volume-bar {
+  -webkit-appearance: none;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+
+.audio-seek-bar {
+  flex: 1;
+}
+
+.audio-volume-bar {
+  width: 70px;
+}
+
+.audio-seek-bar::-webkit-slider-thumb,
+.audio-volume-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--primary, #38BDF8);
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+  cursor: pointer;
+}
+
+/* ===================================================
+   FAZ 3: SAĞ TIK BAĞLAM MENÜSÜ (.context-menu-popover)
+   =================================================== */
+.context-menu-popover {
+  position: fixed;
+  z-index: 99999;
+  min-width: 210px;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: contextMenuFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes contextMenuFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.context-menu-item {
+  appearance: none;
+  background: transparent;
+  border: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #E2E8F0;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+  transform: translateX(2px);
+}
+
+.context-menu-item.danger {
+  color: #F87171;
+}
+
+.context-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.16);
+  color: #EF4444;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
+
+.ctx-color-section {
+  padding: 6px 10px;
+}
+
+.ctx-color-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94A3B8;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ctx-color-palette {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.ctx-color-chip {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.ctx-color-chip:hover {
+  transform: scale(1.2);
+  border-color: #FFFFFF;
+}
+
+/* ===================================================
+   FAZ 3: ETİKET YÖNETİMİ DİYALOĞU
+   =================================================== */
+.tag-manager-list {
+  scrollbar-width: thin;
+}
+
+.tag-manage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-main, #0F172A);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  transition: border-color 0.15s ease;
+}
+
+.tag-manage-row:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.tag-manage-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tag-manage-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary, #38BDF8);
+  background: rgba(56, 189, 248, 0.12);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.tag-manage-count {
+  font-size: 12px;
+  color: var(--text-faint, #64748B);
+}
+
+.tag-manage-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

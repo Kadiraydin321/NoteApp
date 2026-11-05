@@ -430,6 +430,11 @@ class MainActivity : FragmentActivity() {
                                     navController.navigate("note_detail_screen?noteId=${note.id}")
                                 }
                             },
+                            onDailyJournalClick = {
+                                viewModel.openOrCreateDailyNote { noteId ->
+                                    navController.navigate("note_detail_screen?noteId=$noteId")
+                                }
+                            },
                             onAddNoteClick = { action ->
                                 val route = if (action.isNullOrBlank()) "note_detail_screen" else "note_detail_screen?autoAction=$action"
                                 navController.navigate(route)

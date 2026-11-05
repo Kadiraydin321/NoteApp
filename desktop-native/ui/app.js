@@ -538,6 +538,13 @@ function initUI() {
   // 11. Modallar
   initModals();
 
+  // Etiket Yönetimi ve Bağlam Menüsü Başlatıcı
+  document.getElementById("btnManageTags")?.addEventListener("click", openTagManagerModal);
+  document.getElementById("btnCloseTagManager")?.addEventListener("click", () => {
+    document.getElementById("modalTagManager")?.classList.remove("open");
+  });
+  initContextMenuEvents();
+
   // 12. Alt-Tab Gizlilik Kalkanı (Privacy Shield)
   window.addEventListener("blur", () => {
     if (state.antiSsEnabled) {
@@ -913,6 +920,7 @@ function insertMarkdown(prefix, suffix) {
   onEditorChange();
   updateLiveMarkdownPreview();
   updateCharWordsCount();
+  updateAudioPlayerForNote(note);
 }
 
 function sanitizeMarkdownHtml(inputHtml) {
@@ -1336,6 +1344,7 @@ function loadNoteIntoEditor(note, focusTitle = false) {
 
   updateLiveMarkdownPreview();
   updateCharWordsCount();
+  updateAudioPlayerForNote(note);
 
   // Kart listesinde seçili göster
   renderNotesList();
@@ -1601,6 +1610,7 @@ function renderNotesList() {
     `;
 
     card.addEventListener("click", () => {
+      closeNoteContextMenu();
       if (state.batchModeActive) {
         if (state.selectedNoteIds.has(note.id)) {
           state.selectedNoteIds.delete(note.id);
@@ -1612,6 +1622,13 @@ function renderNotesList() {
         return;
       }
       loadNoteIntoEditor(note, false);
+    });
+
+    // Masaüstü Sağ Tık Bağlam Menüsü (Context Menu)
+    card.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openNoteContextMenu(e, note);
     });
 
     card.querySelector(".btn-card-pin").addEventListener("click", (e) => {
@@ -3891,6 +3908,446 @@ function startOpticalStream(noteId) {
   // Modalı göster
   modal.classList.add("open");
   showToast(`📡 "${opticalStreamState.activeNoteTitle}" için optik veri akışı başladı (${totalFrames} kare)`, "info");
+}
+
+// ===================================================
+// FAZ 3.1: SAĞ TIK BAĞLAM MENÜSÜ (CONTEXT MENU)
+// ===================================================
+let activeContextNote = null;
+
+function closeNoteContextMenu() {
+  const menu = document.getElementById("noteContextMenu");
+  if (menu) {
+    menu.style.display = "none";
+  }
+  activeContextNote = null;
+}
+
+function openNoteContextMenu(e, note) {
+  closeNoteContextMenu();
+  activeContextNote = note;
+  state.selectedNoteId = note.id;
+
+  const menu = document.getElementById("noteContextMenu");
+  if (!menu) return;
+
+  // Sabitle / Kasaya Taşı / Sil Etiketleri
+  const pinLabel = document.getElementById("ctxPinLabel");
+  if (pinLabel) {
+    pinLabel.textContent = note.isPinned ? "Sabitlemeyi Kaldır" : "Sabitle";
+  }
+
+  const lockLabel = document.getElementById("ctxLockLabel");
+  if (lockLabel) {
+    lockLabel.textContent = note.isLocked ? "Kasadan Çıkar (Kilidi Aç)" : "Kasaya Taşı / Kilitle";
+  }
+
+  const delLabel = document.getElementById("ctxDeleteLabel");
+  if (delLabel) {
+    delLabel.textContent = note.isDeleted ? "Kalıcı Olarak Sil" : "Çöp Kutusuna Taşı";
+  }
+
+  // 14 Pastel & Koyu Renk Paleti (NOTE_PRESETS)
+  const paletteContainer = document.getElementById("ctxColorPalette");
+  if (paletteContainer) {
+    paletteContainer.innerHTML = "";
+    NOTE_PRESETS.forEach(preset => {
+      const chip = document.createElement("div");
+      chip.className = "ctx-color-chip";
+      chip.style.backgroundColor = preset.color;
+      chip.title = preset.name;
+      if (note.color === preset.id) {
+        chip.style.outline = "2px solid #FFFFFF";
+      }
+      chip.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        note.color = preset.id;
+        applyNoteColor(preset.id);
+        await callIpc("saveNote", { note });
+        renderNotesList();
+        closeNoteContextMenu();
+        showToast(`Not rengi "${preset.name}" yapıldı`, "info");
+      });
+      paletteContainer.appendChild(chip);
+    });
+  }
+
+  // Koordinatları hesapla (ekran sınırlarını aşmayacak şekilde)
+  const menuWidth = 220;
+  const menuHeight = 280;
+  let posX = e.clientX;
+  let posY = e.clientY;
+
+  if (posX + menuWidth > window.innerWidth) {
+    posX = window.innerWidth - menuWidth - 12;
+  }
+  if (posY + menuHeight > window.innerHeight) {
+    posY = window.innerHeight - menuHeight - 12;
+  }
+
+  menu.style.left = `${posX}px`;
+  menu.style.top = `${posY}px`;
+  menu.style.display = "flex";
+}
+
+function initContextMenuEvents() {
+  const menu = document.getElementById("noteContextMenu");
+  if (!menu || menu.__initialized) return;
+  menu.__initialized = true;
+
+  document.getElementById("ctxPinNote")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!activeContextNote) return;
+    activeContextNote.isPinned = !activeContextNote.isPinned;
+    await callIpc("saveNote", { note: activeContextNote });
+    showToast(activeContextNote.isPinned ? "Not sabitlendi" : "Sabitleme kaldırıldı", "info");
+    closeNoteContextMenu();
+    loadAllData();
+  });
+
+  document.getElementById("ctxLockNote")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!activeContextNote) return;
+    activeContextNote.isLocked = !activeContextNote.isLocked;
+    await callIpc("saveNote", { note: activeContextNote });
+    showToast(activeContextNote.isLocked ? "Not kilitli kasaya taşındı" : "Not kasadan çıkarıldı", "info");
+    closeNoteContextMenu();
+    loadAllData();
+  });
+
+  document.getElementById("ctxDuplicateNote")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!activeContextNote) return;
+    state.selectedNoteId = activeContextNote.id;
+    closeNoteContextMenu();
+    await duplicateCurrentNote();
+  });
+
+  document.getElementById("ctxDeleteNote")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!activeContextNote) return;
+    const note = activeContextNote;
+    closeNoteContextMenu();
+    if (note.isDeleted) {
+      await callIpc("deletePermanently", { id: note.id });
+      showToast("Not kalıcı olarak silindi", "danger");
+    } else {
+      await callIpc("moveToTrash", { id: note.id });
+      showToast("Not çöp kutusuna taşındı", "warning");
+    }
+    loadAllData();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target)) {
+      closeNoteContextMenu();
+    }
+  });
+
+  window.addEventListener("blur", closeNoteContextMenu);
+}
+
+// ===================================================
+// FAZ 3.2: ETİKET YÖNETİMİ MODALI (TAG MANAGER)
+// ===================================================
+function openTagManagerModal() {
+  const modal = document.getElementById("modalTagManager");
+  const listContainer = document.getElementById("tagManagerList");
+  if (!modal || !listContainer) return;
+
+  renderTagManagerList();
+  modal.classList.add("open");
+}
+
+function renderTagManagerList() {
+  const listContainer = document.getElementById("tagManagerList");
+  if (!listContainer) return;
+  listContainer.innerHTML = "";
+
+  const allNotes = [...state.activeNotes, ...state.archivedNotes, ...state.trashNotes];
+  const tagNoteMap = new Map(); // tag -> Set of noteIds
+
+  allNotes.forEach(note => {
+    const text = `${note.title || ""} ${note.content || ""}`;
+    const matches = text.match(/#([a-zA-ZçğıöşüÇĞİÖŞÜ0-9_-]+)/g);
+    const setOfTags = new Set();
+    if (matches) {
+      matches.forEach(m => setOfTags.add(m.toLowerCase()));
+    }
+    if (Array.isArray(note.tags)) {
+      note.tags.forEach(t => {
+        const clean = t.startsWith("#") ? t.toLowerCase() : `#${t.toLowerCase()}`;
+        setOfTags.add(clean);
+      });
+    }
+
+    setOfTags.forEach(tag => {
+      if (!tagNoteMap.has(tag)) tagNoteMap.set(tag, new Set());
+      tagNoteMap.get(tag).add(note.id);
+    });
+  });
+
+  if (tagNoteMap.size === 0) {
+    listContainer.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-faint);">Henüz hiç etiket bulunamadı.<br><span style="font-size:12px;">Notlarınıza #etiket yazarak etiket oluşturabilirsiniz.</span></div>`;
+    return;
+  }
+
+  const sortedTags = Array.from(tagNoteMap.keys()).sort();
+
+  sortedTags.forEach(tag => {
+    const noteIds = tagNoteMap.get(tag);
+    const row = document.createElement("div");
+    row.className = "tag-manage-row";
+
+    row.innerHTML = `
+      <div class="tag-manage-info">
+        <span class="tag-manage-badge">${escapeHtml(tag)}</span>
+        <span class="tag-manage-count">${noteIds.size} not</span>
+      </div>
+      <div class="tag-manage-actions">
+        <button class="btn-secondary-sm btn-rename-tag" title="Etiketi Yeniden Adlandır">✏️ Yeniden Adlandır</button>
+        <button class="btn-danger-sm btn-delete-tag" title="Etiketi Tüm Notlardan Sil" style="padding:4px 8px; font-size:12px; background:rgba(239,68,68,0.15); color:#F87171; border:none; border-radius:6px; cursor:pointer;">🗑️ Sil</button>
+      </div>
+    `;
+
+    // Yeniden Adlandır
+    row.querySelector(".btn-rename-tag").addEventListener("click", async () => {
+      const rawOld = tag.replace(/^#/, "");
+      const newName = prompt(`'${tag}' etiketinin yeni adını girin (Örn: #yeni_etiket):`, tag);
+      if (!newName || !newName.trim()) return;
+      const cleanNew = (newName.trim().startsWith("#") ? newName.trim() : `#${newName.trim()}`).toLowerCase();
+      if (cleanNew === tag) return;
+
+      const rawNew = cleanNew.replace(/^#/, "");
+      let updatedCount = 0;
+
+      for (const note of allNotes) {
+        if (!noteIds.has(note.id)) continue;
+        let changed = false;
+
+        const regex = new RegExp(`#${rawOld}(?![a-zA-ZçğıöşüÇĞİÖŞÜ0-9_-])`, "gi");
+        if (note.content && regex.test(note.content)) {
+          note.content = note.content.replace(regex, cleanNew);
+          changed = true;
+        }
+        if (note.title && regex.test(note.title)) {
+          note.title = note.title.replace(regex, cleanNew);
+          changed = true;
+        }
+
+        if (Array.isArray(note.tags)) {
+          note.tags = note.tags.map(t => {
+            const low = t.toLowerCase();
+            if (low === tag || low === rawOld) {
+              changed = true;
+              return rawNew;
+            }
+            return t;
+          });
+        }
+
+        if (changed) {
+          await callIpc("saveNote", { note });
+          updatedCount++;
+        }
+      }
+
+      showToast(`'${tag}' etiketi '${cleanNew}' olarak ${updatedCount} notta güncellendi!`, "success");
+      await loadAllData();
+      renderTagManagerList();
+    });
+
+    // Sil
+    row.querySelector(".btn-delete-tag").addEventListener("click", async () => {
+      const ok = confirm(`'${tag}' etiketini ${noteIds.size} nottan kaldırmak istediğinize emin misiniz?`);
+      if (!ok) return;
+
+      const rawTag = tag.replace(/^#/, "");
+      let updatedCount = 0;
+
+      for (const note of allNotes) {
+        if (!noteIds.has(note.id)) continue;
+        let changed = false;
+
+        const regex = new RegExp(`\\s*#${rawTag}(?![a-zA-ZçğıöşüÇĞİÖŞÜ0-9_-])`, "gi");
+        if (note.content && regex.test(note.content)) {
+          note.content = note.content.replace(regex, "");
+          changed = true;
+        }
+        if (note.title && regex.test(note.title)) {
+          note.title = note.title.replace(regex, "");
+          changed = true;
+        }
+        if (Array.isArray(note.tags)) {
+          const prevLen = note.tags.length;
+          note.tags = note.tags.filter(t => t.toLowerCase() !== tag && t.toLowerCase() !== rawTag);
+          if (note.tags.length !== prevLen) changed = true;
+        }
+
+        if (changed) {
+          await callIpc("saveNote", { note });
+          updatedCount++;
+        }
+      }
+
+      showToast(`'${tag}' etiketi ${updatedCount} nottan kaldırıldı.`, "info");
+      await loadAllData();
+      renderTagManagerList();
+    });
+
+    listContainer.appendChild(row);
+  });
+}
+
+// ===================================================
+// FAZ 3.3: SES DOSYASI OYNATICI ÇUBUĞU (AUDIO PLAYER BAR)
+// ===================================================
+let globalAudio = null;
+let isAudioPlaying = false;
+let audioBarEventsBound = false;
+
+function detectAudioSource(note) {
+  if (!note) return null;
+
+  // 1. Eklerde ses var mı?
+  if (Array.isArray(note.attachments)) {
+    const audioExt = [".mp3", ".wav", ".m4a", ".ogg", ".aac", ".flac"];
+    const found = note.attachments.find(att => {
+      const low = String(att).toLowerCase();
+      return audioExt.some(ext => low.endsWith(ext)) || low.includes("audio/");
+    });
+    if (found) {
+      return { url: found, name: found.split(/[\\/]/).pop() || "Ekli Ses Dosyası" };
+    }
+  }
+
+  // 2. İçerikte ses linki veya verisi var mı?
+  if (note.content) {
+    const urlMatch = note.content.match(/(https?:\/\/[^\s\)]+\.(mp3|wav|m4a|ogg|aac))/i);
+    if (urlMatch) {
+      const url = urlMatch[1];
+      return { url, name: url.split("/").pop() || "Ağ Ses Dosyası" };
+    }
+    const dataMatch = note.content.match(/(data:audio\/[a-zA-Z0-9]+;base64,[^\s\)"']+)/i);
+    if (dataMatch) {
+      return { url: dataMatch[1], name: "Gömülü Ses Kaydı" };
+    }
+  }
+
+  return null;
+}
+
+function updateAudioPlayerForNote(note) {
+  const bar = document.getElementById("audioPlayerBar");
+  if (!bar) return;
+
+  const audioSrc = detectAudioSource(note);
+  if (!audioSrc) {
+    stopAudioPlayer();
+    bar.style.display = "none";
+    return;
+  }
+
+  bar.style.display = "flex";
+  const titleEl = document.getElementById("audioPlayerTitle");
+  if (titleEl) titleEl.textContent = audioSrc.name;
+
+  setupAudioPlayer(audioSrc.url);
+}
+
+function stopAudioPlayer() {
+  if (globalAudio) {
+    globalAudio.pause();
+    globalAudio.currentTime = 0;
+  }
+  isAudioPlaying = false;
+  const playBtn = document.getElementById("btnAudioPlayPause");
+  if (playBtn) playBtn.textContent = "▶";
+}
+
+function setupAudioPlayer(src) {
+  if (globalAudio) {
+    globalAudio.pause();
+    globalAudio = null;
+  }
+
+  const audio = new Audio(src);
+  globalAudio = audio;
+  isAudioPlaying = false;
+
+  const playBtn = document.getElementById("btnAudioPlayPause");
+  const timeEl = document.getElementById("audioPlayerTime");
+  const seekBar = document.getElementById("audioSeekBar");
+  const muteBtn = document.getElementById("btnAudioMute");
+  const volumeBar = document.getElementById("audioVolumeBar");
+
+  if (playBtn) playBtn.textContent = "▶";
+  if (seekBar) seekBar.value = 0;
+
+  const formatTime = (secs) => {
+    if (isNaN(secs) || secs < 0) return "00:00";
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  audio.addEventListener("loadedmetadata", () => {
+    if (timeEl) {
+      timeEl.textContent = `00:00 / ${formatTime(audio.duration)}`;
+    }
+  });
+
+  audio.addEventListener("timeupdate", () => {
+    if (timeEl && audio.duration) {
+      timeEl.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+    }
+    if (seekBar && audio.duration) {
+      seekBar.value = (audio.currentTime / audio.duration) * 100;
+    }
+  });
+
+  audio.addEventListener("ended", () => {
+    isAudioPlaying = false;
+    if (playBtn) playBtn.textContent = "▶";
+    if (seekBar) seekBar.value = 0;
+  });
+
+  if (!audioBarEventsBound) {
+    audioBarEventsBound = true;
+
+    playBtn?.addEventListener("click", () => {
+      if (!globalAudio) return;
+      if (globalAudio.paused) {
+        globalAudio.play().then(() => {
+          isAudioPlaying = true;
+          if (playBtn) playBtn.textContent = "⏸";
+        }).catch(err => {
+          showToast("Ses oynatılamadı: " + err.message, "danger");
+        });
+      } else {
+        globalAudio.pause();
+        isAudioPlaying = false;
+        if (playBtn) playBtn.textContent = "▶";
+      }
+    });
+
+    seekBar?.addEventListener("input", (e) => {
+      if (!globalAudio || !globalAudio.duration) return;
+      const pct = parseFloat(e.target.value);
+      globalAudio.currentTime = (pct / 100) * globalAudio.duration;
+    });
+
+    muteBtn?.addEventListener("click", () => {
+      if (!globalAudio) return;
+      globalAudio.muted = !globalAudio.muted;
+      muteBtn.textContent = globalAudio.muted ? "🔇" : "🔊";
+    });
+
+    volumeBar?.addEventListener("input", (e) => {
+      if (!globalAudio) return;
+      globalAudio.volume = parseFloat(e.target.value) / 100;
+    });
+  }
 }
 
 

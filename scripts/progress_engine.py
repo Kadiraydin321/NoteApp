@@ -13,6 +13,12 @@ import re
 import json
 import subprocess
 import sys
+
+if sys.stdout.encoding != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent

@@ -1,6 +1,6 @@
 # 📌 Proje Durumu & Hafıza Kartı (PROJECT_STATE)
 
-**Son Güncelleme:** 2026-11-04 22:15
+**Son Güncelleme:** 2026-11-05 15:00
 **Aktif Sürüm / Durum:** v1.4.4 (versionCode 35) / Kararlı & Rust Native Masaüstü Mimarili
 **Teknoloji Yığını:** Rust Wry / Tauri (`desktop-native`), Kotlin Jetpack Compose Room SQLite (`app` Android), CameraX & ML Kit Barcode, Vanilla JS, CSS3 Glassmorphism
 
@@ -145,6 +145,7 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] Tam Kapsam & Özellik Eşitlemesi (v2.1): Android F15 Günün Notu (Daily Journal), Masaüstü Sağ Tık Bağlam Menüsü (`#noteContextMenu`), Etiket Yönetim Modalı (`#modalTagManager`) ve Ses Oynatıcı Çubuğu (`#audioPlayerBar`) tamamlandı. 296/296 test %100 yeşil, genel olgunluk skoru %100.0.
 - [x] Masaüstü UI/UX Parlatma & Hata Düzeltmeleri: 3-nokta menüsü koyu cam morfolojisi (dark glassmorphism, blur 16px) ve pointer-events koruması, 11 menü butonunun tam olay bağlantıları, Wi-Fi IP undefined:8765 çözümleme motoru ve sekme metin taşması ("K...") giderildi.
 - [x] Air-Gapped Optical Stream: Çevrimdışı animasyonlu QR akışı (15 FPS), parça sıralama, CRC32 sağlama doğrulaması ve çift yönlü optik aktarım test süiti (%100 yeşil) tamamlandı.
 - [x] Güvenlik & Antivirüs Temizliği: Şüpheli sezgisel (heuristic) ldflags bayrakları ve tarayıcı user-data-dir profil parametreleri kaldırılarak false-positive riskleri tamamen giderildi.
