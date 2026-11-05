@@ -24,7 +24,7 @@ if defined GO_BIN (
     if exist "desktop-native\go-engine\main.go" (
         echo [BİLGİ] Not Defterim ilk kez hazırlanıyor, lütfen bekleyin...
         if not exist "desktop-native\target\release\" mkdir "desktop-native\target\release" >nul 2>&1
-        "%GO_BIN%" build -ldflags "-H windowsgui -s -w" -o "desktop-native\target\release\notdefterim.exe" "desktop-native\go-engine\main.go"
+        "%GO_BIN%" build -o "desktop-native\target\release\notdefterim.exe" "desktop-native\go-engine\main.go"
         if exist "desktop-native\target\release\notdefterim.exe" (
             start "" "desktop-native\target\release\notdefterim.exe" %*
             exit /b 0

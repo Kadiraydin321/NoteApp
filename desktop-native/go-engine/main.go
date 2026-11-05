@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 	"net"
 	"net/http"
@@ -1598,12 +1599,9 @@ func main() {
 			edgePath := findEdgePath()
 
 			if edgePath != "" {
-				stickyProfile := filepath.Join(os.Getenv("APPDATA"), "NotDefterim", "StickyProfile")
-				_ = os.MkdirAll(stickyProfile, 0755)
 				stickyCmd := exec.Command(edgePath,
 					fmt.Sprintf("--app=%s", stickyURL),
 					"--window-size=380,440",
-					fmt.Sprintf("--user-data-dir=%s", stickyProfile),
 				)
 				go func() {
 					_ = stickyCmd.Start()
@@ -1625,30 +1623,27 @@ func main() {
 	})
 
 	server := &http.Server{Handler: mux}
+
+	// 6. Yerel Windows Edge App Modunu Asenkron Başlat
 	go func() {
-		_ = server.Serve(listener)
+		time.Sleep(150 * time.Millisecond)
+		edgePath := findEdgePath()
+		if edgePath != "" {
+			cmd := exec.Command(edgePath,
+				fmt.Sprintf("--app=%s", appURL),
+				"--window-size=1280,820",
+				"--app-id=NotDefterim",
+			)
+			_ = cmd.Start()
+		} else if runtime.GOOS == "windows" {
+			_ = exec.Command("cmd", "/c", "start", appURL).Start()
+		} else {
+			_ = exec.Command("xdg-open", appURL).Start()
+		}
 	}()
 
-	// 6. Yerel Windows Edge App Modunu Başlat
-	edgePath := findEdgePath()
-	var cmd *exec.Cmd
-
-	if edgePath != "" {
-		userDataDir := filepath.Join(os.Getenv("APPDATA"), "NotDefterim", "webview-profile")
-		_ = os.MkdirAll(userDataDir, 0755)
-		cmd = exec.Command(edgePath,
-			fmt.Sprintf("--app=%s", appURL),
-			fmt.Sprintf("--user-data-dir=%s", userDataDir),
-			"--window-size=1280,820",
-			"--app-id=NotDefterim",
-		)
-	} else if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", "start", appURL)
-	} else {
-		cmd = exec.Command("xdg-open", appURL)
-	}
-
-	if err := cmd.Run(); err != nil {
-		time.Sleep(1 * time.Second)
+	// Ana iş parçacığında HTTP sunucusunu bloklayıcı olarak çalıştır
+	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+		log.Printf("Sunucu kapandı: %v\n", err)
 	}
 }

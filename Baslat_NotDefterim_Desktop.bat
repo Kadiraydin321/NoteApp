@@ -72,7 +72,7 @@ if defined GO_BIN (
         color 0E
         echo [ISLEM] Go ile yerel native ikili derleniyor [notdefterim.exe]...
         if not exist "%~dp0desktop-native\target\release\" mkdir "%~dp0desktop-native\target\release" >nul 2>&1
-        call "%GO_BIN%" build -ldflags "-H windowsgui -s -w" -o "%~dp0desktop-native\target\release\notdefterim.exe" "%~dp0desktop-native\go-engine\main.go"
+        call "%GO_BIN%" build -o "%~dp0desktop-native\target\release\notdefterim.exe" "%~dp0desktop-native\go-engine\main.go"
         if exist "%~dp0desktop-native\target\release\notdefterim.exe" (
             color 0A
             echo [BASARILI] Native ikili uretildi, baslatiliyor...
@@ -150,7 +150,7 @@ if not exist "%~dp0desktop-native\go-engine\main.go" (
 
 echo [ISLEM] Go ile optimize edilmis yerel ikili derleniyor...
 if not exist "%~dp0desktop-native\target\release\" mkdir "%~dp0desktop-native\target\release" >nul 2>&1
-call "%GO_BIN%" build -ldflags "-H windowsgui -s -w" -o "%~dp0desktop-native\target\release\notdefterim.exe" "%~dp0desktop-native\go-engine\main.go"
+call "%GO_BIN%" build -o "%~dp0desktop-native\target\release\notdefterim.exe" "%~dp0desktop-native\go-engine\main.go"
 if %errorlevel% neq 0 (
     color 0C
     echo.
