@@ -771,6 +771,18 @@ class SettingsViewModel @Inject constructor(
         _syncUiState.value = _syncUiState.value.copy(message = null, isSuccess = null)
     }
 
+    fun disconnectSyncDesktop() {
+        activeSyncSession = null
+        _syncUiState.value = _syncUiState.value.copy(
+            isConnected = false,
+            serverStatus = null,
+            hasSession = false,
+            sessionExpiresAt = null,
+            message = null,
+            isSuccess = null
+        )
+    }
+
     private fun validSessionFor(host: String): SyncPairingSession? {
         val active = activeSyncSession ?: return null
         if (active.session.expiresAt <= System.currentTimeMillis() || syncOrigin(active.host) != syncOrigin(host)) {

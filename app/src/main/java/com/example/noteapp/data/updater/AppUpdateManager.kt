@@ -309,19 +309,11 @@ class AppUpdateManager @Inject constructor(
                 // Tag'den versiyon kodu ve ismi çıkar
                 val cleanTag = tagName.removePrefix("v").removePrefix("V")
                 val tagDigitsOnly = cleanTag.filter { it.isDigit() }
-                val parsedCode = when {
-                    tagDigitsOnly.isNotEmpty() && cleanTag.all { it.isDigit() } -> tagDigitsOnly.toIntOrNull() ?: 0
-                    cleanTag.contains(".") -> {
-                        // "1.3.1" -> 1*1000 + 3*10 + 1 veya benzeri, ya da BuildConfig.VERSION_CODE + 1
-                        val parts = cleanTag.split(".")
-                        if (parts.size >= 2) {
-                            val major = parts[0].toIntOrNull() ?: 1
-                            val minor = parts[1].toIntOrNull() ?: 0
-                            val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
-                            (major * 100) + (minor * 10) + patch
-                        } else BuildConfig.VERSION_CODE + 1
-                    }
-                    else -> BuildConfig.VERSION_CODE + 1
+                // Etiketten türetilen kod gerçek versionCode değildir; sürüm adı semantik karşılaştırılır.
+                val parsedCode = if (compareVersionNames(cleanTag, BuildConfig.VERSION_NAME) > 0) {
+                    BuildConfig.VERSION_CODE + 1
+                } else {
+                    BuildConfig.VERSION_CODE
                 }
 
                 // Assetler arasından APK dosyasını bul
@@ -338,7 +330,7 @@ class AppUpdateManager @Inject constructor(
                     }
                 }
 
-                if (parsedCode > 0 || tagName.isNotEmpty()) {
+                if (tagName.isNotEmpty()) {
                     CandidateRelease(
                         remoteVersionCode = parsedCode,
                         remoteVersionName = if (tagName.startsWith("v", ignoreCase = true)) tagName else "v$cleanTag",
@@ -388,6 +380,19 @@ class AppUpdateManager @Inject constructor(
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun compareVersionNames(a: String, b: String): Int {
+        fun parts(v: String) = v.trim().removePrefix("v").removePrefix("V")
+            .substringBefore('-').substringBefore('+')
+            .split('.').map { it.filter(Char::isDigit).toIntOrNull() ?: 0 }
+        val pa = parts(a)
+        val pb = parts(b)
+        for (i in 0 until maxOf(pa.size, pb.size)) {
+            val c = pa.getOrElse(i) { 0 }.compareTo(pb.getOrElse(i) { 0 })
+            if (c != 0) return c
+        }
+        return 0
     }
 
     private fun parseIso8601ToMillis(isoString: String): Long {

@@ -105,6 +105,20 @@ enum class ScannerMode {
     OPTICAL_STREAM     // Animasyonlu Optik Veri Akışı (Air-Gapped)
 }
 
+private class ScannerResources {
+    @Volatile var released = false
+    var executor: java.util.concurrent.ExecutorService? = null
+    var scanner: com.google.mlkit.vision.barcode.BarcodeScanner? = null
+    var provider: ProcessCameraProvider? = null
+
+    fun release() {
+        released = true
+        runCatching { provider?.unbindAll() }
+        runCatching { scanner?.close() }
+        executor?.shutdown()
+    }
+}
+
 enum class OpticalReceivePhase {
     SCANNING, NEED_PASSWORD, DECRYPTING, CONFIRM, IMPORTING, DONE
 }
@@ -144,6 +158,14 @@ fun OpticalQrScannerDialog(
     }
 
     var cameraInstance by remember { mutableStateOf<Camera?>(null) }
+    val scannerResources = remember { ScannerResources() }
+    var wifiPayloadHandled by remember { mutableStateOf(false) }
+    var wifiScanError by remember { mutableStateOf<String?>(null) }
+    var cameraError by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose { scannerResources.release() }
+    }
     var isTorchOn by remember { mutableStateOf(false) }
 
     // Optik Akış İlerleme Durumu
@@ -211,14 +233,23 @@ fun OpticalQrScannerDialog(
                         }
                         val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                         val cameraExecutor = Executors.newSingleThreadExecutor()
+                        scannerResources.executor = cameraExecutor
 
                         val barcodeScannerOptions = BarcodeScannerOptions.Builder()
                             .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
                             .build()
                         val barcodeScanner = BarcodeScanning.getClient(barcodeScannerOptions)
+                        scannerResources.scanner = barcodeScanner
 
                         cameraProviderFuture.addListener({
-                            val cameraProvider = cameraProviderFuture.get()
+                            val cameraProvider = try {
+                                cameraProviderFuture.get()
+                            } catch (e: Exception) {
+                                cameraError = "Kamera başlatılamadı. Uygulamayı yeniden açıp tekrar deneyin."
+                                return@addListener
+                            }
+                            if (scannerResources.released) return@addListener
+                            scannerResources.provider = cameraProvider
                             val preview = Preview.Builder().build().also {
                                 it.surfaceProvider = previewView.surfaceProvider
                             }
@@ -240,12 +271,16 @@ fun OpticalQrScannerDialog(
                                                     ScannerMode.WIFI_SYNC_PAIRING -> {
                                                         val payload = qrSyncManager.parseSyncPayload(rawValue)
                                                         if (payload != null) {
+                                                            if (wifiPayloadHandled) return@addOnSuccessListener
+                                                            wifiPayloadHandled = true
                                                             triggerVibration()
                                                             coroutineScope.launch(Dispatchers.Main) {
                                                                 onWifiSyncScanned(payload)
                                                                 onDismiss()
                                                             }
                                                             return@addOnSuccessListener
+                                                        } else {
+                                                            wifiScanError = "Bu QR kodu geçerli bir masaüstü eşleşme kodu değil veya süresi dolmuş. Masaüstündeki güncel kodu okutun."
                                                         }
                                                     }
 
@@ -304,7 +339,7 @@ fun OpticalQrScannerDialog(
                                 )
                                 cameraInstance = cam
                             } catch (e: Exception) {
-                                e.printStackTrace()
+                                cameraError = "Kamera açılamadı: ${e.localizedMessage ?: "bilinmeyen hata"}"
                             }
                         }, ContextCompat.getMainExecutor(ctx))
 
@@ -430,6 +465,14 @@ fun OpticalQrScannerDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
                             )
+                            (cameraError ?: wifiScanError)?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
 
                         ScannerMode.OPTICAL_STREAM -> {
