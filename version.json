@@ -1,8 +1,8 @@
 {
-  "versionCode": 35,
-  "versionName": "1.4.4",
-  "buildTime": 1730752000,
-  "releaseDate": "04.11.2026",
-  "changeLog": "v1.4.4: 3 nokta pop-up menü, gelişmiş araçlar pop-up'ı, TTS sesli okuma onarımı, yoga sesi temizliği ve kasa şifre optimizasyonu.",
+  "versionCode": 37,
+  "versionName": "1.5.0",
+  "buildTime": 1794042300,
+  "releaseDate": "06.11.2026",
+  "changeLog": "v1.5.0: F15 Günün Notu, Optik Kamera QR Senkronizasyonu, NoteLinkGraph Bilgi Grafiği, Şifreli Kasa ve Arama optimizasyonları.",
   "downloadUrl": "https://raw.githubusercontent.com/Kadiraydin321/NoteApp/apk/NoteApp-release.apk"
 }
