@@ -1,7 +1,7 @@
 # 📌 Proje Durumu & Hafıza Kartı (PROJECT_STATE)
 
-**Son Güncelleme:** 2026-11-05 15:00
-**Aktif Sürüm / Durum:** v1.4.5 (versionCode 36) / Kararlı & Rust Native Masaüstü Mimarili
+**Son Güncelleme:** 2026-11-06 10:30
+**Aktif Sürüm / Durum:** v1.5.0 (versionCode 37) / Kararlı & Rust Native Masaüstü Mimarili
 **Teknoloji Yığını:** Rust Wry / Tauri (`desktop-native`), Kotlin Jetpack Compose Room SQLite (`app` Android), CameraX & ML Kit Barcode, Vanilla JS, CSS3 Glassmorphism
 
 ---
@@ -151,6 +151,7 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] v1.5.0 (Android Sürüm Artırımı): Android sürümü versionCode: 37 ve versionName: "1.5.0" olarak güncellendi. F15 Günün Notu (Daily Journal), Optik Kamera QR Çevrimdışı Transfer Motoru (Air-gapped), NoteLinkGraph Canvas Bilgi Grafiği, Şifreli Kasa ve Arama optimizasyonları derlendi ve doğrulandı.
 - [x] Tam Kapsam & Özellik Eşitlemesi (v2.1): Android F15 Günün Notu (Daily Journal), Masaüstü Sağ Tık Bağlam Menüsü (`#noteContextMenu`), Etiket Yönetim Modalı (`#modalTagManager`) ve Ses Oynatıcı Çubuğu (`#audioPlayerBar`) tamamlandı. 296/296 test %100 yeşil, genel olgunluk skoru %100.0.
 - [x] Masaüstü UI/UX Parlatma & Hata Düzeltmeleri: 3-nokta menüsü koyu cam morfolojisi (dark glassmorphism, blur 16px) ve pointer-events koruması, 11 menü butonunun tam olay bağlantıları, Wi-Fi IP undefined:8765 çözümleme motoru ve sekme metin taşması ("K...") giderildi.
 - [x] Air-Gapped Optical Stream: Çevrimdışı animasyonlu QR akışı (15 FPS), parça sıralama, CRC32 sağlama doğrulaması ve çift yönlü optik aktarım test süiti (%100 yeşil) tamamlandı.

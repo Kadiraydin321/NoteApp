@@ -41,3 +41,7 @@ test_tmp_*/
 __pycache__/
 *.pyc
 *.pyo
+
+# Tool outputs
+graphify-out/
+**/graphify-out/
