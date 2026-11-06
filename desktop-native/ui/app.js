@@ -2760,7 +2760,7 @@ function exportCurrentNoteToVaultFile() {
   }
 
   const exportData = {
-    version: "1.4.4",
+    version: "1.5.0",
     exportedAt: Date.now(),
     type: "notdefterim_vault_note",
     note: {

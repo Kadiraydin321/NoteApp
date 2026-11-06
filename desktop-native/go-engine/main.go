@@ -791,7 +791,7 @@ func startUDPDiscoveryResponder(httpPort int, syncState *SyncState, mu *sync.Mut
 			respPayload := map[string]interface{}{
 				"status":      "ok",
 				"appName":     "NotDefterim Masaüstü",
-				"version":     "1.4.4",
+				"version":     "1.5.0",
 				"ip":          localIP,
 				"localIp":     localIP,
 				"local_ip":    localIP,
@@ -978,7 +978,7 @@ func main() {
 		resp := map[string]interface{}{
 			"status":      "ok",
 			"appName":     "NotDefterim Masaüstü",
-			"version":     "1.4.4",
+			"version":     "1.5.0",
 			"notesCount":  count,
 			"port":        port,
 			"requiresPin": true,

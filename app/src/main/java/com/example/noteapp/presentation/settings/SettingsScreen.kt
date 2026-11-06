@@ -180,7 +180,7 @@ fun SettingsScreen(
             !updateUiState.isDownloading &&
             updateUiState.hasShownDialogForVersion != status.remoteVersionCode
         ) {
-            showUpdateDetailsDialog = true
+            // showUpdateDetailsDialog = true // Otomatik popup engellendi, Hakkında kartından manuel açılır
             onMarkDialogShown(status.remoteVersionCode)
         }
     }
@@ -2952,7 +2952,11 @@ fun SettingsScreen(
     if (showUpdateDetailsDialog && activeUpdateInfo != null) {
         val status = activeUpdateInfo
         AlertDialog(
-            onDismissRequest = { showUpdateDetailsDialog = false },
+            onDismissRequest = { 
+                showUpdateDetailsDialog = false
+                onMarkDialogShown(status.remoteVersionCode)
+                onDismissUpdateStatus()
+            },
             icon = {
                 Icon(
                     Icons.Default.CloudDownload,
@@ -3018,7 +3022,11 @@ fun SettingsScreen(
             },
             dismissButton = {
                 OutlinedButton(
-                    onClick = { showUpdateDetailsDialog = false },
+                    onClick = {
+                        showUpdateDetailsDialog = false
+                        onMarkDialogShown(status.remoteVersionCode)
+                        onDismissUpdateStatus()
+                    },
                     modifier = Modifier.heightIn(min = 44.dp)
                 ) {
                     Text("Daha Sonra")

@@ -151,6 +151,7 @@
 ---
 
 ## 5. ⚠️ Bilinen Durumlar ve Gelecek Yol Haritası (Backlog / TODO)
+- [x] v1.5.0 Güncelleme Motoru & UX Düzeltmesi: Sürekli 1.4.4 güncelleme uyarısı ve RAM sıfırlanma sorunu giderildi; SharedPreferences ile kalıcı gösterim kontrolü, eski APK indirme koruması, SettingsScreen'de isteğe bağlı modal açılışı ve masaüstü sürüm metinlerinin 1.5.0 ile eşitlenmesi sağlandı. Release APK (4.52 MB) üretildi ve dağıtıldı.
 - [x] v1.5.0 (Android Sürüm Artırımı): Android sürümü versionCode: 37 ve versionName: "1.5.0" olarak güncellendi. F15 Günün Notu (Daily Journal), Optik Kamera QR Çevrimdışı Transfer Motoru (Air-gapped), NoteLinkGraph Canvas Bilgi Grafiği, Şifreli Kasa ve Arama optimizasyonları derlendi ve doğrulandı.
 - [x] Tam Kapsam & Özellik Eşitlemesi (v2.1): Android F15 Günün Notu (Daily Journal), Masaüstü Sağ Tık Bağlam Menüsü (`#noteContextMenu`), Etiket Yönetim Modalı (`#modalTagManager`) ve Ses Oynatıcı Çubuğu (`#audioPlayerBar`) tamamlandı. 296/296 test %100 yeşil, genel olgunluk skoru %100.0.
 - [x] Masaüstü UI/UX Parlatma & Hata Düzeltmeleri: 3-nokta menüsü koyu cam morfolojisi (dark glassmorphism, blur 16px) ve pointer-events koruması, 11 menü butonunun tam olay bağlantıları, Wi-Fi IP undefined:8765 çözümleme motoru ve sekme metin taşması ("K...") giderildi.

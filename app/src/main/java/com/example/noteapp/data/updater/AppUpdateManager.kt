@@ -96,9 +96,18 @@ class AppUpdateManager @Inject constructor(
     var lastAvailableUpdate: UpdateStatus.UpdateAvailable? = null
         private set
 
-    // Bu oturumda hangi sürüm için popup gösterildiğini takip eder (tekrar tekrar popup açılmasını önler)
-    var hasShownDialogForVersion: Int? = null
-        private set
+    // Bu oturumda ve sonraki oturumlarda hangi sürüm için popup gösterildiğini SharedPreferences ile kalıcı takip eder
+    private val prefs = context.getSharedPreferences("app_update_prefs", Context.MODE_PRIVATE)
+
+    var hasShownDialogForVersion: Int?
+        get() = prefs.getInt("shown_dialog_version", -1).takeIf { it != -1 }
+        private set(value) {
+            if (value != null) {
+                prefs.edit().putInt("shown_dialog_version", value).apply()
+            } else {
+                prefs.edit().remove("shown_dialog_version").apply()
+            }
+        }
 
     fun markDialogShown(versionCode: Int) {
         hasShownDialogForVersion = versionCode
@@ -492,6 +501,16 @@ class AppUpdateManager @Inject constructor(
             }
 
             if (downloadSuccess && apkFile.exists()) {
+                val pkgInfo = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+                val archiveVersionCode = if (pkgInfo != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pkgInfo.longVersionCode.toInt() else @Suppress("DEPRECATION") pkgInfo.versionCode
+                } else 0
+
+                if (archiveVersionCode <= BuildConfig.VERSION_CODE) {
+                    apkFile.delete()
+                    _updateStatus.value = UpdateStatus.Error("İndirilen APK sunucuda henüz yeni sürüme güncellenmemiş. Lütfen daha sonra tekrar deneyin.")
+                    return@launch
+                }
                 val readyStatus = UpdateStatus.ReadyToInstall(apkFile)
                 _updateStatus.value = readyStatus
 
